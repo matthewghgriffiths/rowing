@@ -40,10 +40,15 @@ def get_worldrowing_data(*endpoints, **kwargs):
     return r.json()['data']
 
 
+def get_worldrowing_record(*endpoints, **kwargs):
+    data = get_worldrowing_data(*endpoints, **kwargs)
+    return pd.Series(data, name=data.pop('id'))
+
+
 def get_worldrowing_records(*endpoints, **kwargs):
     records =  pd.DataFrame.from_records(
         get_worldrowing_data(*endpoints, **kwargs)
-    )
+    ).set_index('id')
     for col in records.columns:
         if 'Date' in col:
             dates = pd.to_datetime(records[col])
@@ -52,10 +57,32 @@ def get_worldrowing_records(*endpoints, **kwargs):
     
     return records
 
-
-
 cached_worldrowing_data = lru_cache(get_worldrowing_data)
 cached_worldrowing_records = lru_cache(get_worldrowing_records)
+
+def get_competition_events(competition_id):
+    return cached_worldrowing_records(
+        'event', 
+        filter=(
+            ('competitionId', competition_id),
+        ), 
+        sort=(
+            ('eventId', 'asc'),
+            ('Date', 'asc')
+        )
+    )
+
+def get_competition_races(competition_id):
+    return cached_worldrowing_records(
+        'race', 
+        filter=(
+            ('event.competitionId', competition_id),
+        ), 
+        sort=(
+            ('eventId', 'asc'),
+            ('Date', 'asc')
+        )
+    )
 
 @lru_cache
 def get_competitions(year=None, fisa=True, **kwargs):
@@ -91,12 +118,16 @@ def get_venues():
     
 
 WBT_RECORDS = {
-    'Date': ('DateOfBT',), 
     'BoatClass': ('BoatClass',),
-    'Venue': ('Venue', 'Name'),
+    'ResultTime': ('Competitor', 'ResultTime'),
     'Competition': ('Competition', 'Name'),
+    'Venue': ('Venue', 'Name'),
+    'Event': ('Event', 'DisplayName'),
+    'EventId': ('Event', 'Id'),
     'Race': ('Race', 'Name'),
+    'RaceId': ('Race', 'Id'),
     'Country': ('Competitor', 'Nationality', 'Name'),
+    'Date': ('DateOfBT',), 
 }
 
 def _extract_wbt_record(record):
@@ -106,7 +137,7 @@ def _extract_wbt_record(record):
     }
 
 @lru_cache
-def load_world_best_times(json_url):
+def load_competition_best_times(json_url):
     return pd.DataFrame.from_records(
         map(
             _extract_wbt_record, 
@@ -115,20 +146,53 @@ def load_world_best_times(json_url):
     )
     
 @lru_cache
-def get_world_best_times():
-    wbt_stats = get_worldrowing_records(
+def get_competition_best_times():
+    wbt_stats = cached_worldrowing_records(
         'statistic', 
-        filter={'Category': 'WBT'}
+        filter=(('Category', 'WBT'),)
     )
     wbts, _ = map_concurrent(
-        load_world_best_times, 
+        load_competition_best_times, 
         dict(zip(wbt_stats.description, zip(wbt_stats.url))),
         show_progress=False, 
     )
-    wbts = pd.concat(wbts, names=['Description'])\
+    wbts = pd.concat(wbts, names=['CompetitionType'])\
         .reset_index(0)\
         .reset_index(drop=True)
-    wbts.Description = wbts.Description.str.extract(
+    wbts.CompetitionType = wbts.CompetitionType.str.extract(
         r": ([a-zA-Z]+)"
     )
+    wbts.ResultTime = pd.to_timedelta(wbts.ResultTime)
     return wbts
+
+def get_world_best_times():
+    return get_competition_best_times().\
+        sort_values('ResultTime').\
+        groupby('BoatClass').\
+        first()
+
+def find_world_best_time(
+        boat_class=None, 
+        event=None, 
+        race=None, 
+        race_id=None, 
+):
+    if boat_class is None:
+        if event is None:
+            if race is None:
+                if race_id is None:
+                    raise ValueError(
+                        'must pass at least one of '
+                        'boat_class, event, race or race_id'
+                        )
+                race = get_worldrowing_data(
+                    'race', race_id
+                )
+            event = get_worldrowing_data(
+                'event', race['eventId']
+            )
+        boat_class = get_worldrowing_data(
+            'boatClass', event['boatClassId']
+        )['DisplayName']
+
+    return get_world_best_times().loc[boat_class]

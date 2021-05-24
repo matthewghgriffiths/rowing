@@ -2,10 +2,11 @@
 import numpy as np
 import pandas as pd
 
-from .api import get_worldrowing_data
+from .api import get_worldrowing_data, find_world_best_time
 
-def get_race_livetracker(race_id):
+def get_race_livetracker(race_id, gmt=None, race_distance=2000):
     data = get_worldrowing_data('livetracker', race_id)
+    gmt = gmt or find_world_best_time(race_id=race_id).ResultTime.total_seconds()
 
     lane_boat = {
         lane['Lane']: lane for lane in data['config']['lanes']
@@ -33,8 +34,6 @@ def get_race_livetracker(race_id):
             cnt = lane_cnt[tracker['startPosition']]
             for key, live_data in live_boat_data.items():
                 live_data[cnt].append(tracker[key])
-
-
 
     maxlen = max(
         max(map(len, live_data.values()))
@@ -68,7 +67,60 @@ def get_race_livetracker(race_id):
     for col in boat_times:
         live_boat_data['time', col] = boat_times[col].cumsum()
 
+    
+    gmt_speed = race_distance / gmt
+    countries = live_boat_data.time.columns
+    for cnt in countries:
+        live_boat_data['GMT', cnt] = \
+            live_boat_data.distanceTravelled[cnt]/gmt_speed
+    for cnt in countries:
+        live_boat_data['PGMT', cnt] = \
+            live_boat_data.GMT[cnt] / live_boat_data.time[cnt]
+
+
     return live_boat_data
     
     
-    
+def plot_livedata(live_data):
+    import matplotlib.pyplot as plt
+
+    f, axes = plt.subplots(3, figsize=(10, 8), sharex=True)
+    countries = live_data.time.columns
+    lines = [[] for _ in range(3)]
+    for c in countries:
+        lines[0].extend(
+            axes[0].plot(
+            live_data.distanceTravelled[c], 
+            live_data.PGMT[c], 
+            label=c
+            )
+        )
+        lines[1].extend(
+            axes[1].plot(
+                live_data.distanceTravelled[c], 
+                live_data.metrePerSecond[c], 
+                label=c
+            )
+        )
+        lines[2].extend(
+            axes[2].plot(
+                live_data.distanceTravelled[c], 
+                live_data.strokeRate[c], 
+                label=c
+            )
+        )
+
+    axes[2].set_ylim(25, 55)
+    axes[2].set_xlim(0, 2000)
+    axes[0].set_ylabel('PGMT')
+    axes[1].set_ylabel('m/s')
+    axes[2].set_ylabel('stroke rate')
+    axes[2].set_xlabel('Distance')
+    axes[0].legend(
+        bbox_to_anchor=(0., 1.02, 1., .152), 
+        loc='upper left', 
+        ncol=len(countries),
+        mode="expand", 
+        borderaxespad=0.)
+
+    return f, axes, lines
