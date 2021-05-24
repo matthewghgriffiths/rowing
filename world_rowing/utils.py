@@ -113,6 +113,12 @@ def getnesteditem(container, *items):
     return value
 
 
+def extract_fields(record, fields):
+    return {
+        k: getnesteditem(record, *items) for k, items in fields.items()
+    }
+
+
 class DictSubset(UserDict):
     def __init__(self, parent, /, subset=(), **kwargs):
         self.parent = parent

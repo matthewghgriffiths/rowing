@@ -1,14 +1,47 @@
 
 import numpy as np
 import pandas as pd
+from pandas.core.construction import extract_array
 
-from .api import get_worldrowing_data, find_world_best_time
+from .api import get_worldrowing_data, find_world_best_time, INTERMEDIATE_FIELDS
+from .utils import extract_fields
+
+RESULTS_FIELDS = {
+    'id': ('id',),
+    'boatId': ('boatId',),
+    'countryId': ('countryId',),
+    'worldBestTimeId': ('worldBestTimeId',),
+    'raceId': ('raceId',),
+    'DisplayName': ('DisplayName',),
+    'Rank': ('Rank',),
+    'Lane': ('Lane',),
+    'WorldCupPoints': ('WorldCupPoints',),
+    'InvalidMarkResult': ('InvalidMarkResult',),
+    'Remark': ('Remark',),
+    'ResultTime': ('ResultTime',),
+    # 'raceBoatIntermediates': ('raceBoatIntermediates',),
+}
 
 def get_race_livetracker(race_id, gmt=None, cached=True, race_distance=2000):
     data = get_worldrowing_data('livetracker', race_id, cached=cached)
     has_livedata = data and data['live']
     if not has_livedata:
         return pd.DataFrame([])
+
+    results = pd.DataFrame.from_records(
+        extract_fields(result, RESULTS_FIELDS)
+        for result in data['intermediates'] if result['ResultTime']
+    )
+    results.ResultTime = pd.to_timedelta(results.ResultTime)
+    intermediates = pd.DataFrame.from_records(
+        extract_fields(inter, INTERMEDIATE_FIELDS)
+        for result in data['intermediates'] if result['ResultTime']
+        for inter in sorted(
+            result['raceBoatIntermediates'],
+            key=lambda x: x['ResultTime']
+        )
+    )
+    intermediates.ResultTime = pd.to_timedelta(intermediates.ResultTime)
 
     gmt = gmt or find_world_best_time(
         race_id=race_id
@@ -84,7 +117,7 @@ def get_race_livetracker(race_id, gmt=None, cached=True, race_distance=2000):
             live_boat_data.GMT[cnt] / live_boat_data.time[cnt]
 
 
-    return live_boat_data
+    return live_boat_data, results, intermediates
     
     
 def plot_livedata(live_data):

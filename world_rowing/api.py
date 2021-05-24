@@ -7,7 +7,7 @@ from collections.abc import Mapping
 import pandas as pd
 import requests
 
-from .utils import getnesteditem, map_concurrent
+from .utils import getnesteditem, extract_fields, map_concurrent
 
 def stringify_value(value):
     if isinstance(value, (str, int, float)):
@@ -147,10 +147,6 @@ RACEBOAT_FIELDS = {
     'Lane': ('Lane',),
     'ResultTime': ('ResultTime',),
 }
-def _extract(record, fields):
-    return {
-        k: getnesteditem(record, *items) for k, items in fields.items()
-    }
 
 def get_race_results(
         race_id=None, 
@@ -175,7 +171,7 @@ def get_race_results(
         **kwargs
     )
     results = pd.DataFrame.from_records([
-        _extract(boat, RACEBOAT_FIELDS)
+        extract_fields(boat, RACEBOAT_FIELDS)
         for race in race_data for boat in race['raceBoats']
         if boat['ResultTime']
     ])
@@ -184,10 +180,10 @@ def get_race_results(
         results.ResultTime = pd.to_timedelta(results.ResultTime)
     return results
 
-RACEINTERMEDIATE_FIELDS = {
+INTERMEDIATE_FIELDS = {
     'id': ('id',),
     # 'raceId': 'raceId',
-    'boatId': ('raceBoatId',),
+    'raceBoatId': ('raceBoatId',),
     'Rank': ('Rank',),
     'ResultTime': ('ResultTime',),
     'distanceId': ('distanceId',),
@@ -208,7 +204,7 @@ def get_intermediate_results(
         filters += ('eventId', event_id),
     if competition_id:
         filters += ('event.competitionId', competition_id),
-        
+
     race_data = get_worldrowing_data(
         'race', 
         cached=cached, 
@@ -216,16 +212,19 @@ def get_intermediate_results(
         include='raceBoats.raceBoatIntermediates.distance',
         **kwargs
     )
-    race_fields = RACEBOAT_FIELDS.copy()
-    race_fields['raceBoatId'] = race_fields.pop('id')
+    # race_fields = RACEBOAT_FIELDS.copy()
+    # race_fields['raceBoatId'] = race_fields.pop('id')
     results = pd.DataFrame.from_records([
         {
-            **_extract(boat, race_fields), 
-            **_extract(inter, RACEINTERMEDIATE_FIELDS)
+            **extract_fields(boat, RACEBOAT_FIELDS), 
+            **extract_fields(inter, INTERMEDIATE_FIELDS)
         }
         for race in race_data 
         for boat in race['raceBoats'] if boat['ResultTime']
-        for inter in boat['raceBoatIntermediates']
+        for inter in sorted(
+            boat['raceBoatIntermediates'],
+            key=lambda x: x['ResultTime']
+        )
     ])
     
     if len(results):
@@ -258,7 +257,7 @@ def _extract_wbt_record(record):
 @lru_cache
 def load_competition_best_times(json_url):
     return pd.DataFrame.from_records(
-        _extract(record, WBT_RECORDS)
+        extract_fields(record, WBT_RECORDS)
         for record in requests.get(json_url).json()['BestTimes']
     )
     
