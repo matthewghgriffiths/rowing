@@ -23,7 +23,7 @@ def map_concurrent(
     """
     This function is equalivant to calling,
 
-    >>> output = {k, func(*args, **kwargs) for k, args in inputs.items()}
+    >>> output = {k: func(*args, **kwargs) for k, args in inputs.items()}
 
     except that the function is called using either `ThreadPoolExecutor` 
     if `threaded=True` or a `ProcessPoolExecutor` otherwise.

@@ -4,9 +4,15 @@ import pandas as pd
 
 from .api import get_worldrowing_data, find_world_best_time
 
-def get_race_livetracker(race_id, gmt=None, race_distance=2000):
-    data = get_worldrowing_data('livetracker', race_id)
-    gmt = gmt or find_world_best_time(race_id=race_id).ResultTime.total_seconds()
+def get_race_livetracker(race_id, gmt=None, cached=True, race_distance=2000):
+    data = get_worldrowing_data('livetracker', race_id, cached=cached)
+    has_livedata = data and data['live']
+    if not has_livedata:
+        return pd.DataFrame([])
+
+    gmt = gmt or find_world_best_time(
+        race_id=race_id
+    ).ResultTime.total_seconds()
 
     lane_boat = {
         lane['Lane']: lane for lane in data['config']['lanes']
