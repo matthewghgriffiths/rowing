@@ -119,6 +119,30 @@ def extract_fields(record, fields):
     }
 
 
+def merge(dfs, **kwargs):
+    import pandas as pd
+    left = dfs[0]
+    n = len(dfs[1:])
+    def iterate(val):
+        if isinstance(val, tuple):
+            return iter(val)
+        else:
+            return (val for _ in range(n))
+        
+    iter_kwargs = {k: iterate(val) for k, val in kwargs.items()}
+        
+    for right in dfs[1:]:
+        left = pd.merge(
+            left, right, 
+            **{
+                k: next(val) 
+                for k, val in iter_kwargs.items()
+            }
+        )
+        
+    return left
+
+
 class DictSubset(UserDict):
     def __init__(self, parent, /, subset=(), **kwargs):
         self.parent = parent
