@@ -147,7 +147,6 @@ def parse_livetracker_results(data):
         extract_fields(result, RESULTS_FIELDS)
         for result in data['intermediates'] if result['ResultTime']
     )
-    results.ResultTime = pd.to_timedelta(results.ResultTime)
     intermediates = pd.DataFrame.from_records(
         extract_fields(inter, INTERMEDIATE_FIELDS)
         for result in data['intermediates'] if result['ResultTime']
@@ -156,7 +155,10 @@ def parse_livetracker_results(data):
             key=lambda x: x['ResultTime']
         )
     )
-    intermediates.ResultTime = pd.to_timedelta(intermediates.ResultTime)
+    if 'ResultTime' in results.columns:
+        results.ResultTime = pd.to_timedelta(results.ResultTime)
+    if 'ResultTime' in intermediates.columns:
+        intermediates.ResultTime = pd.to_timedelta(intermediates.ResultTime)
     return results, intermediates
 
 
