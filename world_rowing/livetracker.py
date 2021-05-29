@@ -155,10 +155,13 @@ def parse_livetracker_results(data):
             key=lambda x: x['ResultTime']
         )
     )
-    if 'ResultTime' in results.columns:
-        results.ResultTime = pd.to_timedelta(results.ResultTime)
-    if 'ResultTime' in intermediates.columns:
-        intermediates.ResultTime = pd.to_timedelta(intermediates.ResultTime)
+    for df in [results, intermediates]:
+        if 'ResultTime' in df.columns:
+            minfmt = df.ResultTime.str.match(
+                r"[0-9]+:[0-9][0-9]\.[0-9]")
+            df.loc[minfmt, 'ResultTime'] = "0:" + df.ResultTime[minfmt]
+            df.loc[:, 'ResultTime'] = pd.to_timedelta(df.ResultTime)
+
     return results, intermediates
 
 
