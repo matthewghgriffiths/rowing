@@ -9,6 +9,11 @@ import requests
 
 from .utils import getnesteditem, extract_fields, map_concurrent
 
+OLYMPIC_BOATCLASS = [
+    'M1x', 'LM2x', 'W1x', 'M2x', 'M2-', 'LW2x', 'M4-',
+    'W1x', 'W2x', 'W2-', 'M4x', 'M8+', 'W4x', 'W8+', 'W4-',
+]
+
 def stringify_value(value):
     if isinstance(value, (str, int, float)):
         return str(value)
@@ -173,11 +178,12 @@ def get_race_results(
     results = pd.DataFrame.from_records([
         extract_fields(boat, RACEBOAT_FIELDS)
         for race in race_data for boat in race['raceBoats']
-        if boat['ResultTime']
+        # if boat['ResultTime']
     ])
     if len(results):
         results.set_index(['raceId', 'id'], inplace=True)
-        results.ResultTime = pd.to_timedelta(results.ResultTime)
+        if 'ResultTime' in results.columns:
+            results.ResultTime = pd.to_timedelta(results.ResultTime)
     return results
 
 INTERMEDIATE_FIELDS = {

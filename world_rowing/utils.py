@@ -1,5 +1,6 @@
 
 from collections import UserDict, abc
+from datetime import timedelta
 import logging
 from typing import Callable, Dict, TypeVar, Tuple, Any
 from contextlib import nullcontext
@@ -7,6 +8,44 @@ from concurrent.futures import (
     ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 )
 
+from scipy.special import erf
+
+def Phi(z):
+    sq2 = 1.4142135623730951
+    return 1/2 + erf(z/sq2)/2
+
+def format_totalseconds(seconds, hundreths=True):
+    return format_timedelta(timedelta(seconds=seconds), hundreths=hundreths)
+
+def format_timedelta(td, hundreths=True):
+    mins = td.seconds // 60
+    secs = td.seconds - mins * 60
+    end = f".{(td.microseconds // 10_000):02d}" if hundreths else ''
+    return f"{mins}:{secs:02d}{end}"
+
+def format_yaxis_splits(ax=None, ticks=True):
+    format_axis_splits(ax=ax, yticks=ticks)
+
+def format_xaxis_splits(ax=None, ticks=True):
+    format_axis_splits(ax=ax, yticks=False, xticks=ticks)
+
+def format_axis_splits(ax=None, yticks=True, xticks=False):
+    import matplotlib.pyplot as plt
+    ax = ax or plt.gca()
+    if yticks:
+        if yticks is True:
+            yticks = ax.get_yticks()
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(
+            [format_totalseconds(s, False) for s in yticks]
+        )
+    if xticks:
+        if xticks is True:
+            xticks = ax.get_xticks()
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(
+            [format_totalseconds(s, False) for s in xticks]
+        )
 
 K = TypeVar("K")
 A = TypeVar('A')
@@ -132,13 +171,10 @@ def merge(dfs, **kwargs):
     iter_kwargs = {k: iterate(val) for k, val in kwargs.items()}
         
     for right in dfs[1:]:
-        left = pd.merge(
-            left, right, 
-            **{
-                k: next(val) 
-                for k, val in iter_kwargs.items()
-            }
-        )
+        kws = {
+            k: next(val) for k, val in iter_kwargs.items()
+        }
+        left = pd.merge(left, right, **kws)
         
     return left
 
