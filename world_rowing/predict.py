@@ -8,14 +8,15 @@ import pandas as pd
 from scipy import linalg, integrate, stats
 
 from . import api, utils, livetracker
+from .livetracker import RaceTracker
 
 def calc_win_probs(times, std):
     diffs = times.min() - times.values 
 
     def func(x):
-        logcdf = -stats.norm.logcdf((x - diffs), loc=std)
+        logcdf = -stats.norm.logcdf((x - diffs), scale=std)
         logcdf -= logcdf.sum()
-        logp = stats.norm.logpdf((x - diffs), loc=std)
+        logp = stats.norm.logpdf((x - diffs), scale=std)
         return np.exp(logp + logcdf)
 
     win_prob, err = integrate.quad_vec(
@@ -23,6 +24,22 @@ def calc_win_probs(times, std):
     )
     win_prob /= win_prob.sum()
     return pd.Series(win_prob, index=times.index)
+
+
+def estimate_distance_from_leader(pred_times):
+    leader_times = pred_times.min(axis=1)
+    return pd.DataFrame(
+        np.vstack([
+            np.interp(
+                leader_times,
+                pred_times[cnt],
+                leader_times.index, 
+            )
+            for cnt in pred_times.columns
+        ]).T,
+        columns=pred_times.columns,
+        index=leader_times.index
+    )
 
 
 class PredictRace:
@@ -61,6 +78,36 @@ class PredictRace:
         # cached inverses
         self.pace_predicters = {}
         self.pred_pace_covs = {}
+
+    def calc_distance_data(self, live_data):
+        distances = self.distances
+        columns = [
+            'distanceFromLeader', 'strokeRate', 
+            'metrePerSecond', 'PGMT'
+        ]
+        dist_travelled = live_data.distanceTravelled
+        boat_lims = {
+            cnt: dist_travelled[cnt].searchsorted(distances[-1]) + 1
+            for cnt in dist_travelled.columns
+        }
+        parse_cols = live_data[columns].columns
+        live_dist_data = pd.DataFrame(
+            np.vstack(
+                [
+                    np.interp(
+                        distances, 
+                        dist_travelled.loc[:boat_lims[cnt], cnt],
+                        live_data.loc[:boat_lims[cnt], (col, cnt)],
+                        right=np.nan
+                    )
+                    for (col, cnt) in parse_cols
+                ]
+            ).T,
+            columns=parse_cols,
+            index=distances
+        )
+        live_dist_data
+        return live_dist_data
 
     def calc_boat_times(self, live_data):
         distances = self.distances 
@@ -140,13 +187,39 @@ class PredictRace:
         return self.pred_pace_covs[distance]
     
     def predict_pace(self, race_pace, distance=None):
-        distance = distance or race_pace.index[-1]
-        pace_predictor = self.get_linear_pace_predicter(distance)
-        pred_pace = pace_predictor.dot(race_pace.loc[:distance])
-        pred_pace_cov = self.get_pred_pace_cov(distance)
-        return pred_pace, pred_pace_cov
+        if distance:
+            pace_predictor = self.get_linear_pace_predicter(distance)
+            pred_pace = pace_predictor.dot(race_pace.loc[:distance])
+            pred_pace_cov = self.get_pred_pace_cov(distance)
+            return pred_pace, pred_pace_cov
+        else:
+            pred_pace = {}
+            pred_pace_cov = {}
+            for cnt, cnt_pace in race_pace.items():
+                distance = cnt_pace.index[cnt_pace.notna()][-1]
+                pace_predictor = self.get_linear_pace_predicter(distance)
+                pred_pace[cnt] = pace_predictor.dot(cnt_pace.loc[:distance])
+                pred_pace_cov[cnt] = self.get_pred_pace_cov(distance)
+                
+            return pd.DataFrame(pred_pace), pd.concat(pred_pace_cov, axis=1)
+
+    def predict_pace_times(self, race_pace, distance=None):
+        pred_pace, pred_pace_cov = self.predict_pace(
+            race_pace, distance)
+
+        M = self.pace_time_M
+        pred_times = M.dot(pred_pace)
+        if distance:
+            pred_time_cov = M.dot(pred_pace_cov.dot(M.T))
+        else:
+            pred_time_cov = pd.concat({
+                cnt: M.dot(pred_pace_cov[cnt].dot(M.T))
+                for cnt in pred_times.columns
+            })
+        
+        return (pred_pace, pred_pace_cov), (pred_times, pred_time_cov)
     
-    def predict_time(
+    def predict_times(
             self, race_pace, distance=None, 
             pred_pace=None, pred_pace_cov=None
     ):
@@ -173,151 +246,84 @@ class PredictRace:
         pred_finish_cov = v.dot(pred_pace_cov.dot(v))
         return pred_finish, pred_finish_cov
  
-        
 
-class RaceTracker:
-    def __init__(
-            self, race_id,
-            predicter=None,
-            gmt=None,  
-            colors=None, 
-            live_data=None, 
-            results=None, 
-            intermediates=None,
+
+class LivePrediction(RaceTracker):
+    def __init__( 
+        self, race_id, 
+        predicter: PredictRace, 
+        **kwargs
     ):
-        self.race_id = race_id
-        
+        super().__init__(race_id, **kwargs)
         self.predicter = predicter
-        self.gmt = gmt or api.find_world_best_time(
-            race_id=race_id
-        ).ResultTime.total_seconds()   
-        
-        self.colors = \
-            colors or plt.rcParams['axes.prop_cycle'].by_key()['color']
-        
-        self.live_data = live_data 
-        self.results = results
-        self.intermediates = intermediates
-        
-    @property
-    def final_results(self):
-        if self.results is not None:
-            final_results = self.results.set_index(
-                'DisplayName'
-            ).ResultTime.dt.total_seconds().sort_values()
-            final_results.index.name = 'country'
-            return final_results
-    
-    @property
-    def intermediate_results(self):
-        if self.intermediates is not None:
-            intermediate_results = pd.merge(
-                self.intermediates[
-                    ['raceBoatId', 'distance', 'ResultTime']
-                ], 
-                self.results[
-                    ['id', 'DisplayName']],
-                left_on='raceBoatId', 
-                right_on='id', 
-                how='left'
-            ).set_index(
-                ['DisplayName', 'distance']
-            ).ResultTime.dt.total_seconds().unstack()
-            distance_strs = intermediate_results.columns
-            distances = pd.Series(
-                distance_strs.str.extract(
-                    r"([0-9]+)"
-                )[0].astype(int).values,
-                index=distance_strs,
-                name='distance'
-            ).sort_values()
-            intermediate_results = intermediate_results[distances.index]
-            intermediate_results.columns = distances
-            intermediate_results.index.name = 'country'
-            return intermediate_results
-        
-    @cached_property
-    def race_details(self):
-        return api.get_worldrowing_record('race', self.race_id)
-    
-    @cached_property
-    def race_boats(self):
-        return api.get_race_results(race_id=self.race_id).reset_index()
-    
-    @cached_property
-    def countries(self):
-        return self.race_boats.Country
+        self.pace_preds = {}
+        self.time_preds = {}
+        self.finish_preds = {}
+        self.win_preds = {}
 
-    @property
-    def country_colors(self):
-        return dict(zip(self.countries, self.colors))
-    
-    @cached_property
-    def event_id(self):
-        return self.race_details.eventId
-    
-    @cached_property
-    def event_details(self):
-        return api.get_worldrowing_record('event', self.event_id)
-    
-    @cached_property
-    def competition_id(self):
-        return self.event_details.competitionId
-    
-    @cached_property
-    def competition_details(self):
-        return api.get_worldrowing_record(
-            'competition', self.competition_id)
-    
     def update_livedata(self):
-        self.live_data, self.results, self.intermediates = \
-            livetracker.get_race_livetracker(
-                self.race_id, 
-                gmt=self.gmt,
-                race_distance=self.race_distance,
-                cached=False,
+        super().update_livedata()
+        self.race_pace = self.predicter.calc_boat_pace(
+            self.live_data
         )
-        
-    def plot(self, distance, y, ax=None, maxdistance=None, **kwargs):
-        import matplotlib.pyplot as plt
-        ax = ax or plt.gca()
-        lines = {}
-        for cnt in y.columns:
-            lines[cnt] =  ax.plot(
-                distance[cnt], 
-                y[cnt], 
-                label=cnt, 
-                color=self.country_colors[cnt], 
-                **kwargs
+        self.race_times = self.predicter.calc_boat_times(
+            self.live_data
+        )
+
+    def predict_pace(self, distance=None, update=False):
+        if distance and distance in self.pace_preds:
+            return self.pace_preds[distance]
+
+        if update:
+            self.update_livedata()
+
+        preds = self.predicter.predict_pace(
+            self.race_pace, distance=distance
             )
-        ax.set_xlim(0, maxdistance or 2000)
-        ax.set_xlabel('distance / m')
-        
-        return ax, lines
-    
-    def plot_pace(self, ax=None, **kwargs):
-        distance = self.live_data.distanceTravelled
-        pace = 500 / self.live_data.metrePerSecond
-        ax, lines = self.plot(distance, pace, ax=ax, **kwargs)
-        utils.format_yaxis_splits(ax)
-        ax.set_ylabel('pace / 500m')
-        
-        return ax, lines
-    
-    def plot_speed(self, ax=None, **kwargs):        
-        distance = self.live_data.distanceTravelled
-        speed = self.live_data.metrePerSecond
-        ax, lines = self.plot(distance, speed, ax=ax, **kwargs)
-        ax.set_ylabel('speed / m/s')
-        
-        return ax, lines
-    
-    def plot_distance_from_leader(self, ax=None, **kwargs):  
-        distance = self.live_data.distanceTravelled
-        speed = self.live_data.distanceFromLeader
-        ax, lines = self.plot(distance, speed, ax=ax, **kwargs)
-        ax.set_ylabel('distanceFromLeader / m')
-        return ax, lines
+        distance = distance or self.race_pace.index[-1]
+        self.pace_preds[distance] = preds
+        return preds
+
+    def predict_times(self, distance=None, update=False):
+        if distance and distance in self.time_preds:
+            return self.time_preds[distance]
+
+        if update:
+            self.update_livedata()
+
+        pace_preds, time_preds = self.predicter.predict_pace_times(
+            self.race_pace, distance=distance)
+        distance = distance or self.race_pace.index[-1]
+        self.time_preds[distance] = time_preds
+        self.pace_preds[distance] = pace_preds
+        return time_preds
+
+    def predict_finish_time(self, distance=None, update=False):
+        if distance and distance in self.finish_preds:
+            return self.finish_preds[distance]
+
+        if update:
+            self.update_livedata()
+
+        preds = self.predicter.predict_finish_time(
+            self.race_pace, distance=distance)
+        distance = distance or self.race_pace.index[-1]
+        self.finish_preds[distance] = preds
+        return preds
+
+    def predict_win_probability(self, distance=None, update=False):
+        pred_finish, finish_std = self.predict_finish_time(
+            update=update, distance=distance
+        )
+        win_probs = calc_win_probs(pred_finish, finish_std)
+        distance = distance or self.race_pace.index[-1]
+        self.win_preds[distance] = win_probs
+        return win_probs
+
+
+
+
+
 
 
 def calc_boat_time(live_data, distances=None):

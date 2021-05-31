@@ -23,13 +23,13 @@ def format_timedelta(td, hundreths=True):
     end = f".{(td.microseconds // 10_000):02d}" if hundreths else ''
     return f"{mins}:{secs:02d}{end}"
 
-def format_yaxis_splits(ax=None, ticks=True):
-    format_axis_splits(ax=ax, yticks=ticks)
+def format_yaxis_splits(ax=None, ticks=True, hundreths=False):
+    format_axis_splits(ax=ax, yticks=ticks, hundreths=hundreths)
 
-def format_xaxis_splits(ax=None, ticks=True):
-    format_axis_splits(ax=ax, yticks=False, xticks=ticks)
+def format_xaxis_splits(ax=None, ticks=True, hundreths=False):
+    format_axis_splits(ax=ax, yticks=False, xticks=ticks, hundreths=hundreths)
 
-def format_axis_splits(ax=None, yticks=True, xticks=False):
+def format_axis_splits(ax=None, yticks=True, xticks=False, hundreths=False):
     import matplotlib.pyplot as plt
     ax = ax or plt.gca()
     if yticks:
@@ -37,14 +37,14 @@ def format_axis_splits(ax=None, yticks=True, xticks=False):
             yticks = ax.get_yticks()
         ax.set_yticks(yticks)
         ax.set_yticklabels(
-            [format_totalseconds(s, False) for s in yticks]
+            [format_totalseconds(s, hundreths) for s in yticks]
         )
     if xticks:
         if xticks is True:
             xticks = ax.get_xticks()
         ax.set_xticks(xticks)
         ax.set_xticklabels(
-            [format_totalseconds(s, False) for s in xticks]
+            [format_totalseconds(s, hundreths) for s in xticks]
         )
 
 K = TypeVar("K")
