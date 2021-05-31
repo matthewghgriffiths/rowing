@@ -1,0 +1,1675 @@
+[
+  {
+    "iso2": "AW",
+    "iso3": "ABW",
+    "name": "Aruba",
+    "numeric": 533
+  },
+  {
+    "iso2": "AF",
+    "iso3": "AFG",
+    "name": "Afghanistan",
+    "numeric": 4,
+    "official_name": "Islamic Republic of Afghanistan"
+  },
+  {
+    "iso2": "AO",
+    "iso3": "AGO",
+    "name": "Angola",
+    "numeric": 24,
+    "official_name": "Republic of Angola"
+  },
+  {
+    "iso2": "AI",
+    "iso3": "AIA",
+    "name": "Anguilla",
+    "numeric": 660
+  },
+  {
+    "iso2": "AX",
+    "iso3": "ALA",
+    "name": "\u00c5land Islands",
+    "numeric": 248
+  },
+  {
+    "iso2": "AL",
+    "iso3": "ALB",
+    "name": "Albania",
+    "numeric": 8,
+    "official_name": "Republic of Albania"
+  },
+  {
+    "iso2": "AD",
+    "iso3": "AND",
+    "name": "Andorra",
+    "numeric": 20,
+    "official_name": "Principality of Andorra"
+  },
+  {
+    "iso2": "AE",
+    "iso3": "ARE",
+    "name": "United Arab Emirates",
+    "numeric": 784
+  },
+  {
+    "iso2": "AR",
+    "iso3": "ARG",
+    "name": "Argentina",
+    "numeric": 32,
+    "official_name": "Argentine Republic"
+  },
+  {
+    "iso2": "AM",
+    "iso3": "ARM",
+    "name": "Armenia",
+    "numeric": 51,
+    "official_name": "Republic of Armenia"
+  },
+  {
+    "iso2": "AS",
+    "iso3": "ASM",
+    "name": "American Samoa",
+    "numeric": 16
+  },
+  {
+    "iso2": "AQ",
+    "iso3": "ATA",
+    "name": "Antarctica",
+    "numeric": 10
+  },
+  {
+    "iso2": "TF",
+    "iso3": "ATF",
+    "name": "French Southern Territories",
+    "numeric": 260
+  },
+  {
+    "iso2": "AG",
+    "iso3": "ATG",
+    "name": "Antigua and Barbuda",
+    "numeric": 28
+  },
+  {
+    "iso2": "AU",
+    "iso3": "AUS",
+    "name": "Australia",
+    "numeric": 36
+  },
+  {
+    "iso2": "AT",
+    "iso3": "AUT",
+    "name": "Austria",
+    "numeric": 40,
+    "official_name": "Republic of Austria"
+  },
+  {
+    "iso2": "AZ",
+    "iso3": "AZE",
+    "name": "Azerbaijan",
+    "numeric": 31,
+    "official_name": "Republic of Azerbaijan"
+  },
+  {
+    "iso2": "BI",
+    "iso3": "BDI",
+    "name": "Burundi",
+    "numeric": 108,
+    "official_name": "Republic of Burundi"
+  },
+  {
+    "iso2": "BE",
+    "iso3": "BEL",
+    "name": "Belgium",
+    "numeric": 56,
+    "official_name": "Kingdom of Belgium"
+  },
+  {
+    "iso2": "BJ",
+    "iso3": "BEN",
+    "name": "Benin",
+    "numeric": 204,
+    "official_name": "Republic of Benin"
+  },
+  {
+    "iso2": "BQ",
+    "iso3": "BES",
+    "name": "Bonaire, Sint Eustatius and Saba",
+    "numeric": 535,
+    "official_name": "Bonaire, Sint Eustatius and Saba"
+  },
+  {
+    "iso2": "BF",
+    "iso3": "BFA",
+    "name": "Burkina Faso",
+    "numeric": 854
+  },
+  {
+    "iso2": "BD",
+    "iso3": "BGD",
+    "name": "Bangladesh",
+    "numeric": 50,
+    "official_name": "People's Republic of Bangladesh"
+  },
+  {
+    "iso2": "BG",
+    "iso3": "BGR",
+    "name": "Bulgaria",
+    "numeric": 100,
+    "official_name": "Republic of Bulgaria"
+  },
+  {
+    "iso2": "BH",
+    "iso3": "BHR",
+    "name": "Bahrain",
+    "numeric": 48,
+    "official_name": "Kingdom of Bahrain"
+  },
+  {
+    "iso2": "BS",
+    "iso3": "BHS",
+    "name": "Bahamas",
+    "numeric": 44,
+    "official_name": "Commonwealth of the Bahamas"
+  },
+  {
+    "iso2": "BA",
+    "iso3": "BIH",
+    "name": "Bosnia and Herzegovina",
+    "numeric": 70,
+    "official_name": "Republic of Bosnia and Herzegovina"
+  },
+  {
+    "iso2": "BL",
+    "iso3": "BLM",
+    "name": "Saint Barth\u00e9lemy",
+    "numeric": 652
+  },
+  {
+    "iso2": "BY",
+    "iso3": "BLR",
+    "name": "Belarus",
+    "numeric": 112,
+    "official_name": "Republic of Belarus"
+  },
+  {
+    "iso2": "BZ",
+    "iso3": "BLZ",
+    "name": "Belize",
+    "numeric": 84
+  },
+  {
+    "iso2": "BM",
+    "iso3": "BMU",
+    "name": "Bermuda",
+    "numeric": 60
+  },
+  {
+    "iso2": "BO",
+    "iso3": "BOL",
+    "name": "Bolivia, Plurinational State of",
+    "numeric": 68,
+    "official_name": "Plurinational State of Bolivia",
+    "common_name": "Bolivia"
+  },
+  {
+    "iso2": "BR",
+    "iso3": "BRA",
+    "name": "Brazil",
+    "numeric": 76,
+    "official_name": "Federative Republic of Brazil"
+  },
+  {
+    "iso2": "BB",
+    "iso3": "BRB",
+    "name": "Barbados",
+    "numeric": 52
+  },
+  {
+    "iso2": "BN",
+    "iso3": "BRN",
+    "name": "Brunei Darussalam",
+    "numeric": 96
+  },
+  {
+    "iso2": "BT",
+    "iso3": "BTN",
+    "name": "Bhutan",
+    "numeric": 64,
+    "official_name": "Kingdom of Bhutan"
+  },
+  {
+    "iso2": "BV",
+    "iso3": "BVT",
+    "name": "Bouvet Island",
+    "numeric": 74
+  },
+  {
+    "iso2": "BW",
+    "iso3": "BWA",
+    "name": "Botswana",
+    "numeric": 72,
+    "official_name": "Republic of Botswana"
+  },
+  {
+    "iso2": "CF",
+    "iso3": "CAF",
+    "name": "Central African Republic",
+    "numeric": 140
+  },
+  {
+    "iso2": "CA",
+    "iso3": "CAN",
+    "name": "Canada",
+    "numeric": 124
+  },
+  {
+    "iso2": "CC",
+    "iso3": "CCK",
+    "name": "Cocos (Keeling) Islands",
+    "numeric": 166
+  },
+  {
+    "iso2": "CH",
+    "iso3": "CHE",
+    "name": "Switzerland",
+    "numeric": 756,
+    "official_name": "Swiss Confederation"
+  },
+  {
+    "iso2": "CL",
+    "iso3": "CHL",
+    "name": "Chile",
+    "numeric": 152,
+    "official_name": "Republic of Chile"
+  },
+  {
+    "iso2": "CN",
+    "iso3": "CHN",
+    "name": "China",
+    "numeric": 156,
+    "official_name": "People's Republic of China"
+  },
+  {
+    "iso2": "CI",
+    "iso3": "CIV",
+    "name": "C\u00f4te d'Ivoire",
+    "numeric": 384,
+    "official_name": "Republic of C\u00f4te d'Ivoire"
+  },
+  {
+    "iso2": "CM",
+    "iso3": "CMR",
+    "name": "Cameroon",
+    "numeric": 120,
+    "official_name": "Republic of Cameroon"
+  },
+  {
+    "iso2": "CD",
+    "iso3": "COD",
+    "name": "Congo, The Democratic Republic of the",
+    "numeric": 180
+  },
+  {
+    "iso2": "CG",
+    "iso3": "COG",
+    "name": "Congo",
+    "numeric": 178,
+    "official_name": "Republic of the Congo"
+  },
+  {
+    "iso2": "CK",
+    "iso3": "COK",
+    "name": "Cook Islands",
+    "numeric": 184
+  },
+  {
+    "iso2": "CO",
+    "iso3": "COL",
+    "name": "Colombia",
+    "numeric": 170,
+    "official_name": "Republic of Colombia"
+  },
+  {
+    "iso2": "KM",
+    "iso3": "COM",
+    "name": "Comoros",
+    "numeric": 174,
+    "official_name": "Union of the Comoros"
+  },
+  {
+    "iso2": "CV",
+    "iso3": "CPV",
+    "name": "Cabo Verde",
+    "numeric": 132,
+    "official_name": "Republic of Cabo Verde"
+  },
+  {
+    "iso2": "CR",
+    "iso3": "CRI",
+    "name": "Costa Rica",
+    "numeric": 188,
+    "official_name": "Republic of Costa Rica"
+  },
+  {
+    "iso2": "CU",
+    "iso3": "CUB",
+    "name": "Cuba",
+    "numeric": 192,
+    "official_name": "Republic of Cuba"
+  },
+  {
+    "iso2": "CW",
+    "iso3": "CUW",
+    "name": "Cura\u00e7ao",
+    "numeric": 531,
+    "official_name": "Cura\u00e7ao"
+  },
+  {
+    "iso2": "CX",
+    "iso3": "CXR",
+    "name": "Christmas Island",
+    "numeric": 162
+  },
+  {
+    "iso2": "KY",
+    "iso3": "CYM",
+    "name": "Cayman Islands",
+    "numeric": 136
+  },
+  {
+    "iso2": "CY",
+    "iso3": "CYP",
+    "name": "Cyprus",
+    "numeric": 196,
+    "official_name": "Republic of Cyprus"
+  },
+  {
+    "iso2": "CZ",
+    "iso3": "CZE",
+    "name": "Czechia",
+    "numeric": 203,
+    "official_name": "Czech Republic"
+  },
+  {
+    "iso2": "DE",
+    "iso3": "DEU",
+    "name": "Germany",
+    "numeric": 276,
+    "official_name": "Federal Republic of Germany"
+  },
+  {
+    "iso2": "DJ",
+    "iso3": "DJI",
+    "name": "Djibouti",
+    "numeric": 262,
+    "official_name": "Republic of Djibouti"
+  },
+  {
+    "iso2": "DM",
+    "iso3": "DMA",
+    "name": "Dominica",
+    "numeric": 212,
+    "official_name": "Commonwealth of Dominica"
+  },
+  {
+    "iso2": "DK",
+    "iso3": "DNK",
+    "name": "Denmark",
+    "numeric": 208,
+    "official_name": "Kingdom of Denmark"
+  },
+  {
+    "iso2": "DO",
+    "iso3": "DOM",
+    "name": "Dominican Republic",
+    "numeric": 214
+  },
+  {
+    "iso2": "DZ",
+    "iso3": "DZA",
+    "name": "Algeria",
+    "numeric": 12,
+    "official_name": "People's Democratic Republic of Algeria"
+  },
+  {
+    "iso2": "EC",
+    "iso3": "ECU",
+    "name": "Ecuador",
+    "numeric": 218,
+    "official_name": "Republic of Ecuador"
+  },
+  {
+    "iso2": "EG",
+    "iso3": "EGY",
+    "name": "Egypt",
+    "numeric": 818,
+    "official_name": "Arab Republic of Egypt"
+  },
+  {
+    "iso2": "ER",
+    "iso3": "ERI",
+    "name": "Eritrea",
+    "numeric": 232,
+    "official_name": "the State of Eritrea"
+  },
+  {
+    "iso2": "EH",
+    "iso3": "ESH",
+    "name": "Western Sahara",
+    "numeric": 732
+  },
+  {
+    "iso2": "ES",
+    "iso3": "ESP",
+    "name": "Spain",
+    "numeric": 724,
+    "official_name": "Kingdom of Spain"
+  },
+  {
+    "iso2": "EE",
+    "iso3": "EST",
+    "name": "Estonia",
+    "numeric": 233,
+    "official_name": "Republic of Estonia"
+  },
+  {
+    "iso2": "ET",
+    "iso3": "ETH",
+    "name": "Ethiopia",
+    "numeric": 231,
+    "official_name": "Federal Democratic Republic of Ethiopia"
+  },
+  {
+    "iso2": "FI",
+    "iso3": "FIN",
+    "name": "Finland",
+    "numeric": 246,
+    "official_name": "Republic of Finland"
+  },
+  {
+    "iso2": "FJ",
+    "iso3": "FJI",
+    "name": "Fiji",
+    "numeric": 242,
+    "official_name": "Republic of Fiji"
+  },
+  {
+    "iso2": "FK",
+    "iso3": "FLK",
+    "name": "Falkland Islands (Malvinas)",
+    "numeric": 238
+  },
+  {
+    "iso2": "FR",
+    "iso3": "FRA",
+    "name": "France",
+    "numeric": 250,
+    "official_name": "French Republic"
+  },
+  {
+    "iso2": "FO",
+    "iso3": "FRO",
+    "name": "Faroe Islands",
+    "numeric": 234
+  },
+  {
+    "iso2": "FM",
+    "iso3": "FSM",
+    "name": "Micronesia, Federated States of",
+    "numeric": 583,
+    "official_name": "Federated States of Micronesia"
+  },
+  {
+    "iso2": "GA",
+    "iso3": "GAB",
+    "name": "Gabon",
+    "numeric": 266,
+    "official_name": "Gabonese Republic"
+  },
+  {
+    "iso2": "GB",
+    "iso3": "GBR",
+    "name": "United Kingdom",
+    "numeric": 826,
+    "official_name": "United Kingdom of Great Britain and Northern Ireland"
+  },
+  {
+    "iso2": "GE",
+    "iso3": "GEO",
+    "name": "Georgia",
+    "numeric": 268
+  },
+  {
+    "iso2": "GG",
+    "iso3": "GGY",
+    "name": "Guernsey",
+    "numeric": 831
+  },
+  {
+    "iso2": "GH",
+    "iso3": "GHA",
+    "name": "Ghana",
+    "numeric": 288,
+    "official_name": "Republic of Ghana"
+  },
+  {
+    "iso2": "GI",
+    "iso3": "GIB",
+    "name": "Gibraltar",
+    "numeric": 292
+  },
+  {
+    "iso2": "GN",
+    "iso3": "GIN",
+    "name": "Guinea",
+    "numeric": 324,
+    "official_name": "Republic of Guinea"
+  },
+  {
+    "iso2": "GP",
+    "iso3": "GLP",
+    "name": "Guadeloupe",
+    "numeric": 312
+  },
+  {
+    "iso2": "GM",
+    "iso3": "GMB",
+    "name": "Gambia",
+    "numeric": 270,
+    "official_name": "Republic of the Gambia"
+  },
+  {
+    "iso2": "GW",
+    "iso3": "GNB",
+    "name": "Guinea-Bissau",
+    "numeric": 624,
+    "official_name": "Republic of Guinea-Bissau"
+  },
+  {
+    "iso2": "GQ",
+    "iso3": "GNQ",
+    "name": "Equatorial Guinea",
+    "numeric": 226,
+    "official_name": "Republic of Equatorial Guinea"
+  },
+  {
+    "iso2": "GR",
+    "iso3": "GRC",
+    "name": "Greece",
+    "numeric": 300,
+    "official_name": "Hellenic Republic"
+  },
+  {
+    "iso2": "GD",
+    "iso3": "GRD",
+    "name": "Grenada",
+    "numeric": 308
+  },
+  {
+    "iso2": "GL",
+    "iso3": "GRL",
+    "name": "Greenland",
+    "numeric": 304
+  },
+  {
+    "iso2": "GT",
+    "iso3": "GTM",
+    "name": "Guatemala",
+    "numeric": 320,
+    "official_name": "Republic of Guatemala"
+  },
+  {
+    "iso2": "GF",
+    "iso3": "GUF",
+    "name": "French Guiana",
+    "numeric": 254
+  },
+  {
+    "iso2": "GU",
+    "iso3": "GUM",
+    "name": "Guam",
+    "numeric": 316
+  },
+  {
+    "iso2": "GY",
+    "iso3": "GUY",
+    "name": "Guyana",
+    "numeric": 328,
+    "official_name": "Republic of Guyana"
+  },
+  {
+    "iso2": "HK",
+    "iso3": "HKG",
+    "name": "Hong Kong",
+    "numeric": 344,
+    "official_name": "Hong Kong Special Administrative Region of China"
+  },
+  {
+    "iso2": "HM",
+    "iso3": "HMD",
+    "name": "Heard Island and McDonald Islands",
+    "numeric": 334
+  },
+  {
+    "iso2": "HN",
+    "iso3": "HND",
+    "name": "Honduras",
+    "numeric": 340,
+    "official_name": "Republic of Honduras"
+  },
+  {
+    "iso2": "HR",
+    "iso3": "HRV",
+    "name": "Croatia",
+    "numeric": 191,
+    "official_name": "Republic of Croatia"
+  },
+  {
+    "iso2": "HT",
+    "iso3": "HTI",
+    "name": "Haiti",
+    "numeric": 332,
+    "official_name": "Republic of Haiti"
+  },
+  {
+    "iso2": "HU",
+    "iso3": "HUN",
+    "name": "Hungary",
+    "numeric": 348,
+    "official_name": "Hungary"
+  },
+  {
+    "iso2": "ID",
+    "iso3": "IDN",
+    "name": "Indonesia",
+    "numeric": 360,
+    "official_name": "Republic of Indonesia"
+  },
+  {
+    "iso2": "IM",
+    "iso3": "IMN",
+    "name": "Isle of Man",
+    "numeric": 833
+  },
+  {
+    "iso2": "IN",
+    "iso3": "IND",
+    "name": "India",
+    "numeric": 356,
+    "official_name": "Republic of India"
+  },
+  {
+    "iso2": "IO",
+    "iso3": "IOT",
+    "name": "British Indian Ocean Territory",
+    "numeric": 86
+  },
+  {
+    "iso2": "IE",
+    "iso3": "IRL",
+    "name": "Ireland",
+    "numeric": 372
+  },
+  {
+    "iso2": "IR",
+    "iso3": "IRN",
+    "name": "Iran, Islamic Republic of",
+    "numeric": 364,
+    "official_name": "Islamic Republic of Iran"
+  },
+  {
+    "iso2": "IQ",
+    "iso3": "IRQ",
+    "name": "Iraq",
+    "numeric": 368,
+    "official_name": "Republic of Iraq"
+  },
+  {
+    "iso2": "IS",
+    "iso3": "ISL",
+    "name": "Iceland",
+    "numeric": 352,
+    "official_name": "Republic of Iceland"
+  },
+  {
+    "iso2": "IL",
+    "iso3": "ISR",
+    "name": "Israel",
+    "numeric": 376,
+    "official_name": "State of Israel"
+  },
+  {
+    "iso2": "IT",
+    "iso3": "ITA",
+    "name": "Italy",
+    "numeric": 380,
+    "official_name": "Italian Republic"
+  },
+  {
+    "iso2": "JM",
+    "iso3": "JAM",
+    "name": "Jamaica",
+    "numeric": 388
+  },
+  {
+    "iso2": "JE",
+    "iso3": "JEY",
+    "name": "Jersey",
+    "numeric": 832
+  },
+  {
+    "iso2": "JO",
+    "iso3": "JOR",
+    "name": "Jordan",
+    "numeric": 400,
+    "official_name": "Hashemite Kingdom of Jordan"
+  },
+  {
+    "iso2": "JP",
+    "iso3": "JPN",
+    "name": "Japan",
+    "numeric": 392
+  },
+  {
+    "iso2": "KZ",
+    "iso3": "KAZ",
+    "name": "Kazakhstan",
+    "numeric": 398,
+    "official_name": "Republic of Kazakhstan"
+  },
+  {
+    "iso2": "KE",
+    "iso3": "KEN",
+    "name": "Kenya",
+    "numeric": 404,
+    "official_name": "Republic of Kenya"
+  },
+  {
+    "iso2": "KG",
+    "iso3": "KGZ",
+    "name": "Kyrgyzstan",
+    "numeric": 417,
+    "official_name": "Kyrgyz Republic"
+  },
+  {
+    "iso2": "KH",
+    "iso3": "KHM",
+    "name": "Cambodia",
+    "numeric": 116,
+    "official_name": "Kingdom of Cambodia"
+  },
+  {
+    "iso2": "KI",
+    "iso3": "KIR",
+    "name": "Kiribati",
+    "numeric": 296,
+    "official_name": "Republic of Kiribati"
+  },
+  {
+    "iso2": "KN",
+    "iso3": "KNA",
+    "name": "Saint Kitts and Nevis",
+    "numeric": 659
+  },
+  {
+    "iso2": "KR",
+    "iso3": "KOR",
+    "name": "Korea, Republic of",
+    "numeric": 410
+  },
+  {
+    "iso2": "KW",
+    "iso3": "KWT",
+    "name": "Kuwait",
+    "numeric": 414,
+    "official_name": "State of Kuwait"
+  },
+  {
+    "iso2": "LA",
+    "iso3": "LAO",
+    "name": "Lao People's Democratic Republic",
+    "numeric": 418
+  },
+  {
+    "iso2": "LB",
+    "iso3": "LBN",
+    "name": "Lebanon",
+    "numeric": 422,
+    "official_name": "Lebanese Republic"
+  },
+  {
+    "iso2": "LR",
+    "iso3": "LBR",
+    "name": "Liberia",
+    "numeric": 430,
+    "official_name": "Republic of Liberia"
+  },
+  {
+    "iso2": "LY",
+    "iso3": "LBY",
+    "name": "Libya",
+    "numeric": 434,
+    "official_name": "Libya"
+  },
+  {
+    "iso2": "LC",
+    "iso3": "LCA",
+    "name": "Saint Lucia",
+    "numeric": 662
+  },
+  {
+    "iso2": "LI",
+    "iso3": "LIE",
+    "name": "Liechtenstein",
+    "numeric": 438,
+    "official_name": "Principality of Liechtenstein"
+  },
+  {
+    "iso2": "LK",
+    "iso3": "LKA",
+    "name": "Sri Lanka",
+    "numeric": 144,
+    "official_name": "Democratic Socialist Republic of Sri Lanka"
+  },
+  {
+    "iso2": "LS",
+    "iso3": "LSO",
+    "name": "Lesotho",
+    "numeric": 426,
+    "official_name": "Kingdom of Lesotho"
+  },
+  {
+    "iso2": "LT",
+    "iso3": "LTU",
+    "name": "Lithuania",
+    "numeric": 440,
+    "official_name": "Republic of Lithuania"
+  },
+  {
+    "iso2": "LU",
+    "iso3": "LUX",
+    "name": "Luxembourg",
+    "numeric": 442,
+    "official_name": "Grand Duchy of Luxembourg"
+  },
+  {
+    "iso2": "LV",
+    "iso3": "LVA",
+    "name": "Latvia",
+    "numeric": 428,
+    "official_name": "Republic of Latvia"
+  },
+  {
+    "iso2": "MO",
+    "iso3": "MAC",
+    "name": "Macao",
+    "numeric": 446,
+    "official_name": "Macao Special Administrative Region of China"
+  },
+  {
+    "iso2": "MF",
+    "iso3": "MAF",
+    "name": "Saint Martin (French part)",
+    "numeric": 663
+  },
+  {
+    "iso2": "MA",
+    "iso3": "MAR",
+    "name": "Morocco",
+    "numeric": 504,
+    "official_name": "Kingdom of Morocco"
+  },
+  {
+    "iso2": "MC",
+    "iso3": "MCO",
+    "name": "Monaco",
+    "numeric": 492,
+    "official_name": "Principality of Monaco"
+  },
+  {
+    "iso2": "MD",
+    "iso3": "MDA",
+    "name": "Moldova, Republic of",
+    "numeric": 498,
+    "official_name": "Republic of Moldova",
+    "common_name": "Moldova"
+  },
+  {
+    "iso2": "MG",
+    "iso3": "MDG",
+    "name": "Madagascar",
+    "numeric": 450,
+    "official_name": "Republic of Madagascar"
+  },
+  {
+    "iso2": "MV",
+    "iso3": "MDV",
+    "name": "Maldives",
+    "numeric": 462,
+    "official_name": "Republic of Maldives"
+  },
+  {
+    "iso2": "MX",
+    "iso3": "MEX",
+    "name": "Mexico",
+    "numeric": 484,
+    "official_name": "United Mexican States"
+  },
+  {
+    "iso2": "MH",
+    "iso3": "MHL",
+    "name": "Marshall Islands",
+    "numeric": 584,
+    "official_name": "Republic of the Marshall Islands"
+  },
+  {
+    "iso2": "MK",
+    "iso3": "MKD",
+    "name": "North Macedonia",
+    "numeric": 807,
+    "official_name": "Republic of North Macedonia"
+  },
+  {
+    "iso2": "ML",
+    "iso3": "MLI",
+    "name": "Mali",
+    "numeric": 466,
+    "official_name": "Republic of Mali"
+  },
+  {
+    "iso2": "MT",
+    "iso3": "MLT",
+    "name": "Malta",
+    "numeric": 470,
+    "official_name": "Republic of Malta"
+  },
+  {
+    "iso2": "MM",
+    "iso3": "MMR",
+    "name": "Myanmar",
+    "numeric": 104,
+    "official_name": "Republic of Myanmar"
+  },
+  {
+    "iso2": "ME",
+    "iso3": "MNE",
+    "name": "Montenegro",
+    "numeric": 499,
+    "official_name": "Montenegro"
+  },
+  {
+    "iso2": "MN",
+    "iso3": "MNG",
+    "name": "Mongolia",
+    "numeric": 496
+  },
+  {
+    "iso2": "MP",
+    "iso3": "MNP",
+    "name": "Northern Mariana Islands",
+    "numeric": 580,
+    "official_name": "Commonwealth of the Northern Mariana Islands"
+  },
+  {
+    "iso2": "MZ",
+    "iso3": "MOZ",
+    "name": "Mozambique",
+    "numeric": 508,
+    "official_name": "Republic of Mozambique"
+  },
+  {
+    "iso2": "MR",
+    "iso3": "MRT",
+    "name": "Mauritania",
+    "numeric": 478,
+    "official_name": "Islamic Republic of Mauritania"
+  },
+  {
+    "iso2": "MS",
+    "iso3": "MSR",
+    "name": "Montserrat",
+    "numeric": 500
+  },
+  {
+    "iso2": "MQ",
+    "iso3": "MTQ",
+    "name": "Martinique",
+    "numeric": 474
+  },
+  {
+    "iso2": "MU",
+    "iso3": "MUS",
+    "name": "Mauritius",
+    "numeric": 480,
+    "official_name": "Republic of Mauritius"
+  },
+  {
+    "iso2": "MW",
+    "iso3": "MWI",
+    "name": "Malawi",
+    "numeric": 454,
+    "official_name": "Republic of Malawi"
+  },
+  {
+    "iso2": "MY",
+    "iso3": "MYS",
+    "name": "Malaysia",
+    "numeric": 458
+  },
+  {
+    "iso2": "YT",
+    "iso3": "MYT",
+    "name": "Mayotte",
+    "numeric": 175
+  },
+  {
+    "iso2": "NA",
+    "iso3": "NAM",
+    "name": "Namibia",
+    "numeric": 516,
+    "official_name": "Republic of Namibia"
+  },
+  {
+    "iso2": "NC",
+    "iso3": "NCL",
+    "name": "New Caledonia",
+    "numeric": 540
+  },
+  {
+    "iso2": "NE",
+    "iso3": "NER",
+    "name": "Niger",
+    "numeric": 562,
+    "official_name": "Republic of the Niger"
+  },
+  {
+    "iso2": "NF",
+    "iso3": "NFK",
+    "name": "Norfolk Island",
+    "numeric": 574
+  },
+  {
+    "iso2": "NG",
+    "iso3": "NGA",
+    "name": "Nigeria",
+    "numeric": 566,
+    "official_name": "Federal Republic of Nigeria"
+  },
+  {
+    "iso2": "NI",
+    "iso3": "NIC",
+    "name": "Nicaragua",
+    "numeric": 558,
+    "official_name": "Republic of Nicaragua"
+  },
+  {
+    "iso2": "NU",
+    "iso3": "NIU",
+    "name": "Niue",
+    "numeric": 570,
+    "official_name": "Niue"
+  },
+  {
+    "iso2": "NL",
+    "iso3": "NLD",
+    "name": "Netherlands",
+    "numeric": 528,
+    "official_name": "Kingdom of the Netherlands"
+  },
+  {
+    "iso2": "NO",
+    "iso3": "NOR",
+    "name": "Norway",
+    "numeric": 578,
+    "official_name": "Kingdom of Norway"
+  },
+  {
+    "iso2": "NP",
+    "iso3": "NPL",
+    "name": "Nepal",
+    "numeric": 524,
+    "official_name": "Federal Democratic Republic of Nepal"
+  },
+  {
+    "iso2": "NR",
+    "iso3": "NRU",
+    "name": "Nauru",
+    "numeric": 520,
+    "official_name": "Republic of Nauru"
+  },
+  {
+    "iso2": "NZ",
+    "iso3": "NZL",
+    "name": "New Zealand",
+    "numeric": 554
+  },
+  {
+    "iso2": "OM",
+    "iso3": "OMN",
+    "name": "Oman",
+    "numeric": 512,
+    "official_name": "Sultanate of Oman"
+  },
+  {
+    "iso2": "PK",
+    "iso3": "PAK",
+    "name": "Pakistan",
+    "numeric": 586,
+    "official_name": "Islamic Republic of Pakistan"
+  },
+  {
+    "iso2": "PA",
+    "iso3": "PAN",
+    "name": "Panama",
+    "numeric": 591,
+    "official_name": "Republic of Panama"
+  },
+  {
+    "iso2": "PN",
+    "iso3": "PCN",
+    "name": "Pitcairn",
+    "numeric": 612
+  },
+  {
+    "iso2": "PE",
+    "iso3": "PER",
+    "name": "Peru",
+    "numeric": 604,
+    "official_name": "Republic of Peru"
+  },
+  {
+    "iso2": "PH",
+    "iso3": "PHL",
+    "name": "Philippines",
+    "numeric": 608,
+    "official_name": "Republic of the Philippines"
+  },
+  {
+    "iso2": "PW",
+    "iso3": "PLW",
+    "name": "Palau",
+    "numeric": 585,
+    "official_name": "Republic of Palau"
+  },
+  {
+    "iso2": "PG",
+    "iso3": "PNG",
+    "name": "Papua New Guinea",
+    "numeric": 598,
+    "official_name": "Independent State of Papua New Guinea"
+  },
+  {
+    "iso2": "PL",
+    "iso3": "POL",
+    "name": "Poland",
+    "numeric": 616,
+    "official_name": "Republic of Poland"
+  },
+  {
+    "iso2": "PR",
+    "iso3": "PRI",
+    "name": "Puerto Rico",
+    "numeric": 630
+  },
+  {
+    "iso2": "KP",
+    "iso3": "PRK",
+    "name": "Korea, Democratic People's Republic of",
+    "numeric": 408,
+    "official_name": "Democratic People's Republic of Korea"
+  },
+  {
+    "iso2": "PT",
+    "iso3": "PRT",
+    "name": "Portugal",
+    "numeric": 620,
+    "official_name": "Portuguese Republic"
+  },
+  {
+    "iso2": "PY",
+    "iso3": "PRY",
+    "name": "Paraguay",
+    "numeric": 600,
+    "official_name": "Republic of Paraguay"
+  },
+  {
+    "iso2": "PS",
+    "iso3": "PSE",
+    "name": "Palestine, State of",
+    "numeric": 275,
+    "official_name": "the State of Palestine"
+  },
+  {
+    "iso2": "PF",
+    "iso3": "PYF",
+    "name": "French Polynesia",
+    "numeric": 258
+  },
+  {
+    "iso2": "QA",
+    "iso3": "QAT",
+    "name": "Qatar",
+    "numeric": 634,
+    "official_name": "State of Qatar"
+  },
+  {
+    "iso2": "RE",
+    "iso3": "REU",
+    "name": "R\u00e9union",
+    "numeric": 638
+  },
+  {
+    "iso2": "RO",
+    "iso3": "ROU",
+    "name": "Romania",
+    "numeric": 642
+  },
+  {
+    "iso2": "RU",
+    "iso3": "RUS",
+    "name": "Russian Federation",
+    "numeric": 643
+  },
+  {
+    "iso2": "RW",
+    "iso3": "RWA",
+    "name": "Rwanda",
+    "numeric": 646,
+    "official_name": "Rwandese Republic"
+  },
+  {
+    "iso2": "SA",
+    "iso3": "SAU",
+    "name": "Saudi Arabia",
+    "numeric": 682,
+    "official_name": "Kingdom of Saudi Arabia"
+  },
+  {
+    "iso2": "SD",
+    "iso3": "SDN",
+    "name": "Sudan",
+    "numeric": 729,
+    "official_name": "Republic of the Sudan"
+  },
+  {
+    "iso2": "SN",
+    "iso3": "SEN",
+    "name": "Senegal",
+    "numeric": 686,
+    "official_name": "Republic of Senegal"
+  },
+  {
+    "iso2": "SG",
+    "iso3": "SGP",
+    "name": "Singapore",
+    "numeric": 702,
+    "official_name": "Republic of Singapore"
+  },
+  {
+    "iso2": "GS",
+    "iso3": "SGS",
+    "name": "South Georgia and the South Sandwich Islands",
+    "numeric": 239
+  },
+  {
+    "iso2": "SH",
+    "iso3": "SHN",
+    "name": "Saint Helena, Ascension and Tristan da Cunha",
+    "numeric": 654
+  },
+  {
+    "iso2": "SJ",
+    "iso3": "SJM",
+    "name": "Svalbard and Jan Mayen",
+    "numeric": 744
+  },
+  {
+    "iso2": "SB",
+    "iso3": "SLB",
+    "name": "Solomon Islands",
+    "numeric": 90
+  },
+  {
+    "iso2": "SL",
+    "iso3": "SLE",
+    "name": "Sierra Leone",
+    "numeric": 694,
+    "official_name": "Republic of Sierra Leone"
+  },
+  {
+    "iso2": "SV",
+    "iso3": "SLV",
+    "name": "El Salvador",
+    "numeric": 222,
+    "official_name": "Republic of El Salvador"
+  },
+  {
+    "iso2": "SM",
+    "iso3": "SMR",
+    "name": "San Marino",
+    "numeric": 674,
+    "official_name": "Republic of San Marino"
+  },
+  {
+    "iso2": "SO",
+    "iso3": "SOM",
+    "name": "Somalia",
+    "numeric": 706,
+    "official_name": "Federal Republic of Somalia"
+  },
+  {
+    "iso2": "PM",
+    "iso3": "SPM",
+    "name": "Saint Pierre and Miquelon",
+    "numeric": 666
+  },
+  {
+    "iso2": "RS",
+    "iso3": "SRB",
+    "name": "Serbia",
+    "numeric": 688,
+    "official_name": "Republic of Serbia"
+  },
+  {
+    "iso2": "SS",
+    "iso3": "SSD",
+    "name": "South Sudan",
+    "numeric": 728,
+    "official_name": "Republic of South Sudan"
+  },
+  {
+    "iso2": "ST",
+    "iso3": "STP",
+    "name": "Sao Tome and Principe",
+    "numeric": 678,
+    "official_name": "Democratic Republic of Sao Tome and Principe"
+  },
+  {
+    "iso2": "SR",
+    "iso3": "SUR",
+    "name": "Suriname",
+    "numeric": 740,
+    "official_name": "Republic of Suriname"
+  },
+  {
+    "iso2": "SK",
+    "iso3": "SVK",
+    "name": "Slovakia",
+    "numeric": 703,
+    "official_name": "Slovak Republic"
+  },
+  {
+    "iso2": "SI",
+    "iso3": "SVN",
+    "name": "Slovenia",
+    "numeric": 705,
+    "official_name": "Republic of Slovenia"
+  },
+  {
+    "iso2": "SE",
+    "iso3": "SWE",
+    "name": "Sweden",
+    "numeric": 752,
+    "official_name": "Kingdom of Sweden"
+  },
+  {
+    "iso2": "SZ",
+    "iso3": "SWZ",
+    "name": "Eswatini",
+    "numeric": 748,
+    "official_name": "Kingdom of Eswatini"
+  },
+  {
+    "iso2": "SX",
+    "iso3": "SXM",
+    "name": "Sint Maarten (Dutch part)",
+    "numeric": 534,
+    "official_name": "Sint Maarten (Dutch part)"
+  },
+  {
+    "iso2": "SC",
+    "iso3": "SYC",
+    "name": "Seychelles",
+    "numeric": 690,
+    "official_name": "Republic of Seychelles"
+  },
+  {
+    "iso2": "SY",
+    "iso3": "SYR",
+    "name": "Syrian Arab Republic",
+    "numeric": 760
+  },
+  {
+    "iso2": "TC",
+    "iso3": "TCA",
+    "name": "Turks and Caicos Islands",
+    "numeric": 796
+  },
+  {
+    "iso2": "TD",
+    "iso3": "TCD",
+    "name": "Chad",
+    "numeric": 148,
+    "official_name": "Republic of Chad"
+  },
+  {
+    "iso2": "TG",
+    "iso3": "TGO",
+    "name": "Togo",
+    "numeric": 768,
+    "official_name": "Togolese Republic"
+  },
+  {
+    "iso2": "TH",
+    "iso3": "THA",
+    "name": "Thailand",
+    "numeric": 764,
+    "official_name": "Kingdom of Thailand"
+  },
+  {
+    "iso2": "TJ",
+    "iso3": "TJK",
+    "name": "Tajikistan",
+    "numeric": 762,
+    "official_name": "Republic of Tajikistan"
+  },
+  {
+    "iso2": "TK",
+    "iso3": "TKL",
+    "name": "Tokelau",
+    "numeric": 772
+  },
+  {
+    "iso2": "TM",
+    "iso3": "TKM",
+    "name": "Turkmenistan",
+    "numeric": 795
+  },
+  {
+    "iso2": "TL",
+    "iso3": "TLS",
+    "name": "Timor-Leste",
+    "numeric": 626,
+    "official_name": "Democratic Republic of Timor-Leste"
+  },
+  {
+    "iso2": "TO",
+    "iso3": "TON",
+    "name": "Tonga",
+    "numeric": 776,
+    "official_name": "Kingdom of Tonga"
+  },
+  {
+    "iso2": "TT",
+    "iso3": "TTO",
+    "name": "Trinidad and Tobago",
+    "numeric": 780,
+    "official_name": "Republic of Trinidad and Tobago"
+  },
+  {
+    "iso2": "TN",
+    "iso3": "TUN",
+    "name": "Tunisia",
+    "numeric": 788,
+    "official_name": "Republic of Tunisia"
+  },
+  {
+    "iso2": "TR",
+    "iso3": "TUR",
+    "name": "Turkey",
+    "numeric": 792,
+    "official_name": "Republic of Turkey"
+  },
+  {
+    "iso2": "TV",
+    "iso3": "TUV",
+    "name": "Tuvalu",
+    "numeric": 798
+  },
+  {
+    "iso2": "TW",
+    "iso3": "TWN",
+    "name": "Taiwan, Province of China",
+    "numeric": 158,
+    "official_name": "Taiwan, Province of China",
+    "common_name": "Taiwan"
+  },
+  {
+    "iso2": "TZ",
+    "iso3": "TZA",
+    "name": "Tanzania, United Republic of",
+    "numeric": 834,
+    "official_name": "United Republic of Tanzania",
+    "common_name": "Tanzania"
+  },
+  {
+    "iso2": "UG",
+    "iso3": "UGA",
+    "name": "Uganda",
+    "numeric": 800,
+    "official_name": "Republic of Uganda"
+  },
+  {
+    "iso2": "UA",
+    "iso3": "UKR",
+    "name": "Ukraine",
+    "numeric": 804
+  },
+  {
+    "iso2": "UM",
+    "iso3": "UMI",
+    "name": "United States Minor Outlying Islands",
+    "numeric": 581
+  },
+  {
+    "iso2": "UY",
+    "iso3": "URY",
+    "name": "Uruguay",
+    "numeric": 858,
+    "official_name": "Eastern Republic of Uruguay"
+  },
+  {
+    "iso2": "US",
+    "iso3": "USA",
+    "name": "United States",
+    "numeric": 840,
+    "official_name": "United States of America"
+  },
+  {
+    "iso2": "UZ",
+    "iso3": "UZB",
+    "name": "Uzbekistan",
+    "numeric": 860,
+    "official_name": "Republic of Uzbekistan"
+  },
+  {
+    "iso2": "VA",
+    "iso3": "VAT",
+    "name": "Holy See (Vatican City State)",
+    "numeric": 336
+  },
+  {
+    "iso2": "VC",
+    "iso3": "VCT",
+    "name": "Saint Vincent and the Grenadines",
+    "numeric": 670
+  },
+  {
+    "iso2": "VE",
+    "iso3": "VEN",
+    "name": "Venezuela, Bolivarian Republic of",
+    "numeric": 862,
+    "official_name": "Bolivarian Republic of Venezuela",
+    "common_name": "Venezuela"
+  },
+  {
+    "iso2": "VG",
+    "iso3": "VGB",
+    "name": "Virgin Islands, British",
+    "numeric": 92,
+    "official_name": "British Virgin Islands"
+  },
+  {
+    "iso2": "VI",
+    "iso3": "VIR",
+    "name": "Virgin Islands, U.S.",
+    "numeric": 850,
+    "official_name": "Virgin Islands of the United States"
+  },
+  {
+    "iso2": "VN",
+    "iso3": "VNM",
+    "name": "Viet Nam",
+    "numeric": 704,
+    "official_name": "Socialist Republic of Viet Nam",
+    "common_name": "Vietnam"
+  },
+  {
+    "iso2": "VU",
+    "iso3": "VUT",
+    "name": "Vanuatu",
+    "numeric": 548,
+    "official_name": "Republic of Vanuatu"
+  },
+  {
+    "iso2": "WF",
+    "iso3": "WLF",
+    "name": "Wallis and Futuna",
+    "numeric": 876
+  },
+  {
+    "iso2": "WS",
+    "iso3": "WSM",
+    "name": "Samoa",
+    "numeric": 882,
+    "official_name": "Independent State of Samoa"
+  },
+  {
+    "iso2": "YE",
+    "iso3": "YEM",
+    "name": "Yemen",
+    "numeric": 887,
+    "official_name": "Republic of Yemen"
+  },
+  {
+    "iso2": "ZA",
+    "iso3": "ZAF",
+    "name": "South Africa",
+    "numeric": 710,
+    "official_name": "Republic of South Africa"
+  },
+  {
+    "iso2": "ZM",
+    "iso3": "ZMB",
+    "name": "Zambia",
+    "numeric": 894,
+    "official_name": "Republic of Zambia"
+  },
+  {
+    "iso2": "ZW",
+    "iso3": "ZWE",
+    "name": "Zimbabwe",
+    "numeric": 716,
+    "official_name": "Republic of Zimbabwe"
+  }
+]
