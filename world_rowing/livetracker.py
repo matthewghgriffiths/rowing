@@ -9,7 +9,10 @@ from .api import (
     get_worldrowing_data, get_race_results, get_worldrowing_record,
     find_world_best_time, INTERMEDIATE_FIELDS
 )
-from .utils import extract_fields, format_yaxis_splits
+from .utils import (
+    extract_fields, format_yaxis_splits, update_fill_betweenx, 
+    update_fill_between
+)
 
 RESULTS_FIELDS = {
     'id': ('id',),
@@ -143,20 +146,49 @@ class RaceTracker:
                 gmt=self.gmt,
                 cached=False,
         )
+        return self.live_data
 
-    def bar(self, y, bottom=None, yerr=None, ax=None, **kwargs):
+    def _by_country(self, values):
+        try:
+            return {cnt: values[cnt] for cnt in self.countries}
+        except (TypeError, IndexError):
+            return {cnt: values for cnt in self.countries}
+
+    def bar(self, heights, bottom=None, yerr=None, ax=None, **kwargs):
         import matplotlib.pyplot as plt
         ax = ax or plt.gca()
-        bar = ax.bar(
+        bars = ax.bar(
             self.lane_country.index,
-            y[self.lane_country],
+            heights[self.lane_country],
             bottom=bottom, 
             yerr=yerr, 
             tick_label=self.lane_country,
             color=self.country_colors[self.lane_country],
             **kwargs
         )
-        return bar
+        return dict(zip(self.countries, bars))
+
+    def update_bar(self, bars, heights, bottom=None):
+        if bottom:
+            bottoms = self._by_country(bottom)
+
+        for cnt, height in heights.items():
+            bar = bars[cnt]
+            bar.set_height(height)
+            if bottom:
+                x, _ = bar.get_xy()
+                bar.set_xy((x, bottoms[cnt]))
+
+    def get_bar_lims(self, bars):
+        bar_dims = [
+            b.get_xy() + (b.get_width(), b.get_height(), b)
+            for b in bars.values()
+        ]
+        x, y = np.hstack([
+            [[x, x + w], [y, y + h]]
+            for x, y, w, h, b in bar_dims
+        ])
+        return (x.min(), x.max()), (y.min(), y.max())
 
     def violin(
             self, y_dens, ax=None, width=0.8, alpha=0.6, outline=True, 
@@ -183,7 +215,7 @@ class RaceTracker:
                 **kwargs
             )
             if outline:
-                lines[cnt] = ax.plot(
+                lines[cnt], = ax.plot(
                     np.r_[-y_dens[cnt] + x0, y_dens[cnt].iloc[::-1] + x0],
                     np.r_[y_dens.index, y_dens.index[::-1]],
                     color=self.country_colors[cnt],
@@ -194,73 +226,143 @@ class RaceTracker:
         if set_xticks:
             ax.set_xticks(self.lane_country.index)
             ax.set_xticklabels(self.lane_country)
-        return ax, violins, lines
+        return violins, lines
 
-    def plot_finish_times(
-            self, pred_finish, finish_std, n_std=3, 
-            ax=None, **kwargs
+
+    def update_violins(
+            self, violins, lines, y_dens, width=0.8
     ):
-        ylim = (pred_finish.min() - 4 * finish_std, 
-        pred_finish.max() + 4 * finish_std)
+        if width:
+            y_dens = y_dens / y_dens.max(0) * width /2
+            
+        for x0, cnt in self.lane_country.items():
+            if cnt not in y_dens:
+                continue 
+
+            update_fill_betweenx(
+                violins[cnt], 
+                y_dens.index,
+                -y_dens[cnt] + x0,
+                y_dens[cnt] + x0,
+            )
+            line = lines.get(cnt, None)
+            if line:
+                line.set_data(
+                    np.r_[-y_dens[cnt] + x0, y_dens[cnt].iloc[::-1] + x0],
+                    np.r_[y_dens.index, y_dens.index[::-1]],
+                )
+
+    def calc_finish_densities(self, pred_finish, finish_std, dy_range=None):
+        finish_std = self._by_country(finish_std)
+        dy_range = (
+            dy_range or 4 * max(std for _, std in finish_std.items())
+        )
+        ylim = (pred_finish.min() - dy_range, pred_finish.max() + dy_range)
         y = np.linspace(*ylim, 1000)
         y_dens = pd.DataFrame({
             cnt: stats.norm(
                 loc=pred_finish[cnt], 
-                scale=finish_std
+                scale=finish_std[cnt]
             ).pdf(y)
             for cnt in self.lane_country
         }, 
             index=y
         )
-        ax, violins, lines = self.violin(y_dens, ax=ax, **kwargs)
-        ax.set_ylim(*ylim)
-        ax.invert_yaxis()
-        format_yaxis_splits(ax)
-        return ax, violins, lines
+        return y_dens, ylim
+
+    def plot_finish(
+            self, pred_finish, finish_std, dy_range=None, 
+            ax=None, set_lims=True, **kwargs
+    ):
+        import matplotlib.pyplot as plt 
+        y_dens, ylim = self.calc_finish_densities(
+            pred_finish, finish_std, dy_range=dy_range
+            )
+        violins, lines = self.violin(y_dens, ax=ax, **kwargs)
+        if set_lims:
+            ax = ax or plt.gca()
+            ax.set_ylim(*ylim)
+            
+        return violins, lines
+
+    def update_plot_finish(
+            self, 
+            violins, lines, 
+            pred_finish, finish_std, dy_range=None, width=0.8, 
+    ):
+        y_dens, ylim = self.calc_finish_densities(
+            pred_finish, finish_std, dy_range=dy_range
+            )
+        self.update_violins(
+            violins, lines, y_dens, width=width, 
+        )
+        return ylim
         
-    def plot(self, distance, y, ax=None, maxdistance=None, **kwargs):
+    def plot(
+            self, distance, y=None, ax=None, maxdistance=None, 
+            set_lims=True, 
+            **kwargs
+    ):
         import matplotlib.pyplot as plt
         ax = ax or plt.gca()
         lines = {}
-        if not isinstance(distance, (pd.DataFrame, dict)):
-            distance = {cnt: distance for cnt in y.columns}
+        if y is None:
+            y = distance
+            distance = self._by_country(y.index)
+        else:
+            distance = self._by_country(distance)
 
         for cnt in y.columns:
-            lines[cnt] =  ax.plot(
+            lines[cnt], = ax.plot(
                 distance[cnt], 
                 y[cnt], 
                 label=cnt, 
                 color=self.country_colors[cnt], 
                 **kwargs
             )
-        ax.set_xlim(0, maxdistance or 2000)
-        ax.set_xlabel('distance / m')
+        if set_lims:
+            ax.set_xlim(0, maxdistance or 2000)
+        # ax.set_xlabel('distance (m)')
         
-        return ax, lines
+        return lines
+
+    def update_plot(self, lines, distance, y):
+        distance = self._by_country(distance)
+        for cnt, values in y.items():
+            lines[cnt].set_data(
+                distance[cnt], values
+            )
 
     def plot_uncertainty(
-            self, distance, y, yerr, ax=None, alpha=0.2,
+            self, *args, ax=None, alpha=0.2,
             maxdistance=None, fill_kws=None, **kwargs
     ):
         import matplotlib.pyplot as plt
         ax = ax or plt.gca()
         lines = {}
         collections = {}
+        if len(args) == 2:
+            y, yerr = args 
+            distance = y.index 
+        else:
+            distance, y, yerr = args
 
-        if not isinstance(distance, (pd.DataFrame, dict)):
-            distance = {cnt: distance for cnt in y.columns}
-        if not isinstance(yerr, (pd.DataFrame, dict)):
-            yerr = {cnt: yerr for cnt in y.columns}
+        distance = self._by_country(distance)
+        # if covariance passed extract square root of diagonal
+        yerr = {
+            cnt: np.diag(err)**0.5 if np.ndim(err) == 2 else err
+            for cnt, err in self._by_country(yerr).items()
+        }
 
         for cnt in y.columns:
-            lines[cnt] =  ax.plot(
+            lines[cnt], = ax.plot(
                 distance[cnt], 
                 y[cnt], 
                 label=cnt, 
                 color=self.country_colors[cnt], 
                 **kwargs
             )
-            collections[cnt] =  ax.fill_between(
+            collections[cnt] = ax.fill_between(
                 distance[cnt], 
                 y[cnt] - yerr[cnt], 
                 y[cnt] + yerr[cnt],
@@ -272,8 +374,35 @@ class RaceTracker:
         ax.set_xlim(0, maxdistance or 2000)
         ax.set_xlabel('distance / m')
         
-        return ax, lines, collections
+        return lines, collections
 
+    def update_plot_uncertainty(
+            self, lines, collections, 
+            *args, 
+    ):
+        if len(args) == 2:
+            y, yerr = args 
+            distance = y.index 
+        else:
+            distance, y, yerr = args
+
+        distance = self._by_country(distance)
+        # if covariance passed extract square root of diagonal
+        yerr = {
+            cnt: np.diag(err)**0.5 if np.ndim(err) == 2 else err
+            for cnt, err in self._by_country(yerr).items()
+        }
+        for cnt in y.columns:
+            lines[cnt].set_data(
+                distance[cnt], 
+                y[cnt], 
+            )
+            update_fill_between(
+                collections[cnt],
+                distance[cnt], 
+                y[cnt] - yerr[cnt], 
+                y[cnt] + yerr[cnt],
+            )
     
     def plot_pace(self, ax=None, **kwargs):
         distance = self.live_data.distanceTravelled

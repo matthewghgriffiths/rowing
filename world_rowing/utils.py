@@ -1,4 +1,7 @@
 
+import os 
+from pathlib import Path 
+from functools import lru_cache
 from collections import UserDict, abc
 from datetime import timedelta
 import logging
@@ -8,11 +11,123 @@ from concurrent.futures import (
     ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 )
 
+import numpy as np
+import pandas as pd
 from scipy.special import erf
+
+_file_path = Path(os.path.abspath(__file__))
+_module_path = _file_path.parent 
+_data_path = _module_path / 'data'
+_flag_path = _data_path / 'flags'
 
 def Phi(z):
     sq2 = 1.4142135623730951
     return 1/2 + erf(z/sq2)/2
+
+@lru_cache
+def get_iso_country_data(data_path=_data_path / 'iso_country.json'):
+    return pd.read_json(data_path)
+
+@lru_cache
+def get_iso2_names(data_path=_data_path / 'iso_country.json'):
+    iso_country = get_iso_country_data(data_path)
+    return pd.concat([
+        pd.Series(
+            iso_country.iso2[col.notna()].values,
+            index=col[col.notna()],
+        )
+        for _, col in iso_country.iteritems()
+    ])
+
+@lru_cache
+def get_iso3_names(data_path=_data_path / 'iso_country.json'):
+    iso_country = get_iso_country_data(data_path)
+    return pd.concat([
+        pd.Series(
+            iso_country.iso3[col.notna()].values,
+            index=col[col.notna()].str.upper(),
+        )
+        for _, col in iso_country.iteritems()
+    ])
+
+
+@lru_cache
+def find_country_iso2(
+        country, 
+        data_path=_data_path / 'iso_country.json'
+    ):
+        return get_iso2_names(data_path)[country]
+
+@lru_cache
+def get_flag_im(
+        country, 
+        data_path=_data_path / 'iso_country.json',
+        flag_path=_flag_path
+):
+    import matplotlib.pyplot as plt
+    iso2cnt = find_country_iso2(
+        country, data_path
+    )
+    return plt.imread(
+        flag_path / f"{iso2cnt}.png"
+    )
+
+
+def make_flag_box(
+        country, 
+        xy,
+        zoom=0.04, 
+        resample=True, 
+        frameon=False,
+        xycoords='data',  
+        box_alignment=(0.5, 0.),
+        pad=0,
+        data_path=_data_path / 'iso_country.json',
+        flag_path=_flag_path,
+        offset_kws=None, 
+        **kwargs
+):
+    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+    im = get_flag_im(
+        country, 
+        data_path=data_path,
+        flag_path=flag_path,
+        **(offset_kws or {})
+    )
+    offset_im = OffsetImage(
+        im, zoom=zoom, resample=resample
+    )
+    return AnnotationBbox(
+        offset_im, xy, 
+        frameon=frameon,
+        xycoords=xycoords,  
+        box_alignment=box_alignment,
+        pad=0,
+        **kwargs
+    )
+
+def update_fill_between(poly, x, y0, y1):
+    x, y0, y1 = map(np.asarray, (x, y0, y1))
+    vertices = poly.get_paths()[0].vertices
+    vertices[1:len(x)+1, 0] = x
+    vertices[1:len(x)+1, 1] = y0
+    vertices[len(x) + 1:-2, 0] = x[::-1]
+    vertices[len(x) + 1:-2, 1] = y1[::-1]
+    vertices[0, 0] = vertices[-1, 0] = x[0]
+    vertices[0, 1] = vertices[-1, 1] = y1[0]
+
+
+def update_fill_betweenx(poly, y, x0, x1):
+    y, x0, x1 = map(np.asarray, (y, x0, x1))
+    vertices = poly.get_paths()[0].vertices
+    n = len(y)
+    vertices[1:n+1, 0] = x0
+    vertices[1:n+1, 1] = y
+    vertices[n + 1:-2, 0] = x1[::-1]
+    vertices[n + 1:-2, 1] = y[::-1]
+    vertices[0, 0] = vertices[-1, 0] = x1[0]
+    vertices[0, 1] = vertices[-1, 1] = y[0]
+
 
 def format_totalseconds(seconds, hundreths=True):
     return format_timedelta(timedelta(seconds=seconds), hundreths=hundreths)

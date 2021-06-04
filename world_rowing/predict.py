@@ -10,13 +10,17 @@ from scipy import linalg, integrate, stats
 from . import api, utils, livetracker
 from .livetracker import RaceTracker
 
+
 def calc_win_probs(times, std):
-    diffs = times.min() - times.values 
+    norm = stats.norm(
+        loc=times.min() - times.values, 
+        scale=np.asarray(std)
+    )
 
     def func(x):
-        logcdf = -stats.norm.logcdf((x - diffs), scale=std)
+        logcdf = -norm.logcdf(x)
         logcdf -= logcdf.sum()
-        logp = stats.norm.logpdf((x - diffs), scale=std)
+        logp = norm.logpdf(x)
         return np.exp(logp + logcdf)
 
     win_prob, err = integrate.quad_vec(
@@ -26,20 +30,28 @@ def calc_win_probs(times, std):
     return pd.Series(win_prob, index=times.index)
 
 
-def estimate_distance_from_leader(pred_times):
-    leader_times = pred_times.min(axis=1)
-    return pd.DataFrame(
-        np.vstack([
-            np.interp(
-                leader_times,
-                pred_times[cnt],
-                leader_times.index, 
-            )
-            for cnt in pred_times.columns
-        ]).T,
-        columns=pred_times.columns,
-        index=leader_times.index
+def load_predicter(noise=10., data_path=utils._data_path):
+    mean_pace = pd.read_csv(
+        data_path / 'mean_pace.csv.gz'
+    ).set_index('distance').pace
+    distances = mean_pace.index
+
+    cov_pace = pd.read_csv(
+        data_path / 'cov_pace.csv.gz',
+        index_col=0
     )
+    cov_pace.columns = cov_pace.columns.astype(int)
+    assert (
+        (cov_pace.index == distances).all() and 
+        (cov_pace.columns == distances).all()
+    )
+    mean_cov = mean_pace.values[:, None] * mean_pace.values[None, :]
+    K = pd.DataFrame(
+        mean_cov + cov_pace, 
+        index=distances, 
+        columns=distances 
+    )
+    return PredictRace(distances, K, noise=noise)
 
 
 class PredictRace:
@@ -106,7 +118,8 @@ class PredictRace:
             columns=parse_cols,
             index=distances
         )
-        live_dist_data
+        for cnt in live_dist_data.metrePerSecond.columns:
+            live_dist_data[('pace', cnt)] = 500 / live_dist_data.metrePerSecond[cnt]
         return live_dist_data
 
     def calc_boat_times(self, live_data):
@@ -185,6 +198,59 @@ class PredictRace:
             self.calc_predicters(distance)
             
         return self.pred_pace_covs[distance]
+
+    def predict(self, race_pace):
+        pred_pace = race_pace.copy()
+        pred_times = race_pace.copy()
+        pred_distance = race_pace.copy()
+        pred_pace_cov = {}
+        pred_times_cov = {}
+        pred_distance_cov = {}
+
+        M = self.pace_time_M
+        for cnt, cnt_pace in race_pace.items():
+            distance = cnt_pace.index[cnt_pace.notna()][-1]
+            pace_predictor = self.get_linear_pace_predicter(distance)
+            pred_pace[cnt] = pace_predictor.dot(cnt_pace.loc[:distance])
+            pred_pace_cov[cnt] = self.get_pred_pace_cov(distance)
+            pred_times[cnt] = M.dot(pred_pace[cnt])
+            pred_times_cov[cnt] = M.dot(pred_pace_cov[cnt].dot(M.T))
+
+        leader_time = pred_times.min(1)
+        for cnt in pred_times.columns:
+            maxi = pred_times[cnt].searchsorted(leader_time.iloc[-1]) + 1
+            pred_distance[cnt] = np.interp(
+                leader_time, 
+                pred_times[cnt].iloc[:maxi], 
+                pred_times.index[:maxi], 
+            )
+            pred_speed = 500 / pred_pace[cnt].values[:, None]
+            pred_distance_cov[cnt] = pred_times_cov[cnt] * pred_speed * pred_speed.T
+
+        pred_pace_std, pred_times_std, pred_distance_std = (
+            pd.DataFrame(
+                {
+                    cnt: np.sqrt(cov.values.diagonal())
+                    for cnt, cov in pred_pace_cov.items()
+                }, 
+                index=race_pace.index
+            )
+            for pred_cov in (
+                pred_pace_cov, pred_times_cov, pred_distance_cov, 
+            )
+        )
+        win_probs = calc_win_probs(
+            pred_times.iloc[-1], 
+            pred_times_std.iloc[-1]
+        )
+
+        return (
+            (pred_pace, pred_pace_std), 
+            (pred_times, pred_times_std),
+            (pred_distance, pred_distance_std),
+            win_probs
+        )
+
     
     def predict_pace(self, race_pace, distance=None):
         if distance:
@@ -215,7 +281,7 @@ class PredictRace:
             pred_time_cov = pd.concat({
                 cnt: M.dot(pred_pace_cov[cnt].dot(M.T))
                 for cnt in pred_times.columns
-            })
+            }).T
         
         return (pred_pace, pred_pace_cov), (pred_times, pred_time_cov)
     
@@ -247,15 +313,18 @@ class PredictRace:
         return pred_finish, pred_finish_cov
  
 
-
 class LivePrediction(RaceTracker):
     def __init__( 
         self, race_id, 
-        predicter: PredictRace, 
+        predicter: PredictRace = None, 
+        noise=10.,
+        data_path=utils._data_path,
         **kwargs
     ):
         super().__init__(race_id, **kwargs)
-        self.predicter = predicter
+        self.predicter = \
+            predicter or load_predicter(noise=noise, data_path=data_path)
+        
         self.pace_preds = {}
         self.time_preds = {}
         self.finish_preds = {}
@@ -269,6 +338,7 @@ class LivePrediction(RaceTracker):
         self.race_times = self.predicter.calc_boat_times(
             self.live_data
         )
+        return self.live_data
 
     def predict_pace(self, distance=None, update=False):
         if distance and distance in self.pace_preds:
