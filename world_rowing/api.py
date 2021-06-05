@@ -7,7 +7,7 @@ from collections.abc import Mapping
 import pandas as pd
 import requests
 
-from .utils import getnesteditem, extract_fields, map_concurrent
+from .utils import getnesteditem, extract_fields, read_times, map_concurrent
 
 OLYMPIC_BOATCLASS = [
     'M1x', 'LM2x', 'W1x', 'M2x', 'M2-', 'LW2x', 'M4-',
@@ -131,6 +131,22 @@ def get_most_recent_competition(fisa=True):
     started = competitions.StartDate < datetime.datetime.now()
     return competitions.loc[started].iloc[-1]
 
+def get_last_race_started(fisa=True, competition=None):
+    return get_last_races(n=1, fisa=fisa, competition=competition).iloc[0]
+
+def get_last_races(n=1, fisa=True, competition=None):
+    competition = competition or get_most_recent_competition(fisa)
+    races = get_competition_races(competition.name)
+    started = races.DateString < datetime.datetime.now().astimezone()
+    return races.loc[started].sort_values('DateString').iloc[-n:]
+
+def get_next_races(n=1, fisa=True, competition=None):
+    competition = competition or get_most_recent_competition(fisa)
+    races = get_competition_races(competition.name)
+    to_race = races.DateString > datetime.datetime.now().astimezone()
+    return races.loc[to_race].sort_values('DateString').iloc[:n]
+
+
 def get_boat_types():
     return get_worldrowing_records('boatClass', cached=True)
 
@@ -183,7 +199,7 @@ def get_race_results(
     if len(results):
         results.set_index(['raceId', 'id'], inplace=True)
         if 'ResultTime' in results.columns:
-            results.ResultTime = pd.to_timedelta(results.ResultTime)
+            results.ResultTime = read_times(results.ResultTime)
     return results
 
 INTERMEDIATE_FIELDS = {

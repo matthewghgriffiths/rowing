@@ -10,8 +10,8 @@ from .api import (
     find_world_best_time, INTERMEDIATE_FIELDS
 )
 from .utils import (
-    extract_fields, format_yaxis_splits, update_fill_betweenx, 
-    update_fill_between
+    extract_fields, format_yaxis_splits, make_flag_box, update_fill_betweenx, 
+    update_fill_between, read_times
 )
 
 RESULTS_FIELDS = {
@@ -71,7 +71,9 @@ class RaceTracker:
     
     @property
     def intermediate_results(self):
-        if self.intermediates is not None:
+        if self.intermediates is None:
+            return None 
+        elif len(self.intermediates):
             intermediate_results = pd.merge(
                 self.intermediates[
                     ['raceBoatId', 'distance', 'ResultTime']
@@ -96,6 +98,8 @@ class RaceTracker:
             intermediate_results.columns = distances
             intermediate_results.index.name = 'country'
             return intermediate_results
+        else:
+            return self.intermediates
         
     @cached_property
     def race_details(self):
@@ -112,6 +116,10 @@ class RaceTracker:
     @cached_property
     def lane_country(self):
         return self.race_boats.set_index('Lane').Country.sort_index()
+
+    @cached_property
+    def country_lane(self):
+        return self.race_boats.set_index('Country').Lane.sort_values()
 
     @property
     def country_colors(self):
@@ -190,6 +198,48 @@ class RaceTracker:
         ])
         return (x.min(), x.max()), (y.min(), y.max())
 
+    def plot_flags(
+            self, *args, ax=None,  
+            zoom=0.04, 
+            box_alignment=(0.5, 0.),
+            **kwargs
+    ):
+        import matplotlib.pyplot as plt
+        ax = ax or plt.gca()
+        if len(args) == 1:
+            y, = args
+            x = self.country_lane[y.index]
+        else:
+            x, y = args
+
+        flags = {}
+        for cnt in y.index:
+            xy = x[cnt], y[cnt]
+            flag = make_flag_box(
+                cnt[:3],
+                xy, 
+                zoom=zoom, 
+                box_alignment=box_alignment,
+                **kwargs
+            )
+            
+            ax.add_artist(flag)
+            flags[cnt] = flag
+
+        return flags
+
+    def update_flags(
+        self, flags, *args
+    ):
+        if len(args) == 1:
+            y, = args
+            x = self.country_lane[y.index]
+        else:
+            x, y = args
+
+        for cnt in y.index:
+            flags[cnt].xybox = flags[cnt].xy = x[cnt], y[cnt]
+
     def violin(
             self, y_dens, ax=None, width=0.8, alpha=0.6, outline=True, 
             set_xticks=True, outline_kws=None, **kwargs
@@ -227,7 +277,6 @@ class RaceTracker:
             ax.set_xticks(self.lane_country.index)
             ax.set_xticklabels(self.lane_country)
         return violins, lines
-
 
     def update_violins(
             self, violins, lines, y_dens, width=0.8
@@ -467,10 +516,7 @@ def parse_livetracker_results(data):
     )
     for df in [results, intermediates]:
         if 'ResultTime' in df.columns:
-            minfmt = df.ResultTime.str.match(
-                r"[0-9]+:[0-9][0-9]\.[0-9]")
-            df.loc[minfmt, 'ResultTime'] = "0:" + df.ResultTime[minfmt]
-            df.loc[:, 'ResultTime'] = pd.to_timedelta(df.ResultTime)
+            df.ResultTime = read_times(df.ResultTime)
 
     return results, intermediates
 

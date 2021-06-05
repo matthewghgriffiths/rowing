@@ -17,7 +17,8 @@
     "iso3": "AGO",
     "name": "Angola",
     "numeric": 24,
-    "official_name": "Republic of Angola"
+    "official_name": "Republic of Angola",
+    "other_symbols": "ANG"
   },
   {
     "iso2": "AI",
@@ -49,7 +50,8 @@
     "iso2": "AE",
     "iso3": "ARE",
     "name": "United Arab Emirates",
-    "numeric": 784
+    "numeric": 784,
+    "other_symbols": "UAE"
   },
   {
     "iso2": "AR",
@@ -155,7 +157,8 @@
     "iso3": "BGR",
     "name": "Bulgaria",
     "numeric": 100,
-    "official_name": "Republic of Bulgaria"
+    "official_name": "Republic of Bulgaria",
+    "other_symbols": "BUL"
   },
   {
     "iso2": "BH",
@@ -169,7 +172,8 @@
     "iso3": "BHS",
     "name": "Bahamas",
     "numeric": 44,
-    "official_name": "Commonwealth of the Bahamas"
+    "official_name": "Commonwealth of the Bahamas",
+    "other_symbols": "BAH"
   },
   {
     "iso2": "BA",
@@ -201,7 +205,8 @@
     "iso2": "BM",
     "iso3": "BMU",
     "name": "Bermuda",
-    "numeric": 60
+    "numeric": 60,
+    "other_symbols": "BER"
   },
   {
     "iso2": "BO",
@@ -273,14 +278,16 @@
     "iso3": "CHE",
     "name": "Switzerland",
     "numeric": 756,
-    "official_name": "Swiss Confederation"
+    "official_name": "Swiss Confederation",
+    "other_symbols": "SUI"
   },
   {
     "iso2": "CL",
     "iso3": "CHL",
     "name": "Chile",
     "numeric": 152,
-    "official_name": "Republic of Chile"
+    "official_name": "Republic of Chile",
+    "other_symbols": "CHI"
   },
   {
     "iso2": "CN",
@@ -348,7 +355,8 @@
     "iso3": "CRI",
     "name": "Costa Rica",
     "numeric": 188,
-    "official_name": "Republic of Costa Rica"
+    "official_name": "Republic of Costa Rica",
+    "other_symbols": "CRC"
   },
   {
     "iso2": "CU",
@@ -395,7 +403,8 @@
     "iso3": "DEU",
     "name": "Germany",
     "numeric": 276,
-    "official_name": "Federal Republic of Germany"
+    "official_name": "Federal Republic of Germany",
+    "other_symbols": "GER"
   },
   {
     "iso2": "DJ",
@@ -416,7 +425,8 @@
     "iso3": "DNK",
     "name": "Denmark",
     "numeric": 208,
-    "official_name": "Kingdom of Denmark"
+    "official_name": "Kingdom of Denmark",
+    "other_symbols": "DEN"
   },
   {
     "iso2": "DO",
@@ -429,7 +439,8 @@
     "iso3": "DZA",
     "name": "Algeria",
     "numeric": 12,
-    "official_name": "People's Democratic Republic of Algeria"
+    "official_name": "People's Democratic Republic of Algeria",
+    "other_symbols": "ALG"
   },
   {
     "iso2": "EC",
@@ -597,7 +608,8 @@
     "iso3": "GRC",
     "name": "Greece",
     "numeric": 300,
-    "official_name": "Hellenic Republic"
+    "official_name": "Hellenic Republic",
+    "other_symbols": "GRE"
   },
   {
     "iso2": "GD",
@@ -616,7 +628,8 @@
     "iso3": "GTM",
     "name": "Guatemala",
     "numeric": 320,
-    "official_name": "Republic of Guatemala"
+    "official_name": "Republic of Guatemala",
+    "other_symbols": "GUA"
   },
   {
     "iso2": "GF",
@@ -655,14 +668,16 @@
     "iso3": "HND",
     "name": "Honduras",
     "numeric": 340,
-    "official_name": "Republic of Honduras"
+    "official_name": "Republic of Honduras",
+    "other_symbols": "HON"
   },
   {
     "iso2": "HR",
     "iso3": "HRV",
     "name": "Croatia",
     "numeric": 191,
-    "official_name": "Republic of Croatia"
+    "official_name": "Republic of Croatia",
+    "other_symbols": "CRO"
   },
   {
     "iso2": "HT",
@@ -683,7 +698,8 @@
     "iso3": "IDN",
     "name": "Indonesia",
     "numeric": 360,
-    "official_name": "Republic of Indonesia"
+    "official_name": "Republic of Indonesia",
+    "other_symbols": "INA"
   },
   {
     "iso2": "IM",
@@ -715,7 +731,8 @@
     "iso3": "IRN",
     "name": "Iran, Islamic Republic of",
     "numeric": 364,
-    "official_name": "Islamic Republic of Iran"
+    "official_name": "Islamic Republic of Iran",
+    "other_symbols": "IRI"
   },
   {
     "iso2": "IQ",
@@ -822,7 +839,8 @@
     "iso3": "KWT",
     "name": "Kuwait",
     "numeric": 414,
-    "official_name": "State of Kuwait"
+    "official_name": "State of Kuwait",
+    "other_symbols": "KUW"
   },
   {
     "iso2": "LA",
@@ -849,7 +867,8 @@
     "iso3": "LBY",
     "name": "Libya",
     "numeric": 434,
-    "official_name": "Libya"
+    "official_name": "Libya",
+    "other_symbols": "LBA"
   },
   {
     "iso2": "LC",
@@ -869,7 +888,8 @@
     "iso3": "LKA",
     "name": "Sri Lanka",
     "numeric": 144,
-    "official_name": "Democratic Socialist Republic of Sri Lanka"
+    "official_name": "Democratic Socialist Republic of Sri Lanka",
+    "other_symbols": "SRI"
   },
   {
     "iso2": "LS",
@@ -897,7 +917,8 @@
     "iso3": "LVA",
     "name": "Latvia",
     "numeric": 428,
-    "official_name": "Republic of Latvia"
+    "official_name": "Republic of Latvia",
+    "other_symbols": "LAT"
   },
   {
     "iso2": "MO",
@@ -924,7 +945,8 @@
     "iso3": "MCO",
     "name": "Monaco",
     "numeric": 492,
-    "official_name": "Principality of Monaco"
+    "official_name": "Principality of Monaco",
+    "other_symbols": "MON"
   },
   {
     "iso2": "MD",
@@ -939,7 +961,8 @@
     "iso3": "MDG",
     "name": "Madagascar",
     "numeric": 450,
-    "official_name": "Republic of Madagascar"
+    "official_name": "Republic of Madagascar",
+    "other_symbols": "MAD"
   },
   {
     "iso2": "MV",
@@ -988,7 +1011,8 @@
     "iso3": "MMR",
     "name": "Myanmar",
     "numeric": 104,
-    "official_name": "Republic of Myanmar"
+    "official_name": "Republic of Myanmar",
+    "other_symbols": "MYA"
   },
   {
     "iso2": "ME",
@@ -1041,7 +1065,8 @@
     "iso3": "MUS",
     "name": "Mauritius",
     "numeric": 480,
-    "official_name": "Republic of Mauritius"
+    "official_name": "Republic of Mauritius",
+    "other_symbols": "MRI"
   },
   {
     "iso2": "MW",
@@ -1054,7 +1079,8 @@
     "iso2": "MY",
     "iso3": "MYS",
     "name": "Malaysia",
-    "numeric": 458
+    "numeric": 458,
+    "other_symbols": "MAS"
   },
   {
     "iso2": "YT",
@@ -1080,7 +1106,8 @@
     "iso3": "NER",
     "name": "Niger",
     "numeric": 562,
-    "official_name": "Republic of the Niger"
+    "official_name": "Republic of the Niger",
+    "other_symbols": "NIG"
   },
   {
     "iso2": "NF",
@@ -1093,14 +1120,16 @@
     "iso3": "NGA",
     "name": "Nigeria",
     "numeric": 566,
-    "official_name": "Federal Republic of Nigeria"
+    "official_name": "Federal Republic of Nigeria",
+    "other_symbols": "NGR"
   },
   {
     "iso2": "NI",
     "iso3": "NIC",
     "name": "Nicaragua",
     "numeric": 558,
-    "official_name": "Republic of Nicaragua"
+    "official_name": "Republic of Nicaragua",
+    "other_symbols": "NCA"
   },
   {
     "iso2": "NU",
@@ -1114,7 +1143,8 @@
     "iso3": "NLD",
     "name": "Netherlands",
     "numeric": 528,
-    "official_name": "Kingdom of the Netherlands"
+    "official_name": "Kingdom of the Netherlands",
+    "other_symbols": "NED"
   },
   {
     "iso2": "NO",
@@ -1182,7 +1212,8 @@
     "iso3": "PHL",
     "name": "Philippines",
     "numeric": 608,
-    "official_name": "Republic of the Philippines"
+    "official_name": "Republic of the Philippines",
+    "other_symbols": "PHI"
   },
   {
     "iso2": "PW",
@@ -1209,7 +1240,8 @@
     "iso2": "PR",
     "iso3": "PRI",
     "name": "Puerto Rico",
-    "numeric": 630
+    "numeric": 630,
+    "other_symbols": "PUR"
   },
   {
     "iso2": "KP",
@@ -1223,14 +1255,16 @@
     "iso3": "PRT",
     "name": "Portugal",
     "numeric": 620,
-    "official_name": "Portuguese Republic"
+    "official_name": "Portuguese Republic",
+    "other_symbols": "POR"
   },
   {
     "iso2": "PY",
     "iso3": "PRY",
     "name": "Paraguay",
     "numeric": 600,
-    "official_name": "Republic of Paraguay"
+    "official_name": "Republic of Paraguay",
+    "other_symbols": "PAR"
   },
   {
     "iso2": "PS",
@@ -1289,7 +1323,8 @@
     "iso3": "SDN",
     "name": "Sudan",
     "numeric": 729,
-    "official_name": "Republic of the Sudan"
+    "official_name": "Republic of the Sudan",
+    "other_symbols": "SUD"
   },
   {
     "iso2": "SN",
@@ -1303,7 +1338,8 @@
     "iso3": "SGP",
     "name": "Singapore",
     "numeric": 702,
-    "official_name": "Republic of Singapore"
+    "official_name": "Republic of Singapore",
+    "other_symbols": "SIN"
   },
   {
     "iso2": "GS",
@@ -1341,7 +1377,8 @@
     "iso3": "SLV",
     "name": "El Salvador",
     "numeric": 222,
-    "official_name": "Republic of El Salvador"
+    "official_name": "Republic of El Salvador",
+    "other_symbols": "ESA"
   },
   {
     "iso2": "SM",
@@ -1403,7 +1440,8 @@
     "iso3": "SVN",
     "name": "Slovenia",
     "numeric": 705,
-    "official_name": "Republic of Slovenia"
+    "official_name": "Republic of Slovenia",
+    "other_symbols": "SLO"
   },
   {
     "iso2": "SE",
@@ -1457,7 +1495,8 @@
     "iso3": "TGO",
     "name": "Togo",
     "numeric": 768,
-    "official_name": "Togolese Republic"
+    "official_name": "Togolese Republic",
+    "other_symbols": "TOG"
   },
   {
     "iso2": "TH",
@@ -1532,7 +1571,8 @@
     "name": "Taiwan, Province of China",
     "numeric": 158,
     "official_name": "Taiwan, Province of China",
-    "common_name": "Taiwan"
+    "common_name": "Taiwan",
+    "other_symbols": "TPE"
   },
   {
     "iso2": "TZ",
@@ -1566,7 +1606,8 @@
     "iso3": "URY",
     "name": "Uruguay",
     "numeric": 858,
-    "official_name": "Eastern Republic of Uruguay"
+    "official_name": "Eastern Republic of Uruguay",
+    "other_symbols": "URU"
   },
   {
     "iso2": "US",
@@ -1592,7 +1633,8 @@
     "iso2": "VC",
     "iso3": "VCT",
     "name": "Saint Vincent and the Grenadines",
-    "numeric": 670
+    "numeric": 670,
+    "other_symbols": "VIN"
   },
   {
     "iso2": "VE",
@@ -1622,14 +1664,16 @@
     "name": "Viet Nam",
     "numeric": 704,
     "official_name": "Socialist Republic of Viet Nam",
-    "common_name": "Vietnam"
+    "common_name": "Vietnam",
+    "other_symbols": "VIE"
   },
   {
     "iso2": "VU",
     "iso3": "VUT",
     "name": "Vanuatu",
     "numeric": 548,
-    "official_name": "Republic of Vanuatu"
+    "official_name": "Republic of Vanuatu",
+    "other_symbols": "VAN"
   },
   {
     "iso2": "WF",
@@ -1642,7 +1686,8 @@
     "iso3": "WSM",
     "name": "Samoa",
     "numeric": 882,
-    "official_name": "Independent State of Samoa"
+    "official_name": "Independent State of Samoa",
+    "other_symbols": "SAM"
   },
   {
     "iso2": "YE",
@@ -1656,20 +1701,23 @@
     "iso3": "ZAF",
     "name": "South Africa",
     "numeric": 710,
-    "official_name": "Republic of South Africa"
+    "official_name": "Republic of South Africa",
+    "other_symbols": "RSA"
   },
   {
     "iso2": "ZM",
     "iso3": "ZMB",
     "name": "Zambia",
     "numeric": 894,
-    "official_name": "Republic of Zambia"
+    "official_name": "Republic of Zambia",
+    "other_symbols": "ZAM"
   },
   {
     "iso2": "ZW",
     "iso3": "ZWE",
     "name": "Zimbabwe",
     "numeric": 716,
-    "official_name": "Republic of Zimbabwe"
+    "official_name": "Republic of Zimbabwe",
+    "other_symbols": "ZIM"
   }
 ]

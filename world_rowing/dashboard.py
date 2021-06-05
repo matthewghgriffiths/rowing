@@ -1,32 +1,48 @@
 
+import datetime 
+
 import numpy as np
 import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-from .utils import format_yaxis_splits
+from .utils import format_yaxis_splits, update_table, format_totalseconds
 from .predict import LivePrediction
 
 class Dashboard:
-    def __init__(self, race_tracker, subplots_adjust=None, alpha=0.1, **kwargs):
+    def __init__(
+            self, race_tracker, 
+            subplots_adjust=None, alpha=0.1, 
+            table_bbox=(0, 1.05, 1, 0.6),
+            **kwargs
+    ):
         self.race_tracker = race_tracker
         
         self.alpha = alpha
+        self.table_bbox = table_bbox
         self._subplots_adjust = subplots_adjust or {'hspace': 0.05, 'wspace': 0.05}
-        
         
         kwargs.setdefault('figsize', (12, 8))
         self._init(**kwargs)
 
+        self.finished = False
+        self.p_pace = None
+        self.p_times = None
+        self.p_win = None
+        self.p_dist = None
+        self.p_finish = None
+
     @classmethod
     def from_race_id(cls, race_id, **kwargs):
-        race_tracker = LivePrediction(race_id)
+        race_tracker = LivePrediction(race_id, noise=1)
         return cls(race_tracker, **kwargs)
         
     def _init(self, **kwargs):
         self._init_fig(**kwargs)
+        self._init_tables()
         self._init_distance_behind()
+        self._init_flags()
         self._init_pace()
         self._init_stroke_rate()
         self._init_predict()
@@ -86,6 +102,34 @@ class Dashboard:
         
         self.p_win_ax = self.right_axes[-1]
         self.p_win_ax.get_shared_y_axes().remove(self.p_win_ax)
+
+    def _init_tables(self):
+        race_tracker = self.race_tracker
+        bbox = self.table_bbox 
+        n = len(race_tracker.lane_country)
+        self.left_table = self.left_axes[0].table(
+            np.full((n, 2), '-'),
+            rowLabels=race_tracker.lane_country.values,
+            rowColours=race_tracker.country_colors[
+                race_tracker.lane_country
+            ],
+            colLabels=['lane', 'pos'],
+            loc='top',
+            bbox=bbox,
+        )
+        self.middle_table = self.middle_axes[0].table(
+            np.full((n, 4), '-'),
+            colLabels=[500, 1000, 1500, 2000],
+            loc='top',
+            bbox=bbox,
+        )
+
+        self.right_table = self.right_axes[0].table(
+            np.full((n, 2), '-'), 
+            colLabels=['PGMT', 'pred pos'],
+            loc='top',
+            bbox=bbox,
+        )
         
     def _init_bar_line(self, bar_ax, line_ax):
         bars = self.race_tracker.bar(
@@ -109,6 +153,14 @@ class Dashboard:
         self.b_distance_behind, self.l_distance_behind = self._init_bar_line(
             self.b_distance_behind_ax, self.l_distance_behind_ax
         )
+
+    def _init_flags(self):
+        self.b_distance_flags = self.race_tracker.plot_flags(
+            self.race_tracker.country_lane * 0,
+            zoom=0.015,
+            zorder=10,
+            ax=self.b_distance_behind_ax
+        )
         
     def _init_pace(self):
         self.b_pace, self.l_pace = self._init_bar_line(
@@ -130,6 +182,22 @@ class Dashboard:
         )
         
     def _init_axes(self):
+        comp_name = self.race_tracker.competition_details.DisplayName
+        race_name = self.race_tracker.race_details.DisplayName
+        date = pd.to_datetime(
+            self.race_tracker.race_details.DateString
+        ).astimezone(
+            datetime.datetime.now().astimezone().tzinfo
+        ).strftime("%c (%Z)")
+        progression = self.race_tracker.race_details.Progression
+        if progression:
+            progression = f"\nProgression: {progression}"
+        else:
+            progression = ''
+
+        fig_title = f"{comp_name}: {race_name}, {date}{progression}"
+        self.fig.suptitle(fig_title)
+
         self.b_distance_behind_ax.set_ylabel('distance from leader (m)')
         self.b_pace_ax.set_ylabel('split (/500m)')
         self.b_stroke_rates_ax.set_ylabel('rate (s/m)')
@@ -149,37 +217,86 @@ class Dashboard:
             self.axes[-1, -1].get_xticklabels(), 
             rotation=45,
         )
-        
+        self.fig.tight_layout()
         self.fig.subplots_adjust(**self._subplots_adjust)
-        
-    def update_bar(self, bars, heights, bottom=None):
-        return self.race_tracker.update_bar(
-            bars, heights, bottom=bottom
-        )
+
+    def update(self, live_data=None, predictions=None):
+        self.update_livedata(live_data)
+        self.update_predictions(predictions=predictions, live_data=live_data)
         
     def update_livedata(self, live_data=None):
         if live_data is None:
             live_data = self.race_tracker.update_livedata()
             
-        self.update_stroke_rate(live_data)
-        self.update_pace(live_data)
-        self.update_distance_behind(live_data)
+        if len(live_data):
+            self.update_stroke_rate(live_data)
+            self.update_pace(live_data)
+            self.update_distance_behind(live_data)
+            self.update_pos(live_data)
+            self.update_intermediates(
+                self.race_tracker.intermediate_results)
+
+    def update_pos(self, live_data):
+        update_table(
+            self.left_table, 
+            self.race_tracker.lane_country, 
+            ['lane', 'pos'], 
+            pd.DataFrame({
+                'lane': self.race_tracker.country_lane,
+                'pos': live_data.currentPosition.iloc[-1]
+            })
+        )
+
+    def update_intermediates(self, intermediates):
+        update_table(
+            self.middle_table, 
+            self.race_tracker.lane_country, 
+            [500, 1000, 1500, 2000], 
+            intermediates.applymap(
+                format_totalseconds, 
+                na_action='ignore'
+            ).fillna('-')
+        )
+
+        if 2000 in intermediates.columns:
+            self.finished = True
+            finish_times = intermediates[2000]
+            finish_pos = finish_times.sort_values()
+            finish_pos[:] = np.arange(1, len(finish_pos) + 1)
+            pgmt = (self.race_tracker.gmt / finish_times).apply(
+                "{:.1%}".format
+                )
         
+            update_table(
+                self.right_table, 
+                self.race_tracker.lane_country, 
+                ['PGMT', 'pos'],
+                pd.DataFrame({
+                    'PGMT': pgmt,
+                    'pos': finish_pos.astype(int), 
+                }) 
+            )
+            self.right_table[0, 1].get_text().set_text('final pos')
         
     def update_distance_behind(self, live_data):
-        self.race_tracker.update_bar(
-            self.b_distance_behind, 
-            live_data.distanceFromLeader.iloc[-1],
-        )        
+        # self.race_tracker.update_bar(
+        #     self.b_distance_behind, 
+        #     live_data.distanceFromLeader.iloc[-1],
+        # )        
         self.race_tracker.update_plot(
             self.l_distance_behind, 
             live_data.distanceTravelled,
             live_data.distanceFromLeader,
         )
+        self.race_tracker.update_flags(
+            self.b_distance_flags,
+            live_data.distanceFromLeader.iloc[-1],
+        )
         self.b_distance_behind_ax.set_ylim(
             live_data.distanceFromLeader.values.max() + 1, 
-            0, 
+            -5, 
         )
+        
         
     def update_pace(self, live_data):
         pace = 500 / live_data.metrePerSecond
@@ -192,14 +309,16 @@ class Dashboard:
             live_data.distanceTravelled,
             pace,
         )
-        self.b_pace_ax.set_ylim(
-            np.nanmax([
+        ylim = (
+            np.nanmin([
                 pace.values.max(),
-                pace.values[50:].max()
-            ]), 
-            pace.values.min()
+                pace.values[100:].max()
+            ]) + 1, 
+            pace.values.min() - 1
         )
+        self.b_pace_ax.set_ylim(ylim)
         format_yaxis_splits(self.b_pace_ax)
+        self.b_pace_ax.set_ylim(ylim)
         
             
     def update_stroke_rate(self, live_data):
@@ -224,12 +343,16 @@ class Dashboard:
         self.plot_finish_times(*preds_time)
         self.plot_win_probs(win_probs)
         
-    def update_predictions(self, predictions):
-        preds_pace, preds_time, preds_dist, win_probs = predictions
-        self.update_pred_distance(*preds_dist)
-        self.update_pred_pace(*preds_pace)
-        self.update_finish_times(*preds_time)
-        self.update_win_probs(win_probs)
+    def update_predictions(self, predictions=None, live_data=None):
+        if predictions is None:
+            predictions = self.race_tracker.predict(live_data=live_data)
+
+        if predictions:
+            preds_pace, preds_time, preds_dist, win_probs = predictions
+            self.update_pred_distance(*preds_dist)
+            self.update_pred_pace(*preds_pace)
+            self.update_finish_times(*preds_time)
+            self.update_win_probs(win_probs)
             
     def plot_pred_distance(self, pred_dist, pred_dist_std):
         pred_dist_behind = pred_dist.max(1).values[:, None] - pred_dist
@@ -251,20 +374,22 @@ class Dashboard:
         )
         
     def update_pred_distance(self, pred_dist, pred_dist_std):
-        pred_dist_behind = pred_dist.max(1).values[:, None] - pred_dist
-        
-        self.race_tracker.update_plot_uncertainty(
-            *self.p_dist,
-            pred_dist_behind, pred_dist_std,
-        )
-        self.race_tracker.update_plot_finish(
-            *self.p_finish,
-            pred_dist_behind.iloc[-1],
-            pred_dist_std.iloc[-1],
-        )
-        self.right_axes[0].set_ylim(
-            pred_dist_behind.iloc[-1].max() + 5, -5 
-        )
+        if self.p_dist is None:
+            self.plot_pred_distance(pred_dist, pred_dist_std)
+        else:
+            pred_dist_behind = pred_dist.max(1).values[:, None] - pred_dist
+            self.race_tracker.update_plot_uncertainty(
+                *self.p_dist,
+                pred_dist_behind, pred_dist_std,
+            )
+            self.race_tracker.update_plot_finish(
+                *self.p_finish,
+                pred_dist_behind.iloc[-1],
+                pred_dist_std.iloc[-1],
+            )
+            self.right_axes[0].set_ylim(
+                pred_dist_behind.iloc[-1].max() + 5, -5 
+            )
         
     def plot_pred_pace(self, pred_pace, pred_pace_std):
         self.p_pace = \
@@ -274,25 +399,51 @@ class Dashboard:
             )
         
     def update_pred_pace(self, pred_pace, pred_pace_std):
-        self.race_tracker.update_plot_uncertainty(
-            *self.p_pace, pred_pace, pred_pace_std, 
-        )
+        if self.p_pace is None:
+            self.plot_pred_pace(pred_pace, pred_pace_std)
+        else:
+            self.race_tracker.update_plot_uncertainty(
+                *self.p_pace, pred_pace, pred_pace_std, 
+            )
         
     def plot_finish_times(self, pred_times, pred_times_std):
+        ax = self.right_axes[1]
         self.p_times = \
             self.race_tracker.plot_finish(
                 pred_times.iloc[-1], pred_times_std.iloc[-1], 
-                ax=self.right_axes[1]
+                ax=ax
             )
-        ylims = self.right_axes[1].get_ylim()
-        format_yaxis_splits(self.right_axes[1])
-        self.right_axes[1].set_ylim(*ylims[::-1])
+        ylims = ax.get_ylim()
+        format_yaxis_splits(ax)
+        ax.set_ylim(*ylims[::-1])   
+
+        if not self.finished:
+            finish_times = pred_times.iloc[-1]
+            finish_pos = finish_times.sort_values()
+            finish_pos[:] = np.arange(1, len(finish_pos) + 1)
+            update_table(
+                self.right_table, 
+                self.race_tracker.lane_country, 
+                ['PGMT', 'pos'],
+                pd.DataFrame({
+                    'PGMT': (self.race_tracker.gmt / finish_times).apply(
+                        "{:.1%}".format
+                    ),
+                    'pos': finish_pos.astype(int), 
+                }) 
+            )
         
     def update_finish_times(self, pred_times, pred_times_std):
-        ylims = self.race_tracker.update_plot_finish(
-            *self.p_times, pred_times.iloc[-1], pred_times_std.iloc[-1], 
-        )
-        self.right_axes[1].set_ylim(*ylims[::-1])        
+        if self.p_times is None:
+            self.plot_finish_times(pred_times, pred_times_std)
+        else:
+            from matplotlib.ticker import AutoLocator
+            ylims = self.race_tracker.update_plot_finish(
+                *self.p_times, pred_times.iloc[-1], pred_times_std.iloc[-1], 
+            )
+            self.right_axes[1].yaxis.set_major_locator(AutoLocator()) 
+            format_yaxis_splits(self.right_axes[1])    
+            self.right_axes[1].set_ylim(*ylims[::-1])   
         
     def plot_win_probs(self, win_probs):
         self.p_win = self.race_tracker.bar(
@@ -301,5 +452,8 @@ class Dashboard:
         self.p_win_ax.set_ylim(0, win_probs.max()*1.05)
         
     def update_win_probs(self, win_probs):
-        self.race_tracker.update_bar(self.p_win, win_probs)
-        self.p_win_ax.set_ylim(0, win_probs.max()*1.05)
+        if self.p_win is None:
+            self.plot_win_probs(win_probs)
+        else:
+            self.race_tracker.update_bar(self.p_win, win_probs)
+            self.p_win_ax.set_ylim(0, win_probs.max()*1.05)

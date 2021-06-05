@@ -1,5 +1,6 @@
 
 
+from typing import Dict
 from collections import namedtuple
 from functools import cached_property
 
@@ -47,7 +48,7 @@ def load_predicter(noise=10., data_path=utils._data_path):
     )
     mean_cov = mean_pace.values[:, None] * mean_pace.values[None, :]
     K = pd.DataFrame(
-        mean_cov + cov_pace, 
+        mean_cov + 0.5*cov_pace, 
         index=distances, 
         columns=distances 
     )
@@ -55,7 +56,7 @@ def load_predicter(noise=10., data_path=utils._data_path):
 
 
 class PredictRace:
-    def __init__(self, distances, K, noise=10.):
+    def __init__(self, distances, K, noise=1.):
         self.distances = pd.Index(distances, name='distance')
         # Distance travelled between each distance
         # Needed to calculate times
@@ -120,6 +121,15 @@ class PredictRace:
         )
         for cnt in live_dist_data.metrePerSecond.columns:
             live_dist_data[('pace', cnt)] = 500 / live_dist_data.metrePerSecond[cnt]
+            
+        for cnt in live_dist_data.metrePerSecond.columns:
+            live_dist_data[('time', cnt)] = np.interp(
+                distances, 
+                dist_travelled.loc[:boat_lims[cnt], cnt],
+                live_data.time.loc[:boat_lims[cnt]],
+                right=np.nan
+            )
+
         return live_dist_data
 
     def calc_boat_times(self, live_data):
@@ -199,7 +209,10 @@ class PredictRace:
             
         return self.pred_pace_covs[distance]
 
-    def predict(self, race_pace):
+    def predict(self, live_data, match_to_live=True):
+        live_dist_data = self.calc_distance_data(live_data)
+        race_pace = live_dist_data.pace 
+
         pred_pace = race_pace.copy()
         pred_times = race_pace.copy()
         pred_distance = race_pace.copy()
@@ -215,6 +228,17 @@ class PredictRace:
             pred_pace_cov[cnt] = self.get_pred_pace_cov(distance)
             pred_times[cnt] = M.dot(pred_pace[cnt])
             pred_times_cov[cnt] = M.dot(pred_pace_cov[cnt].dot(M.T))
+
+        for cnt in race_pace.columns:
+            pred_time = pred_times[cnt]
+            time = live_dist_data.time[cnt]
+            diff = pred_time - time
+            mean_diff = diff.mean()
+            curr_diff = diff.dropna().iloc[[-1]] - mean_diff
+            pace_diff = 500 / curr_diff.index[0] * curr_diff.values[0]
+
+            pred_pace[cnt] -= pace_diff
+            pred_times[cnt] = M.dot(pred_pace[cnt]) - mean_diff
 
         leader_time = pred_times.min(1)
         for cnt in pred_times.columns:
@@ -236,9 +260,22 @@ class PredictRace:
                 index=race_pace.index
             )
             for pred_cov in (
-                pred_pace_cov, pred_times_cov, pred_distance_cov, 
+                pred_pace_cov, pred_times_cov, pred_distance_cov
             )
         )
+        pred_distance_std = pred_times_std * (500 / pred_pace)
+
+        if match_to_live:
+            for cnt in race_pace.columns:
+                pace = live_dist_data.pace[cnt]
+                pred_pace.loc[pace.notna(), cnt] = pace.dropna()
+                time  = live_dist_data.time[cnt]
+                pred_times.loc[time.notna(), cnt] = time.dropna()
+                dist = (
+                    live_dist_data.index 
+                    - live_dist_data.distanceFromLeader[cnt])
+                pred_distance.loc[dist.notna(), cnt] = dist.dropna()
+
         win_probs = calc_win_probs(
             pred_times.iloc[-1], 
             pred_times_std.iloc[-1]
@@ -317,214 +354,155 @@ class LivePrediction(RaceTracker):
     def __init__( 
         self, race_id, 
         predicter: PredictRace = None, 
-        noise=10.,
+        noise=0.3,
         data_path=utils._data_path,
         **kwargs
     ):
         super().__init__(race_id, **kwargs)
         self.predicter = \
             predicter or load_predicter(noise=noise, data_path=data_path)
-        
-        self.pace_preds = {}
-        self.time_preds = {}
-        self.finish_preds = {}
-        self.win_preds = {}
 
-    def update_livedata(self):
-        super().update_livedata()
-        self.race_pace = self.predicter.calc_boat_pace(
-            self.live_data
-        )
-        self.race_times = self.predicter.calc_boat_times(
-            self.live_data
-        )
-        return self.live_data
-
-    def predict_pace(self, distance=None, update=False):
-        if distance and distance in self.pace_preds:
-            return self.pace_preds[distance]
-
-        if update:
-            self.update_livedata()
-
-        preds = self.predicter.predict_pace(
-            self.race_pace, distance=distance
-            )
-        distance = distance or self.race_pace.index[-1]
-        self.pace_preds[distance] = preds
-        return preds
-
-    def predict_times(self, distance=None, update=False):
-        if distance and distance in self.time_preds:
-            return self.time_preds[distance]
-
-        if update:
-            self.update_livedata()
-
-        pace_preds, time_preds = self.predicter.predict_pace_times(
-            self.race_pace, distance=distance)
-        distance = distance or self.race_pace.index[-1]
-        self.time_preds[distance] = time_preds
-        self.pace_preds[distance] = pace_preds
-        return time_preds
-
-    def predict_finish_time(self, distance=None, update=False):
-        if distance and distance in self.finish_preds:
-            return self.finish_preds[distance]
-
-        if update:
-            self.update_livedata()
-
-        preds = self.predicter.predict_finish_time(
-            self.race_pace, distance=distance)
-        distance = distance or self.race_pace.index[-1]
-        self.finish_preds[distance] = preds
-        return preds
-
-    def predict_win_probability(self, distance=None, update=False):
-        pred_finish, finish_std = self.predict_finish_time(
-            update=update, distance=distance
-        )
-        win_probs = calc_win_probs(pred_finish, finish_std)
-        distance = distance or self.race_pace.index[-1]
-        self.win_preds[distance] = win_probs
-        return win_probs
+    def predict(self, live_data=None, match_to_live=True):
+        if live_data is None:
+            if self.live_data is None:
+                live_data = self.update_livedata()
+            else:
+                live_data = self.live_data 
+            
+        if len(live_data):
+            return self.predicter.predict(live_data, match_to_live=match_to_live)
 
 
 
+# def calc_boat_time(live_data, distances=None):
+#     distances = distances or np.linspace(0, 2000, 401).astype(int)
+#     dist_travelled = live_data.distanceTravelled
+#     boat_time_lims = (
+#         (cnt, dist_travelled[cnt].searchsorted(distances[-1]) + 1)
+#         for cnt in dist_travelled.columns
+#     )
+#     boat_times = pd.DataFrame(
+#         np.vstack(
+#             [
+#                 np.interp(
+#                     distances, 
+#                     dist_travelled[cnt][:i],
+#                     live_data.time[:i]
+#                 )
+#                 for cnt, i in boat_time_lims
+#             ]
+#         ),
+#         index=dist_travelled.columns,
+#         columns=distances
+#     )
+#     boat_times[0] = 0
+#     boat_times.columns.name = 'distance'
+#     boat_times.index.name = 'country'
+#     return boat_times
+
+# def calc_boat_pace(live_data, distances=None):
+#     distances = distances or np.linspace(0, 2000, 401).astype(int)
+#     boat_pace = pd.DataFrame(
+#         np.vstack(
+#             [
+#                 np.interp(
+#                     distances, 
+#                     live_data.distanceTravelled[cnt],
+#                     500 / live_data.metrePerSecond[cnt]
+#                 )
+#                 for cnt in live_data.metrePerSecond.columns
+#             ]
+#         ),
+#         index=live_data.metrePerSecond.columns,
+#         columns=distances
+#     )
+#     boat_pace.columns.name = 'distance'
+#     boat_pace.index.name = 'country'
+#     return boat_pace
 
 
+# def calc_all_boat_pace(race_live_data, distances=None, set_last=True):
+#     distances = distances or np.linspace(0, 2000, 401).astype(int)
+#     boat_pace = pd.concat({
+#         race_id: calc_boat_pace(live_data)
+#         for race_id, live_data in race_live_data.items()
+#     }) 
+#     if set_last:
+#         boat_pace.loc[:, distances[-1]] = boat_pace.loc[:, distances[-2]]
 
+#     return boat_pace
 
-def calc_boat_time(live_data, distances=None):
-    distances = distances or np.linspace(0, 2000, 401).astype(int)
-    dist_travelled = live_data.distanceTravelled
-    boat_time_lims = (
-        (cnt, dist_travelled[cnt].searchsorted(distances[-1]) + 1)
-        for cnt in dist_travelled.columns
-    )
-    boat_times = pd.DataFrame(
-        np.vstack(
-            [
-                np.interp(
-                    distances, 
-                    dist_travelled[cnt][:i],
-                    live_data.time[:i]
-                )
-                for cnt, i in boat_time_lims
-            ]
-        ),
-        index=dist_travelled.columns,
-        columns=distances
-    )
-    boat_times[0] = 0
-    boat_times.columns.name = 'distance'
-    boat_times.index.name = 'country'
-    return boat_times
+# PacePred = namedtuple('PacePred', 'pace, pace_cov, time, time_cov')
 
-def calc_boat_pace(live_data, distances=None):
-    distances = distances or np.linspace(0, 2000, 401).astype(int)
-    boat_pace = pd.DataFrame(
-        np.vstack(
-            [
-                np.interp(
-                    distances, 
-                    live_data.distanceTravelled[cnt],
-                    500 / live_data.metrePerSecond[cnt]
-                )
-                for cnt in live_data.metrePerSecond.columns
-            ]
-        ),
-        index=live_data.metrePerSecond.columns,
-        columns=distances
-    )
-    boat_pace.columns.name = 'distance'
-    boat_pace.index.name = 'country'
-    return boat_pace
-
-
-def calc_all_boat_pace(race_live_data, distances=None, set_last=True):
-    distances = distances or np.linspace(0, 2000, 401).astype(int)
-    boat_pace = pd.concat({
-        race_id: calc_boat_pace(live_data)
-        for race_id, live_data in race_live_data.items()
-    }) 
-    if set_last:
-        boat_pace.loc[:, distances[-1]] = boat_pace.loc[:, distances[-2]]
-
-    return boat_pace
-
-PacePred = namedtuple('PacePred', 'pace, pace_cov, time, time_cov')
-
-def predict_pace_time(pred_distances, pace, K, L=None, noise=0.1):
-    x = pred_distances
-    X = pace.index
+# def predict_pace_time(pred_distances, pace, K, L=None, noise=0.1):
+#     x = pred_distances
+#     X = pace.index
     
-    kxx = K.loc[x, x]
-    kxX = K.loc[x, X]
-    if L is None:
-        KXX = K.loc[X, X] + np.eye(len(X)) * noise
-        L = pd.DataFrame(
-            np.linalg.cholesky(KXX),
-            index=KXX.index,
-            columns=KXX.columns, 
-        ) 
-    else:
-        KXX = K.loc[X, X]
-        L = L.loc[X,X]
+#     kxx = K.loc[x, x]
+#     kxX = K.loc[x, X]
+#     if L is None:
+#         KXX = K.loc[X, X] + np.eye(len(X)) * noise
+#         L = pd.DataFrame(
+#             np.linalg.cholesky(KXX),
+#             index=KXX.index,
+#             columns=KXX.columns, 
+#         ) 
+#     else:
+#         KXX = K.loc[X, X]
+#         L = L.loc[X,X]
     
-    pred_pace = kxX.dot(linalg.cho_solve((L, True), pace))
-    Kkh = linalg.solve_triangular(
-        L, kxX.T, lower=True
-    )
-    pred_pace_cov = kxx - Kkh.T.dot(Kkh)
+#     pred_pace = kxX.dot(linalg.cho_solve((L, True), pace))
+#     Kkh = linalg.solve_triangular(
+#         L, kxX.T, lower=True
+#     )
+#     pred_pace_cov = kxx - Kkh.T.dot(Kkh)
     
-    deltam = np.diff(pred_distances)
-    triu = np.triu(
-        np.ones_like(kxx) * np.r_[deltam, deltam[0]]
-    )/500
-    pred_times = pred_pace.dot(triu)
-    pred_times_cov = triu.T.dot(pred_pace_cov).dot(triu)
+#     deltam = np.diff(pred_distances)
+#     triu = np.triu(
+#         np.ones_like(kxx) * np.r_[deltam, deltam[0]]
+#     )/500
+#     pred_times = pred_pace.dot(triu)
+#     pred_times_cov = triu.T.dot(pred_pace_cov).dot(triu)
     
-    return PacePred(
-        pred_pace, pred_pace_cov, 
-        pred_times, pred_times_cov)
+#     return PacePred(
+#         pred_pace, pred_pace_cov, 
+#         pred_times, pred_times_cov)
 
 
-def pred_finish_time(pred_distances, pace, K, noise=0.1, start_distance=250):
-    x = pred_distances
-    X = pace.index
+# def pred_finish_time(pred_distances, pace, K, noise=0.1, start_distance=250):
+#     x = pred_distances
+#     X = pace.index
     
-    kxx = K.loc[x, x]
-    L = pd.DataFrame(
-        np.linalg.cholesky(
-            K.loc[X, X] + np.eye(len(X)) * noise
-        ),
-        index=K.index,
-        columns=K.columns, 
-    )
+#     kxx = K.loc[x, x]
+#     L = pd.DataFrame(
+#         np.linalg.cholesky(
+#             K.loc[X, X] + np.eye(len(X)) * noise
+#         ),
+#         index=K.index,
+#         columns=K.columns, 
+#     )
 
-    n = X.searchsorted(start_distance)
-    pred_finish = pace.loc[start_distance:].copy()
-    pred_finish_std = pace.iloc[start_distance:].copy()
-    pred_finish.name = 'predicted_finish_time'
-    pred_finish_std.name = 'predicted_finish_time_std'
+#     n = X.searchsorted(start_distance)
+#     pred_finish = pace.loc[start_distance:].copy()
+#     pred_finish_std = pace.iloc[start_distance:].copy()
+#     pred_finish.name = 'predicted_finish_time'
+#     pred_finish_std.name = 'predicted_finish_time_std'
 
-    for d in pred_finish.index:
-        X = pace.loc[:d].index
-        kxX = K.loc[x, X]
-        LXX = L.loc[X, X]
-        pred_pace = kxX.dot(linalg.cho_solve((LXX, True), pace.loc[:d]))
-        Kkh = linalg.solve_triangular(
-            LXX, kxX.T, lower=True
-        )
-        pred_pace_cov = kxx - Kkh.T.dot(Kkh)
-        deltam = np.diff(x)    
-        deltam = np.r_[deltam, deltam[0]]/500
-        pred_finish[d] = pred_pace.dot(deltam)
-        pred_finish_std[d] = deltam.dot(pred_pace_cov).dot(deltam)
+#     for d in pred_finish.index:
+#         X = pace.loc[:d].index
+#         kxX = K.loc[x, X]
+#         LXX = L.loc[X, X]
+#         pred_pace = kxX.dot(linalg.cho_solve((LXX, True), pace.loc[:d]))
+#         Kkh = linalg.solve_triangular(
+#             LXX, kxX.T, lower=True
+#         )
+#         pred_pace_cov = kxx - Kkh.T.dot(Kkh)
+#         deltam = np.diff(x)    
+#         deltam = np.r_[deltam, deltam[0]]/500
+#         pred_finish[d] = pred_pace.dot(deltam)
+#         pred_finish_std[d] = deltam.dot(pred_pace_cov).dot(deltam)
 
-    return pred_finish, pred_finish_std
+#     return pred_finish, pred_finish_std
 
 
 

@@ -24,6 +24,13 @@ def Phi(z):
     sq2 = 1.4142135623730951
     return 1/2 + erf(z/sq2)/2
 
+def read_times(times):
+     minfmt = ~ times.str.match(r"[0-9]+:[0-9][0-9]?:[0-9][0-9]?")
+     new_times = times.copy()
+     new_times[minfmt] = "0:" + times 
+     return pd.to_timedelta(new_times)
+
+
 @lru_cache
 def get_iso_country_data(data_path=_data_path / 'iso_country.json'):
     return pd.read_json(data_path)
@@ -68,14 +75,25 @@ def get_flag_im(
     iso2cnt = find_country_iso2(
         country, data_path
     )
-    return plt.imread(
+    im = plt.imread(
         flag_path / f"{iso2cnt}.png"
     )
+    print(country, im.shape)
+    return im
 
+
+def update_table(table, index, columns, update):
+    index, columns = map(np.asarray, (index, columns))
+    for row, rowvals in update.iterrows():
+        i, = np.where(index == row)[0]
+        for col, val in rowvals.items():
+            j, = np.where(columns == col)[0]
+            table[i + 1, j].get_text().set_text(val)
 
 def make_flag_box(
         country, 
         xy,
+        base_width=900, 
         zoom=0.04, 
         resample=True, 
         frameon=False,
@@ -92,10 +110,12 @@ def make_flag_box(
         country, 
         data_path=data_path,
         flag_path=flag_path,
-        **(offset_kws or {})
     )
     offset_im = OffsetImage(
-        im, zoom=zoom, resample=resample
+        im, 
+        zoom=zoom * base_width / im.shape[1], 
+        resample=resample,
+        **(offset_kws or {})
     )
     return AnnotationBbox(
         offset_im, xy, 
