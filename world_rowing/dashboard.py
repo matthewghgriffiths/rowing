@@ -54,7 +54,7 @@ class Dashboard:
         last_race = get_last_race_started()
         return cls.from_race_id(last_race.name, **kwargs)
 
-    def live_dashboard(self):
+    def live_notebook_dashboard(self):
         from IPython.display import display, clear_output
         for live_data in self.race_tracker.stream_livedata():
             clear_output(wait = True)
@@ -64,18 +64,20 @@ class Dashboard:
             else:
                 print('no race data received')
                 break
+        else:
+            clear_output(wait=False)
 
     def live_ion_dashboard(self):
         import matplotlib.pyplot as plt
         plt.ion()
         plt.show()
-        for live_data in dash.race_tracker.stream_livedata():
+        for live_data in self.race_tracker.stream_livedata():
             if len(live_data):
                 current_data = get_current_data(live_data)
                 print(current_data)
-                dash.update(live_data)
-                dash.fig.canvas.draw()
-                dash.fig.canvas.flush_events()
+                self.update(live_data)
+                self.fig.canvas.draw()
+                self.fig.canvas.flush_events()
             else:
                 print('no race data received')
                 break
