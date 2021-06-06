@@ -251,12 +251,15 @@ class PredictRace:
             for cnt in race_pace.columns:
                 pace = live_dist_data.pace[cnt]
                 pred_pace.loc[pace.notna(), cnt] = pace.dropna()
+                pred_distance_std.loc[pace.notna(), cnt] = 0
                 time  = live_dist_data.time[cnt]
                 pred_times.loc[time.notna(), cnt] = time.dropna()
+                pred_times_std.loc[time.notna(), cnt] = 0
                 dist = (
                     live_dist_data.index 
                     - live_dist_data.distanceFromLeader[cnt])
                 pred_distance.loc[dist.notna(), cnt] = dist.dropna()
+                pred_distance_std.loc[dist.notna(), cnt] = 0
 
         win_probs = calc_win_probs(
             pred_times.iloc[-1], 

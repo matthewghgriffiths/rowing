@@ -27,7 +27,7 @@ def Phi(z):
 CURRENT_TIMEZONE = datetime.now().astimezone().tzinfo
 
 def read_times(times):
-     minfmt = ~ times.str.match(r"[0-9]+:[0-9][0-9]?:[0-9][0-9]?")
+     minfmt = ~ times.fillna('').str.match(r"[0-9]+:[0-9][0-9]?:[0-9][0-9]?")
      new_times = times.copy()
      new_times[minfmt] = "0:" + times 
      return pd.to_timedelta(new_times)

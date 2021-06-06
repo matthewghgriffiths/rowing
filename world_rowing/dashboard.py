@@ -1,5 +1,7 @@
 
 import datetime 
+import time 
+import logging
 
 import numpy as np
 import pandas as pd
@@ -37,6 +39,11 @@ class Dashboard:
     @classmethod
     def from_race_id(cls, race_id, **kwargs):
         race_tracker = LivePrediction(race_id, noise=1)
+        race_name = race_tracker.race_details.DisplayName
+        race_start = pd.to_datetime(
+            race_tracker.race_details.DateString
+        ).tz_convert(CURRENT_TIMEZONE)
+        print(f"loading {race_name}, starting at {race_start}")
         return cls(race_tracker, **kwargs)
 
     @classmethod 
@@ -48,8 +55,12 @@ class Dashboard:
         from IPython.display import display, clear_output
         for live_data in self.race_tracker.stream_livedata():
             clear_output(wait = True)
-            self.update(live_data)
-            display(self.fig)
+            if len(live_data):
+                self.update(live_data)
+                display(self.fig)
+            else:
+                print('no race data received')
+                break
         
     def _init(self, **kwargs):
         self._init_fig(**kwargs)
@@ -274,7 +285,7 @@ class Dashboard:
         if 2000 in intermediates.columns:
             self.finished = True
             countries = self.race_tracker.lane_country
-            finish_times = intermediates.loc[countries, 2000]
+            finish_times = intermediates.reindex(countries)[2000]
             finish_pos = finish_times.sort_values()
             finish_pos[:] = np.arange(1, len(finish_pos) + 1)
             pgmt = (self.race_tracker.gmt / finish_times).apply("{:.1%}".format)
@@ -320,13 +331,8 @@ class Dashboard:
             self.l_pace, 
             live_data.distanceTravelled,
             pace,
-        )
-        if len(pace) > 150:
-            ymax = pace.values[100:].max()
-        else:
-            ymax = pace.values.max()
-            
-        ylim = (ymax + 1, pace.values.min() - 1)
+        )            
+        ylim = (pace.values[-100:].max() + 1, pace.values.min() - 1)
         self.b_pace_ax.set_ylim(ylim)
         format_yaxis_splits(self.b_pace_ax)
         self.b_pace_ax.set_ylim(ylim)
@@ -401,9 +407,12 @@ class Dashboard:
                 pred_dist_behind.iloc[-1],
                 pred_dist_std.iloc[-1],
             )
-            self.right_axes[0].set_ylim(
-                pred_dist_behind.iloc[-1].max() + 5, -5 
-            )
+            
+            if self.race_tracker.completed:
+                ymax = pred_dist_behind.values.max()  + 5
+            else:
+                ymax = pred_dist_behind.iloc[-1].max() + 5
+            self.right_axes[0].set_ylim(ymax, -9)
         
     def plot_pred_pace(self, pred_pace, pred_pace_std):
         self.p_pace = \
@@ -437,7 +446,8 @@ class Dashboard:
             finish_pos = finish_times.sort_values()
             finish_pos[:] = np.arange(1, len(finish_pos) + 1)
             pgmt = (self.race_tracker.gmt / finish_times).apply("{:.1%}".format)
-            print(countries, finish_pos, pgmt)
+            logging.info(pgmt[countries])
+            logging.info(finish_pos[countries].astype(int))
             update_table(
                 self.right_table, 
                 countries, 
@@ -449,6 +459,9 @@ class Dashboard:
             )
         
     def update_finish_times(self, pred_times, pred_times_std):
+        if self.finished:
+            return None 
+            
         if self.p_times is None:
             self.plot_finish_times(pred_times, pred_times_std)
         else:
@@ -464,11 +477,21 @@ class Dashboard:
         self.p_win = self.race_tracker.bar(
             win_probs, ax=self.p_win_ax
         )
-        self.p_win_ax.set_ylim(0, win_probs.max()*1.05)
+        self.p_win_ax.set_ylim(0, np.nan_to_num(np.nanmax(win_probs)) + 0.05)
         
     def update_win_probs(self, win_probs):
         if self.p_win is None:
             self.plot_win_probs(win_probs)
         else:
             self.race_tracker.update_bar(self.p_win, win_probs)
-            self.p_win_ax.set_ylim(0, win_probs.max()*1.05)
+            self.p_win_ax.set_ylim(0, np.nan_to_num(np.nanmax(win_probs)) + 0.05)
+
+
+if __name__ == "__main__":
+    from world_rowing.api import show_next_races
+
+    print("loading most recent race")
+    dash = Dashboard.load_last_race(figsize=(14, 10))
+    dash.live_dashboard()
+
+    print(show_next_races())

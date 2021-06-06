@@ -9,7 +9,7 @@ import requests
 
 from .utils import (
     getnesteditem, extract_fields, read_times, map_concurrent, CURRENT_TIMEZONE,
-    format_timedelta_hours
+    format_timedelta_hours, format_totalseconds, merge
 )
 
 OLYMPIC_BOATCLASS = [
@@ -357,3 +357,39 @@ def find_world_best_time(
         )['DisplayName']
 
     return get_world_best_times().loc[boat_class]
+
+
+def get_competition_pgmts(competition_id=None):
+    competition_id = competition_id or get_most_recent_competition().name
+    competition_races = get_competition_races(competition_id)
+    competition_events = get_competition_events(competition_id)
+    competition_results = get_race_results(competition_id=competition_id)
+    boat_classes = get_boat_types()
+    wbts = get_world_best_times().ResultTime
+    wbts.index.name, wbts.name = 'id', 'worldBestTime'
+
+    competition_results = merge(
+        (
+            competition_results.reset_index(), 
+            competition_races[['eventId', 'Date']], 
+            competition_events['boatClassId'],
+            boat_classes, 
+            wbts,
+        ),
+        left_on=('raceId', 'eventId', 'boatClassId', 'DisplayName'),
+        right_on='id'
+    )
+    results = competition_results.loc[
+        competition_results.ResultTime > pd.to_timedelta(0),
+        ['DisplayName', 'Country', 'Rank', 'Lane', 'Date', 'ResultTime', 'worldBestTime']
+    ]
+    results.columns = [
+        'BoatClass', 'Country', 'Rank', 'Lane', 'Date', 'Time', 'worldBestTime'
+    ]
+    results['PGMT'] = results.worldBestTime / results.Time
+    results['Rank'] = results.Rank.astype(int)
+    results.Time = results.Time.dt.total_seconds().apply(format_totalseconds)
+    results.worldBestTime = results.worldBestTime.dt.total_seconds().apply(
+        format_totalseconds
+    )
+    return results.sort_values('PGMT', ascending=False)
