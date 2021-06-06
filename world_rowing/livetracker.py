@@ -11,7 +11,7 @@ from .api import (
 )
 from .utils import (
     extract_fields, format_yaxis_splits, make_flag_box, update_fill_betweenx, 
-    update_fill_between, read_times
+    update_fill_between, read_times, format_totalseconds
 )
 
 RESULTS_FIELDS = {
@@ -486,6 +486,16 @@ class RaceTracker:
         ax, lines = self.plot(distance, speed, ax=ax, **kwargs)
         ax.set_ylabel('distanceFromLeader / m')
         return ax, lines
+
+
+def get_current_data(live_data):
+    current_data = live_data.iloc[[-1]].copy()
+    current_data.PGMT = current_data.PGMT.applymap("{:.1%}".format)
+    current_data.time = current_data.time.apply(format_totalseconds)
+    current_data.GMT = current_data.GMT.applymap(format_totalseconds)
+    current = current_data.set_index("time").astype('string').T.unstack(1)
+    current.columns.names = ['time elapsed', 'Country']
+    return current
 
 
 def get_race_livetracker(race_id, gmt=None, cached=True, race_distance=2000):

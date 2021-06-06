@@ -10,7 +10,10 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 from .api import get_last_race_started
-from .utils import format_yaxis_splits, update_table, format_totalseconds, CURRENT_TIMEZONE
+from .utils import (
+    format_yaxis_splits, update_table, format_totalseconds, CURRENT_TIMEZONE
+)
+from .livetracker import get_current_data
 from .predict import LivePrediction
 
 class Dashboard:
@@ -58,6 +61,21 @@ class Dashboard:
             if len(live_data):
                 self.update(live_data)
                 display(self.fig)
+            else:
+                print('no race data received')
+                break
+
+    def live_ion_dashboard(self):
+        import matplotlib.pyplot as plt
+        plt.ion()
+        plt.show()
+        for live_data in dash.race_tracker.stream_livedata():
+            if len(live_data):
+                current_data = get_current_data(live_data)
+                print(current_data)
+                dash.update(live_data)
+                dash.fig.canvas.draw()
+                dash.fig.canvas.flush_events()
             else:
                 print('no race data received')
                 break
@@ -461,7 +479,7 @@ class Dashboard:
     def update_finish_times(self, pred_times, pred_times_std):
         if self.finished:
             return None 
-            
+
         if self.p_times is None:
             self.plot_finish_times(pred_times, pred_times_std)
         else:
@@ -487,11 +505,20 @@ class Dashboard:
             self.p_win_ax.set_ylim(0, np.nan_to_num(np.nanmax(win_probs)) + 0.05)
 
 
-if __name__ == "__main__":
+def main():
+    import matplotlib.pyplot as plt
     from world_rowing.api import show_next_races
 
-    print("loading most recent race")
-    dash = Dashboard.load_last_race(figsize=(14, 10))
-    dash.live_dashboard()
+    dash = Dashboard.load_last_race(figsize=(12, 8))
+    dash.live_ion_dashboard()
+        
+    print('race results:')
+    print(dash.race_tracker.intermediate_results)
 
+    print('\nupcoming races:')
     print(show_next_races())
+    plt.show(block=True)
+
+
+if __name__ == "__main__":
+    main()
