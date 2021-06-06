@@ -2,7 +2,7 @@
 
 from typing import Dict
 from collections import namedtuple
-from functools import cached_property
+from functools import cached_property, lru_cache
 
 import numpy as np 
 import pandas as pd
@@ -30,7 +30,7 @@ def calc_win_probs(times, std):
     win_prob /= win_prob.sum()
     return pd.Series(win_prob, index=times.index)
 
-
+@lru_cache
 def load_predicter(noise=10., data_path=utils._data_path):
     mean_pace = pd.read_csv(
         data_path / 'mean_pace.csv.gz'
@@ -88,9 +88,6 @@ class PredictRace:
             index=self.distances,
             columns=self.distances
         )
-        # cached inverses
-        self.pace_predicters = {}
-        self.pred_pace_covs = {}
 
     def calc_distance_data(self, live_data):
         distances = self.distances
@@ -174,6 +171,7 @@ class PredictRace:
         )
         return boat_pace
 
+    @lru_cache
     def calc_predicters(self, distance):
         kxx = self.K.loc[:, :]
         kxX = self.K.loc[:, :distance]
@@ -184,30 +182,14 @@ class PredictRace:
         pace_predicter = pd.DataFrame(
             linalg.cho_solve((LXX, True), kxX.T).T,
             index=x, columns=X,
-        )
-        self.pace_predicters[distance] = pace_predicter
-        
+        )        
         LK = linalg.solve_triangular(
             LXX, kxX.T, lower=True
         )
         pred_pace_cov = pd.DataFrame(
             kxx - LK.T.dot(LK), index=x, columns=x
         )
-        self.pred_pace_covs[distance] = pred_pace_cov
-        
         return pace_predicter, pred_pace_cov
-        
-    def get_linear_pace_predicter(self, distance):
-        if distance not in self.pace_predicters:
-            self.calc_predicters(distance)
-            
-        return self.pace_predicters[distance]
-    
-    def get_pred_pace_cov(self, distance):
-        if distance not in self.pred_pace_covs:
-            self.calc_predicters(distance)
-            
-        return self.pred_pace_covs[distance]
 
     def predict(self, live_data, match_to_live=True):
         live_dist_data = self.calc_distance_data(live_data)
@@ -223,9 +205,9 @@ class PredictRace:
         M = self.pace_time_M
         for cnt, cnt_pace in race_pace.items():
             distance = cnt_pace.index[cnt_pace.notna()][-1]
-            pace_predictor = self.get_linear_pace_predicter(distance)
+            pace_predictor, pred_pace_cov[cnt] = self.calc_predicters(distance)
+
             pred_pace[cnt] = pace_predictor.dot(cnt_pace.loc[:distance])
-            pred_pace_cov[cnt] = self.get_pred_pace_cov(distance)
             pred_times[cnt] = M.dot(pred_pace[cnt])
             pred_times_cov[cnt] = M.dot(pred_pace_cov[cnt].dot(M.T))
 
@@ -291,7 +273,7 @@ class PredictRace:
     
     def predict_pace(self, race_pace, distance=None):
         if distance:
-            pace_predictor = self.get_linear_pace_predicter(distance)
+            pace_predictor, pred_pace_cov = self.calc_predicters(distance)
             pred_pace = pace_predictor.dot(race_pace.loc[:distance])
             pred_pace_cov = self.get_pred_pace_cov(distance)
             return pred_pace, pred_pace_cov
@@ -300,9 +282,8 @@ class PredictRace:
             pred_pace_cov = {}
             for cnt, cnt_pace in race_pace.items():
                 distance = cnt_pace.index[cnt_pace.notna()][-1]
-                pace_predictor = self.get_linear_pace_predicter(distance)
+                pace_predictor, pred_pace_cov[cnt] = self.calc_predicters(distance)
                 pred_pace[cnt] = pace_predictor.dot(cnt_pace.loc[:distance])
-                pred_pace_cov[cnt] = self.get_pred_pace_cov(distance)
                 
             return pd.DataFrame(pred_pace), pd.concat(pred_pace_cov, axis=1)
 
@@ -371,138 +352,6 @@ class LivePrediction(RaceTracker):
             
         if len(live_data):
             return self.predicter.predict(live_data, match_to_live=match_to_live)
-
-
-
-# def calc_boat_time(live_data, distances=None):
-#     distances = distances or np.linspace(0, 2000, 401).astype(int)
-#     dist_travelled = live_data.distanceTravelled
-#     boat_time_lims = (
-#         (cnt, dist_travelled[cnt].searchsorted(distances[-1]) + 1)
-#         for cnt in dist_travelled.columns
-#     )
-#     boat_times = pd.DataFrame(
-#         np.vstack(
-#             [
-#                 np.interp(
-#                     distances, 
-#                     dist_travelled[cnt][:i],
-#                     live_data.time[:i]
-#                 )
-#                 for cnt, i in boat_time_lims
-#             ]
-#         ),
-#         index=dist_travelled.columns,
-#         columns=distances
-#     )
-#     boat_times[0] = 0
-#     boat_times.columns.name = 'distance'
-#     boat_times.index.name = 'country'
-#     return boat_times
-
-# def calc_boat_pace(live_data, distances=None):
-#     distances = distances or np.linspace(0, 2000, 401).astype(int)
-#     boat_pace = pd.DataFrame(
-#         np.vstack(
-#             [
-#                 np.interp(
-#                     distances, 
-#                     live_data.distanceTravelled[cnt],
-#                     500 / live_data.metrePerSecond[cnt]
-#                 )
-#                 for cnt in live_data.metrePerSecond.columns
-#             ]
-#         ),
-#         index=live_data.metrePerSecond.columns,
-#         columns=distances
-#     )
-#     boat_pace.columns.name = 'distance'
-#     boat_pace.index.name = 'country'
-#     return boat_pace
-
-
-# def calc_all_boat_pace(race_live_data, distances=None, set_last=True):
-#     distances = distances or np.linspace(0, 2000, 401).astype(int)
-#     boat_pace = pd.concat({
-#         race_id: calc_boat_pace(live_data)
-#         for race_id, live_data in race_live_data.items()
-#     }) 
-#     if set_last:
-#         boat_pace.loc[:, distances[-1]] = boat_pace.loc[:, distances[-2]]
-
-#     return boat_pace
-
-# PacePred = namedtuple('PacePred', 'pace, pace_cov, time, time_cov')
-
-# def predict_pace_time(pred_distances, pace, K, L=None, noise=0.1):
-#     x = pred_distances
-#     X = pace.index
-    
-#     kxx = K.loc[x, x]
-#     kxX = K.loc[x, X]
-#     if L is None:
-#         KXX = K.loc[X, X] + np.eye(len(X)) * noise
-#         L = pd.DataFrame(
-#             np.linalg.cholesky(KXX),
-#             index=KXX.index,
-#             columns=KXX.columns, 
-#         ) 
-#     else:
-#         KXX = K.loc[X, X]
-#         L = L.loc[X,X]
-    
-#     pred_pace = kxX.dot(linalg.cho_solve((L, True), pace))
-#     Kkh = linalg.solve_triangular(
-#         L, kxX.T, lower=True
-#     )
-#     pred_pace_cov = kxx - Kkh.T.dot(Kkh)
-    
-#     deltam = np.diff(pred_distances)
-#     triu = np.triu(
-#         np.ones_like(kxx) * np.r_[deltam, deltam[0]]
-#     )/500
-#     pred_times = pred_pace.dot(triu)
-#     pred_times_cov = triu.T.dot(pred_pace_cov).dot(triu)
-    
-#     return PacePred(
-#         pred_pace, pred_pace_cov, 
-#         pred_times, pred_times_cov)
-
-
-# def pred_finish_time(pred_distances, pace, K, noise=0.1, start_distance=250):
-#     x = pred_distances
-#     X = pace.index
-    
-#     kxx = K.loc[x, x]
-#     L = pd.DataFrame(
-#         np.linalg.cholesky(
-#             K.loc[X, X] + np.eye(len(X)) * noise
-#         ),
-#         index=K.index,
-#         columns=K.columns, 
-#     )
-
-#     n = X.searchsorted(start_distance)
-#     pred_finish = pace.loc[start_distance:].copy()
-#     pred_finish_std = pace.iloc[start_distance:].copy()
-#     pred_finish.name = 'predicted_finish_time'
-#     pred_finish_std.name = 'predicted_finish_time_std'
-
-#     for d in pred_finish.index:
-#         X = pace.loc[:d].index
-#         kxX = K.loc[x, X]
-#         LXX = L.loc[X, X]
-#         pred_pace = kxX.dot(linalg.cho_solve((LXX, True), pace.loc[:d]))
-#         Kkh = linalg.solve_triangular(
-#             LXX, kxX.T, lower=True
-#         )
-#         pred_pace_cov = kxx - Kkh.T.dot(Kkh)
-#         deltam = np.diff(x)    
-#         deltam = np.r_[deltam, deltam[0]]/500
-#         pred_finish[d] = pred_pace.dot(deltam)
-#         pred_finish_std[d] = deltam.dot(pred_pace_cov).dot(deltam)
-
-#     return pred_finish, pred_finish_std
 
 
 

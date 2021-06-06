@@ -7,7 +7,10 @@ from collections.abc import Mapping
 import pandas as pd
 import requests
 
-from .utils import getnesteditem, extract_fields, read_times, map_concurrent
+from .utils import (
+    getnesteditem, extract_fields, read_times, map_concurrent, CURRENT_TIMEZONE,
+    format_timedelta_hours
+)
 
 OLYMPIC_BOATCLASS = [
     'M1x', 'LM2x', 'W1x', 'M2x', 'M2-', 'LW2x', 'M4-',
@@ -145,6 +148,22 @@ def get_next_races(n=1, fisa=True, competition=None):
     races = get_competition_races(competition.name)
     to_race = races.DateString > datetime.datetime.now().astimezone()
     return races.loc[to_race].sort_values('DateString').iloc[:n]
+
+def show_next_races(n=10, fisa=True, competition=None):
+    next_races = get_next_races(n, fisa=fisa, competition=competition)[
+        ['DisplayName', 'DateString']
+    ].reset_index(drop=True)
+    next_races.DateString = next_races.DateString.dt.tz_convert(
+        CURRENT_TIMEZONE
+    )
+    next_races.columns = ['Race', 'Time']
+    now = datetime.datetime.now().astimezone(CURRENT_TIMEZONE)
+    next_races['Time to race'] = (next_races.Time - now).apply(
+        format_timedelta_hours
+    )
+    return next_races
+
+    
 
 
 def get_boat_types():

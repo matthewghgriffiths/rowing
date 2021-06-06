@@ -7,7 +7,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-from .utils import format_yaxis_splits, update_table, format_totalseconds
+from .api import get_last_race_started
+from .utils import format_yaxis_splits, update_table, format_totalseconds, CURRENT_TIMEZONE
 from .predict import LivePrediction
 
 class Dashboard:
@@ -37,6 +38,18 @@ class Dashboard:
     def from_race_id(cls, race_id, **kwargs):
         race_tracker = LivePrediction(race_id, noise=1)
         return cls(race_tracker, **kwargs)
+
+    @classmethod 
+    def load_last_race(cls, **kwargs):
+        last_race = get_last_race_started()
+        return cls.from_race_id(last_race.name, **kwargs)
+
+    def live_dashboard(self):
+        from IPython.display import display, clear_output
+        for live_data in self.race_tracker.stream_livedata():
+            clear_output(wait = True)
+            self.update(live_data)
+            display(self.fig)
         
     def _init(self, **kwargs):
         self._init_fig(**kwargs)
@@ -186,9 +199,7 @@ class Dashboard:
         race_name = self.race_tracker.race_details.DisplayName
         date = pd.to_datetime(
             self.race_tracker.race_details.DateString
-        ).astimezone(
-            datetime.datetime.now().astimezone().tzinfo
-        ).strftime("%c (%Z)")
+        ).astimezone(CURRENT_TIMEZONE).strftime("%c (%Z)")
         progression = self.race_tracker.race_details.Progression
         if progression:
             progression = f"\nProgression: {progression}"
@@ -243,7 +254,9 @@ class Dashboard:
             ['lane', 'pos'], 
             pd.DataFrame({
                 'lane': self.race_tracker.country_lane,
-                'pos': live_data.currentPosition.iloc[-1]
+                'pos': live_data.currentPosition.iloc[-1].loc[
+                    self.race_tracker.lane_country
+                ]
             })
         )
 
@@ -260,20 +273,19 @@ class Dashboard:
 
         if 2000 in intermediates.columns:
             self.finished = True
-            finish_times = intermediates[2000]
+            countries = self.race_tracker.lane_country
+            finish_times = intermediates.loc[countries, 2000]
             finish_pos = finish_times.sort_values()
             finish_pos[:] = np.arange(1, len(finish_pos) + 1)
-            pgmt = (self.race_tracker.gmt / finish_times).apply(
-                "{:.1%}".format
-                )
+            pgmt = (self.race_tracker.gmt / finish_times).apply("{:.1%}".format)
         
             update_table(
                 self.right_table, 
                 self.race_tracker.lane_country, 
                 ['PGMT', 'pos'],
                 pd.DataFrame({
-                    'PGMT': pgmt,
-                    'pos': finish_pos.astype(int), 
+                    'PGMT': pgmt[countries],
+                    'pos': finish_pos.astype(int)[countries], 
                 }) 
             )
             self.right_table[0, 1].get_text().set_text('final pos')
@@ -309,13 +321,12 @@ class Dashboard:
             live_data.distanceTravelled,
             pace,
         )
-        ylim = (
-            np.nanmin([
-                pace.values.max(),
-                pace.values[100:].max()
-            ]) + 1, 
-            pace.values.min() - 1
-        )
+        if len(pace) > 150:
+            ymax = pace.values[100:].max()
+        else:
+            ymax = pace.values.max()
+            
+        ylim = (ymax + 1, pace.values.min() - 1)
         self.b_pace_ax.set_ylim(ylim)
         format_yaxis_splits(self.b_pace_ax)
         self.b_pace_ax.set_ylim(ylim)
@@ -369,9 +380,12 @@ class Dashboard:
                 set_lims=False,
                 ax=self.right_axes[0], 
             )
-        self.right_axes[0].set_ylim(
-            pred_dist_behind.iloc[-1].max() + 5, -5 
-        )
+
+        if self.race_tracker.completed:
+            ymax = pred_dist_behind.values.max()  +5
+        else:
+            ymax = pred_dist_behind.iloc[-1].max() + 5
+        self.right_axes[0].set_ylim(ymax, -9)
         
     def update_pred_distance(self, pred_dist, pred_dist_std):
         if self.p_dist is None:
@@ -418,18 +432,19 @@ class Dashboard:
         ax.set_ylim(*ylims[::-1])   
 
         if not self.finished:
+            countries = self.race_tracker.lane_country
             finish_times = pred_times.iloc[-1]
             finish_pos = finish_times.sort_values()
             finish_pos[:] = np.arange(1, len(finish_pos) + 1)
+            pgmt = (self.race_tracker.gmt / finish_times).apply("{:.1%}".format)
+            print(countries, finish_pos, pgmt)
             update_table(
                 self.right_table, 
-                self.race_tracker.lane_country, 
+                countries, 
                 ['PGMT', 'pos'],
                 pd.DataFrame({
-                    'PGMT': (self.race_tracker.gmt / finish_times).apply(
-                        "{:.1%}".format
-                    ),
-                    'pos': finish_pos.astype(int), 
+                    'PGMT': pgmt[countries],
+                    'pos': finish_pos[countries].astype(int), 
                 }) 
             )
         

@@ -3,7 +3,7 @@ import os
 from pathlib import Path 
 from functools import lru_cache
 from collections import UserDict, abc
-from datetime import timedelta
+from datetime import timedelta, datetime
 import logging
 from typing import Callable, Dict, TypeVar, Tuple, Any
 from contextlib import nullcontext
@@ -23,6 +23,8 @@ _flag_path = _data_path / 'flags'
 def Phi(z):
     sq2 = 1.4142135623730951
     return 1/2 + erf(z/sq2)/2
+
+CURRENT_TIMEZONE = datetime.now().astimezone().tzinfo
 
 def read_times(times):
      minfmt = ~ times.str.match(r"[0-9]+:[0-9][0-9]?:[0-9][0-9]?")
@@ -78,7 +80,6 @@ def get_flag_im(
     im = plt.imread(
         flag_path / f"{iso2cnt}.png"
     )
-    print(country, im.shape)
     return im
 
 
@@ -152,11 +153,17 @@ def update_fill_betweenx(poly, y, x0, x1):
 def format_totalseconds(seconds, hundreths=True):
     return format_timedelta(timedelta(seconds=seconds), hundreths=hundreths)
 
-def format_timedelta(td, hundreths=True):
-    mins = td.seconds // 60
-    secs = td.seconds - mins * 60
-    end = f".{(td.microseconds // 10_000):02d}" if hundreths else ''
-    return f"{mins}:{secs:02d}{end}"
+def format_timedelta(td, hours=False, hundreths=True):
+    mins, secs = divmod(td.seconds, 60)
+    if hours:
+        hs, mins = divmod(mins, 60)
+        return f"{hs:02d}:{mins:02d}:{secs:02d}"
+    else:
+        end = f".{(td.microseconds // 10_000):02d}" if hundreths else ''
+        return f"{mins}:{secs:02d}{end}"
+
+def format_timedelta_hours(td):
+    return format_timedelta(td, hours=True)
 
 def format_yaxis_splits(ax=None, ticks=True, hundreths=False):
     format_axis_splits(ax=ax, yticks=ticks, hundreths=hundreths)

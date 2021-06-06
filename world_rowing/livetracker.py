@@ -51,6 +51,7 @@ class RaceTracker:
         self.live_data = live_data 
         self.results = results
         self.intermediates = intermediates
+        self.completed = False
         
     @property
     def final_results(self):
@@ -154,7 +155,16 @@ class RaceTracker:
                 gmt=self.gmt,
                 cached=False,
         )
+
+        if 2000 in self.intermediate_results.columns:
+            if self.intermediate_results[2000].notna().all():
+                self.completed = True
+
         return self.live_data
+
+    def stream_livedata(self):
+        while not self.completed:
+            yield self.update_livedata()
 
     def _by_country(self, values):
         try:
@@ -174,7 +184,7 @@ class RaceTracker:
             color=self.country_colors[self.lane_country],
             **kwargs
         )
-        return dict(zip(self.countries, bars))
+        return dict(zip(self.lane_country, bars))
 
     def update_bar(self, bars, heights, bottom=None):
         if bottom:
