@@ -2,7 +2,7 @@
 
 from typing import Dict
 from collections import namedtuple
-from functools import cached_property, lru_cache
+from functools import cached_property
 
 import numpy as np 
 import pandas as pd
@@ -10,6 +10,7 @@ from scipy import linalg, integrate, stats
 
 from . import api, utils, livetracker
 from .livetracker import RaceTracker
+from .utils import cache
 
 
 def calc_win_probs(times, std):
@@ -30,7 +31,7 @@ def calc_win_probs(times, std):
     win_prob /= win_prob.sum()
     return pd.Series(win_prob, index=times.index)
 
-@lru_cache
+@cache
 def load_predicter(noise=10., data_path=utils._data_path):
     mean_pace = pd.read_csv(
         data_path / 'mean_pace.csv.gz'
@@ -171,7 +172,7 @@ class PredictRace:
         )
         return boat_pace
 
-    @lru_cache
+    @cache
     def calc_predicters(self, distance):
         kxx = self.K.loc[:, :]
         kxX = self.K.loc[:, :distance]

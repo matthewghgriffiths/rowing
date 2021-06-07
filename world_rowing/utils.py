@@ -1,8 +1,7 @@
 
 import os 
 from pathlib import Path 
-from functools import lru_cache
-from collections import UserDict, abc
+from functools import lru_cache, partial
 from datetime import timedelta, datetime
 import logging
 from typing import Callable, Dict, TypeVar, Tuple, Any
@@ -20,6 +19,8 @@ _module_path = _file_path.parent
 _data_path = _module_path / 'data'
 _flag_path = _data_path / 'flags'
 
+cache = lru_cache(maxsize=None)
+
 def Phi(z):
     sq2 = 1.4142135623730951
     return 1/2 + erf(z/sq2)/2
@@ -33,11 +34,11 @@ def read_times(times):
      return pd.to_timedelta(new_times)
 
 
-@lru_cache
+@cache
 def get_iso_country_data(data_path=_data_path / 'iso_country.json'):
     return pd.read_json(data_path)
 
-@lru_cache
+@cache
 def get_iso2_names(data_path=_data_path / 'iso_country.json'):
     iso_country = get_iso_country_data(data_path)
     return pd.concat([
@@ -48,7 +49,7 @@ def get_iso2_names(data_path=_data_path / 'iso_country.json'):
         for _, col in iso_country.iteritems()
     ])
 
-@lru_cache
+@cache
 def get_iso3_names(data_path=_data_path / 'iso_country.json'):
     iso_country = get_iso_country_data(data_path)
     return pd.concat([
@@ -60,14 +61,14 @@ def get_iso3_names(data_path=_data_path / 'iso_country.json'):
     ])
 
 
-@lru_cache
+@cache
 def find_country_iso2(
         country, 
         data_path=_data_path / 'iso_country.json'
     ):
         return get_iso2_names(data_path)[country]
 
-@lru_cache
+@cache
 def get_flag_im(
         country, 
         data_path=_data_path / 'iso_country.json',
