@@ -1,6 +1,5 @@
 
 
-from functools import lru_cache
 import datetime 
 from collections.abc import Mapping
 
@@ -9,7 +8,7 @@ import requests
 
 from .utils import (
     getnesteditem, extract_fields, read_times, map_concurrent, CURRENT_TIMEZONE,
-    format_timedelta_hours, format_totalseconds, merge
+    format_timedelta_hours, format_totalseconds, merge, cache
 )
 
 OLYMPIC_BOATCLASS = [
@@ -55,7 +54,7 @@ def request_worldrowing_data(*endpoints, **kwargs):
     params = prepare_params(**kwargs) or None
     return requests.get(url, params=params)
 
-cached_request_worldrowing_data = lru_cache(request_worldrowing_data)
+cached_request_worldrowing_data = cache(request_worldrowing_data)
 
 
 def get_worldrowing_data(*endpoints, cached=True, **kwargs):
@@ -104,8 +103,7 @@ def get_competition_events(competition_id, cached=True):
             ('competitionId', competition_id),
         ), 
         sort=(
-            ('eventId', 'asc'),
-            ('Date', 'asc')
+            ('Date', 'asc'), 
         )
     )
 
@@ -122,19 +120,7 @@ def get_competition_races(competition_id, cached=True):
         )
     )
 
-def get_event_races(event_id, cached=True):
-    return get_worldrowing_records(
-        'race', 
-        cached=cached,
-        filter=(
-            ('eventId', event_id),
-        ), 
-        sort=(
-            ('Date', 'asc')
-        )
-    )
-
-@lru_cache
+@cache
 def get_competitions(year=None, fisa=True, **kwargs):
     year = year or datetime.date.today().year
     kwargs.setdefault('filter', {})['Year'] = year
@@ -315,7 +301,7 @@ def _extract_wbt_record(record):
     }
 
 
-@lru_cache
+@cache
 def load_competition_best_times(json_url):
     return pd.DataFrame.from_records(
         extract_fields(record, WBT_RECORDS)
@@ -323,7 +309,7 @@ def load_competition_best_times(json_url):
     )
     
 
-@lru_cache
+@cache
 def get_competition_best_times():
     wbt_stats = get_worldrowing_records(
         'statistic', 

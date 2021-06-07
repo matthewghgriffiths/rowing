@@ -3,7 +3,7 @@ from setuptools import setup
 
 
 setup(
-    name='rowing',
+    name='rowing-pkg-matthewghgriffiths',
     version='0.1.0',
     description='Python Distribution Utilities',
     author='Matthew Grifiths',
@@ -15,6 +15,8 @@ setup(
         'scipy', 
         'pandas', 
         'matplotlib',
-        'requests'
-    ]
+        'requests',
+        'cmd2', 
+    ],
+    python_requires=">=3.8",
 )
