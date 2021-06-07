@@ -19,7 +19,8 @@ _module_path = _file_path.parent
 _data_path = _module_path / 'data'
 _flag_path = _data_path / 'flags'
 
-cache = lru_cache(maxsize=None)
+# Make lru_cache 3.7 compatible
+cache = lru_cache(maxsize=128)
 
 def Phi(z):
     sq2 = 1.4142135623730951

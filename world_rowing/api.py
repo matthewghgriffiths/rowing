@@ -1,6 +1,5 @@
 
 
-from functools import lru_cache
 import datetime 
 from collections.abc import Mapping
 
@@ -47,7 +46,7 @@ def request_worldrowing_data(*endpoints, **kwargs):
     params = prepare_params(**kwargs) or None
     return requests.get(url, params=params)
 
-cached_request_worldrowing_data = lru_cache(request_worldrowing_data)
+cached_request_worldrowing_data = cache(request_worldrowing_data)
 
 
 def get_worldrowing_data(*endpoints, cached=True, **kwargs):
@@ -96,8 +95,7 @@ def get_competition_events(competition_id, cached=True):
             ('competitionId', competition_id),
         ), 
         sort=(
-            ('eventId', 'asc'),
-            ('Date', 'asc')
+            ('Date', 'asc'), 
         )
     )
 

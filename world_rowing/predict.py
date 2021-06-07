@@ -10,7 +10,7 @@ from scipy import linalg, integrate, stats
 
 from . import api, utils, livetracker
 from .livetracker import RaceTracker
-from .utils import cache
+from .utils import cache, lru_cache
 
 
 def calc_win_probs(times, std):
@@ -32,7 +32,7 @@ def calc_win_probs(times, std):
     return pd.Series(win_prob, index=times.index)
 
 @cache
-def load_predicter(noise=10., data_path=utils._data_path):
+def load_predicter(noise=1., data_path=utils._data_path):
     mean_pace = pd.read_csv(
         data_path / 'mean_pace.csv.gz'
     ).set_index('distance').pace
@@ -172,7 +172,7 @@ class PredictRace:
         )
         return boat_pace
 
-    @cache
+    @lru_cache(maxsize=512)
     def calc_predicters(self, distance):
         kxx = self.K.loc[:, :]
         kxX = self.K.loc[:, :distance]
