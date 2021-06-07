@@ -17,6 +17,14 @@ OLYMPIC_BOATCLASS = [
     'W1x', 'W2x', 'W2-', 'M4x', 'M8+', 'W4x', 'W8+', 'W4-',
 ]
 
+RACE_PHASES = {
+    'Repechage': '0959f5e8-f85a-40fb-93ab-b6c477f6aade',
+    'Test Race': '92b34c4e-af58-4e91-8f4a-22c09984a006',
+    'Heat': 'cd3d5ca1-5aed-4146-b39b-a192ae6533f1',
+    'Final': 'e0fc3320-cd66-43af-a5b5-97afd55b2971',
+    'Semifinal': 'e6693585-d2cf-464c-9f8e-b2e531b26400'
+}
+
 def stringify_value(value):
     if isinstance(value, (str, int, float)):
         return str(value)
@@ -110,6 +118,18 @@ def get_competition_races(competition_id, cached=True):
         ), 
         sort=(
             ('eventId', 'asc'),
+            ('Date', 'asc')
+        )
+    )
+
+def get_event_races(event_id, cached=True):
+    return get_worldrowing_records(
+        'race', 
+        cached=cached,
+        filter=(
+            ('eventId', event_id),
+        ), 
+        sort=(
             ('Date', 'asc')
         )
     )
@@ -359,7 +379,7 @@ def find_world_best_time(
     return get_world_best_times().loc[boat_class]
 
 
-def get_competition_pgmts(competition_id=None):
+def get_competition_pgmts(competition_id=None, finals_only=False):
     competition_id = competition_id or get_most_recent_competition().name
     competition_races = get_competition_races(competition_id)
     competition_events = get_competition_events(competition_id)
@@ -367,6 +387,11 @@ def get_competition_pgmts(competition_id=None):
     boat_classes = get_boat_types()
     wbts = get_world_best_times().ResultTime
     wbts.index.name, wbts.name = 'id', 'worldBestTime'
+
+    if finals_only:
+        competition_races = competition_races.loc[
+            competition_races.racePhaseId == RACE_PHASES['Final']
+        ]
 
     competition_results = merge(
         (
@@ -392,4 +417,6 @@ def get_competition_pgmts(competition_id=None):
     results.worldBestTime = results.worldBestTime.dt.total_seconds().apply(
         format_totalseconds
     )
-    return results.sort_values('PGMT', ascending=False)
+    return results.sort_values('PGMT', ascending=False).reset_index()
+
+
