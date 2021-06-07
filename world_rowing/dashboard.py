@@ -41,7 +41,7 @@ class Dashboard:
 
     @classmethod
     def from_race_id(cls, race_id, **kwargs):
-        race_tracker = LivePrediction(race_id, noise=1)
+        race_tracker = LivePrediction(race_id, noise=1.)
         race_name = race_tracker.race_details.DisplayName
         race_start = pd.to_datetime(
             race_tracker.race_details.DateString

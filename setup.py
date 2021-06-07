@@ -16,7 +16,7 @@ setup(
         'pandas', 
         'matplotlib',
         'requests',
-        'cmd2', 
+        'cmd2'
     ],
     python_requires=">=3.8",
 )

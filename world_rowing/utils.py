@@ -28,6 +28,10 @@ def Phi(z):
 
 CURRENT_TIMEZONE = datetime.now().astimezone().tzinfo
 
+
+def first(it, *args):
+    return next(iter(it), *args)
+
 def read_times(times):
      minfmt = ~ times.fillna('').str.match(r"[0-9]+:[0-9][0-9]?:[0-9][0-9]?")
      new_times = times.copy()

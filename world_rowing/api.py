@@ -374,6 +374,9 @@ def get_competition_pgmts(competition_id=None, finals_only=False):
     wbts = get_world_best_times().ResultTime
     wbts.index.name, wbts.name = 'id', 'worldBestTime'
 
+    if competition_results.empty:
+        return competition_results
+
     if finals_only:
         competition_races = competition_races.loc[
             competition_races.racePhaseId == RACE_PHASES['Final']
@@ -390,19 +393,29 @@ def get_competition_pgmts(competition_id=None, finals_only=False):
         left_on=('raceId', 'eventId', 'boatClassId', 'DisplayName'),
         right_on='id'
     )
+    competition_results['PGMT'] = \
+        competition_results.worldBestTime / competition_results.ResultTime
+
     results = competition_results.loc[
         competition_results.ResultTime > pd.to_timedelta(0),
-        ['DisplayName', 'Country', 'Rank', 'Lane', 'Date', 'ResultTime', 'worldBestTime']
+        [
+            'DisplayName', 
+            'PGMT', 
+            'ResultTime', 
+            'worldBestTime',
+            'Country', 
+            'Rank', 'Lane', 'Date', 
+        ]
     ]
     results.columns = [
-        'BoatClass', 'Country', 'Rank', 'Lane', 'Date', 'Time', 'worldBestTime'
+        'Boat', 'PGMT', 'Time', 'WBT', 'Country', 'Rank', 'Lane', 'Date'
     ]
-    results['PGMT'] = results.worldBestTime / results.Time
+    # results['PGMT'] = results.worldBestTime / results.Time
     results['Rank'] = results.Rank.astype(int)
     results.Time = results.Time.dt.total_seconds().apply(format_totalseconds)
-    results.worldBestTime = results.worldBestTime.dt.total_seconds().apply(
+    results.WBT = results.WBT.dt.total_seconds().apply(
         format_totalseconds
     )
-    return results.sort_values('PGMT', ascending=False).reset_index()
+    return results.sort_values('PGMT', ascending=False).reset_index(drop=True)
 
 
