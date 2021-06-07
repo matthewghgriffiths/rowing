@@ -3,3 +3,4 @@ scipy
 pandas
 matplotlib
 requests
+cmd2
