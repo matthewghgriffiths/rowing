@@ -6,9 +6,6 @@ from datetime import timedelta, datetime
 import logging
 from typing import Callable, Dict, TypeVar, Tuple, Any
 from contextlib import nullcontext
-from concurrent.futures import (
-    ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-)
 
 import numpy as np
 import pandas as pd
@@ -258,6 +255,10 @@ def map_concurrent(
     45%|█████████▍           | 9/20 [00:00<00:00, 17.71it/s, completed=5]
     task failed!
     """
+    # to allow calling from pyiodide
+    from concurrent.futures import (
+        ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+    )
     output = {}
     errors = {}
 
