@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='rowing-pkg-matthewghgriffiths',
-    version='0.0.2',
+    version='0.0.1',
     description='Python Distribution Utilities',
     author='Matthew Grifiths',
     author_email='matthewghgriffiths@gmail.com',
