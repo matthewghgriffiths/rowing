@@ -128,9 +128,6 @@ class RowingApp(cmd2.Cmd):
         boat_pgmts = group_boat_pgmts\
             .first()\
             .sort_values('PGMT', ascending=False)
-        
-        pgmts.PGMT = pgmts.PGMT.map("{:.2%}".format)
-        boat_pgmts.PGMT = boat_pgmts.PGMT.map("{:.2%}".format)
         self.poutput(
             f"loaded PGMTS for {len(pgmts)} results"
         )
@@ -145,8 +142,10 @@ class RowingApp(cmd2.Cmd):
             choice=next(choices, None)
         ) 
         if mode == 'by result':
+            pgmts.PGMT = pgmts.PGMT.map("{:.2%}".format)
             self.poutput(pgmts.to_string())
         elif mode == 'by boat class':
+            boat_pgmts.PGMT = boat_pgmts.PGMT.map("{:.2%}".format)
             self.poutput(boat_pgmts.to_string())
         elif mode == 'by final':
             final_pgmts = api.get_competition_pgmts(
@@ -155,18 +154,26 @@ class RowingApp(cmd2.Cmd):
             self.poutput(final_pgmts.to_string())
         else:
             import matplotlib.pyplot as plt
+            plt.ion()
             f, ax = plt.subplots(figsize=(12, 8))
-
+            ymin = 1
+            ymax = 0
+            n = 10
             for boat in boat_pgmts.index:
                 pgmt = group_boat_pgmts.get_group(boat).PGMT.sort_values(ascending=False)
                 ax.step(
                     range(pgmt.size), pgmt.values, 
                     label=boat, where='post'
                 )
+                ymin = min(ymin, pgmt.values[:n].min())
+                ymax = max(ymax, pgmt.values[:n].max())
                 
-            ax.set_xlim(0, 10)
-            ax.set_ylim(0.9, comp_pgmts.PGMT.max() + .01)
-            ax.legend();
+            ax.set_xlim(0, n)
+            ax.set_ylim(
+                ymin - 0.01, 
+                pgmts.PGMT.max() + .01)
+            ax.legend()
+            plt.show()
 
     @cmd2.with_argparser(n_parser)
     def do_upcoming(self, args):

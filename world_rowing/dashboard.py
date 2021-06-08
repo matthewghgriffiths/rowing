@@ -67,7 +67,7 @@ class Dashboard:
         else:
             clear_output(wait=False)
 
-    def live_ion_dashboard(self):
+    def live_ion_dashboard(self, block=True):
         import matplotlib.pyplot as plt
         plt.ion()
         plt.show()
@@ -81,6 +81,8 @@ class Dashboard:
             else:
                 print('no race data received')
                 break
+
+        plt.show(block=block)
         
     def _init(self, **kwargs):
         self._init_fig(**kwargs)
@@ -507,19 +509,19 @@ class Dashboard:
             self.p_win_ax.set_ylim(0, np.nan_to_num(np.nanmax(win_probs)) + 0.05)
 
 
-def main():
+def main(block=True):
     import matplotlib.pyplot as plt
     from world_rowing.api import show_next_races
 
     dash = Dashboard.load_last_race(figsize=(12, 8))
-    dash.live_ion_dashboard()
+    dash.live_ion_dashboard(block=False)
         
     print('race results:')
     print(dash.race_tracker.intermediate_results)
 
     print('\nupcoming races:')
     print(show_next_races())
-    plt.show(block=True)
+    plt.show(block=block)
 
 
 if __name__ == "__main__":
