@@ -41,12 +41,12 @@ jobs:
       env: 
         PYTHONPATH: /home/runner/work/rowing/rowing
         
-    - name: Build and publish
-      run: |
-        python setup.py sdist bdist_wheel
-    - uses: actions/upload-artifact@v2
-      with:
-        path: dist/*.tar.gz
-    - uses: actions/upload-artifact@v2
-      with:
-        path: dist/*.whl
+    # - name: Build and publish
+    #   run: |
+    #     python setup.py sdist bdist_wheel
+    # - uses: actions/upload-artifact@v2
+    #   with:
+    #     path: dist/*.tar.gz
+    # - uses: actions/upload-artifact@v2
+    #   with:
+    #     path: dist/*.whl
