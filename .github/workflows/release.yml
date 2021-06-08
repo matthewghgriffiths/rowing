@@ -40,7 +40,6 @@ jobs:
   release:
     name: Create Github Release
     if: contains(github.ref, 'tags/v')
-    needs: [test]
     runs-on: ubuntu-latest
     steps:
       # - name: Create Release
