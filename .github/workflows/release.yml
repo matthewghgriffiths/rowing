@@ -41,7 +41,7 @@ jobs:
         id: release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./dist/rowing*
+          files: ./dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
