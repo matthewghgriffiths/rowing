@@ -94,7 +94,7 @@ class RowingApp(cmd2.Cmd):
     def select_from_dataframe(
             self, df, 
             column='DisplayName', name='row', 
-            choice: Optional[str] = None, prompt: Optional[str] = None
+            choice: Optional[int] = None, prompt: Optional[str] = None
     ):
         selected_id = self.select_with_choice(
             list(df[column].items()),
@@ -240,9 +240,11 @@ class RowingApp(cmd2.Cmd):
         )
         return race, event
 
+def run():
+    RowingApp().cmdloop()
     
 def main():
-    sys.exit(RowingApp().cmdloop())
+    sys.exit(run())
 
 
 if __name__ == '__main__':

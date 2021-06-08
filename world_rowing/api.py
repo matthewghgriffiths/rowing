@@ -1,10 +1,18 @@
 
-
+import sys
 import datetime 
 from collections.abc import Mapping
 
 import pandas as pd
-import requests
+
+if "pyodide" in sys.modules:
+    use_requests = False
+    import pyodide
+    import json
+    from urllib import parse 
+else:
+    use_requests = True
+    import requests
 
 from .utils import (
     getnesteditem, extract_fields, read_times, map_concurrent, CURRENT_TIMEZONE,
@@ -48,13 +56,46 @@ def prepare_params(**kwargs):
         for field, value in prepare_options(key, options)
     }
 
-def request_worldrowing_data(*endpoints, **kwargs):
+if use_requests:
+    def load_json_url(url, params=None, **kwargs):
+        r = requests.get(url, params=params)
+        r.raise_for_status()
+        if r.text:
+            return r.json()
+        else:
+            return {}
+
+else:
+    def load_json_url(url, params=None, **kwargs):
+        if params:
+            query = parse.urlencode(params)
+            url = parse.urlparse(url)._replace(query=query).geturl()
+
+        data = pyodide.open_url(url)
+        try:
+            return json.load(data)
+        except json.JSONDecodeError:
+            return {}  
+
+def prepare_request(*endpoints, **kwargs):
     endpoint = "/".join(endpoints)
     url = f"https://world-rowing-api.soticcloud.net/stats/api/{endpoint}"
     params = prepare_params(**kwargs) or None
-    return requests.get(url, params=params)
+    return url, params
+
+
+def request_worldrowing_data(*endpoints, **kwargs):
+    return load_json_url(*prepare_request(*endpoints, **kwargs))
+
 
 cached_request_worldrowing_data = cache(request_worldrowing_data)
+
+@cache
+def load_competition_best_times(json_url):
+    return pd.DataFrame.from_records(
+        extract_fields(record, WBT_RECORDS)
+        for record in load_json_url(json_url)['BestTimes']
+    )
 
 
 def get_worldrowing_data(*endpoints, cached=True, **kwargs):
@@ -64,14 +105,11 @@ def get_worldrowing_data(*endpoints, cached=True, **kwargs):
             else tuple(dict(vals).items())
             for k, vals in kwargs.items()
         }
-        r = cached_request_worldrowing_data(*endpoints, **hashable_kws)
+        data = cached_request_worldrowing_data(*endpoints, **hashable_kws)
     else:
-        r = request_worldrowing_data(*endpoints, **kwargs)
-    r.raise_for_status()
-    if r.text:
-        return r.json()['data']
-    else:
-        return []
+        data = request_worldrowing_data(*endpoints, **kwargs)
+    
+    return data.get('data', [])
 
 
 def get_worldrowing_record(*endpoints, **kwargs):
@@ -300,13 +338,6 @@ def _extract_wbt_record(record):
         for key, items in WBT_RECORDS.items()
     }
 
-
-@cache
-def load_competition_best_times(json_url):
-    return pd.DataFrame.from_records(
-        extract_fields(record, WBT_RECORDS)
-        for record in requests.get(json_url).json()['BestTimes']
-    )
     
 
 @cache
