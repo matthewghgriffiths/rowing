@@ -160,7 +160,7 @@ class RaceTracker:
             if self.intermediate_results[2000].notna().all():
                 self.completed = True
 
-        return self.live_data
+        return self.live_data, self.intermediate_results
 
     def stream_livedata(self):
         while not self.completed:
@@ -358,22 +358,23 @@ class RaceTracker:
         return ylim
         
     def plot(
-            self, distance, y=None, ax=None, maxdistance=None, 
+            self, *args, ax=None, maxdistance=None, 
             set_lims=True, 
             **kwargs
     ):
         import matplotlib.pyplot as plt
         ax = ax or plt.gca()
         lines = {}
-        if y is None:
-            y = distance
-            distance = self._by_country(y.index)
+        if len(args) == 1:
+            y, = args
+            x = self._by_country(y.index)
         else:
-            distance = self._by_country(distance)
+            x, y = args
+            x = self._by_country(x)
 
         for cnt in y.columns:
             lines[cnt], = ax.plot(
-                distance[cnt], 
+                x[cnt], 
                 y[cnt], 
                 label=cnt, 
                 color=self.country_colors[cnt], 
@@ -385,11 +386,11 @@ class RaceTracker:
         
         return lines
 
-    def update_plot(self, lines, distance, y):
-        distance = self._by_country(distance)
-        for cnt, values in y.items():
+    def update_plot(self, lines, x, y):
+        x = self._by_country(x)
+        for cnt, c_y in y.items():
             lines[cnt].set_data(
-                distance[cnt], values
+                x[cnt], c_y
             )
 
     def plot_uncertainty(
@@ -611,6 +612,23 @@ def calculate_pgmts(live_boat_data, gmt, race_distance=2000):
     for cnt in countries:
         live_boat_data['PGMT', cnt] = \
             live_boat_data.GMT[cnt] / live_boat_data.time
+
+    
+    leader_distance = live_boat_data.distanceTravelled.max(1)
+    imax = leader_distance.searchsorted(leader_distance.max())
+    for cnt, dist in live_boat_data.distanceTravelled.items():
+        delta = (
+            live_boat_data.time 
+            - np.interp(
+                dist, 
+                leader_distance.loc[:imax], 
+                live_boat_data.time.loc[:imax]
+            )
+        )
+        jlast = dist.searchsorted(leader_distance.max())
+        delta[jlast:] = delta[jlast]
+        live_boat_data[('timeFromLeader', cnt)] = delta
+
 
     return live_boat_data
 

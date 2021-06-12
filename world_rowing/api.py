@@ -2,6 +2,7 @@
 import sys
 import datetime 
 from collections.abc import Mapping
+import logging
 
 import pandas as pd
 
@@ -18,6 +19,8 @@ from .utils import (
     getnesteditem, extract_fields, read_times, map_concurrent, CURRENT_TIMEZONE,
     format_timedelta_hours, format_totalseconds, merge, cache
 )
+
+logger = logging.getLogger('world_rowing.api')
 
 OLYMPIC_BOATCLASS = [
     'M1x', 'LM2x', 'W1x', 'M2x', 'M2-', 'LW2x', 'M4-',
@@ -114,7 +117,7 @@ def get_worldrowing_data(*endpoints, cached=True, **kwargs):
 
 def get_worldrowing_record(*endpoints, **kwargs):
     data = get_worldrowing_data(*endpoints, **kwargs)
-    return pd.Series(data, name=data.pop('id'))
+    return pd.Series(data, name=data.pop('id', data.get('DisplayName', '')))
 
 
 def get_worldrowing_records(*endpoints, **kwargs):
@@ -133,7 +136,8 @@ def get_worldrowing_records(*endpoints, **kwargs):
     return records
 
 
-def get_competition_events(competition_id, cached=True):
+def get_competition_events(competition_id=None, cached=True):
+    competition_id = competition_id or get_most_recent_competition().name
     return get_worldrowing_records(
         'event', 
         cached=True,
@@ -145,7 +149,8 @@ def get_competition_events(competition_id, cached=True):
         )
     )
 
-def get_competition_races(competition_id, cached=True):
+def get_competition_races(competition_id=None, cached=True):
+    competition_id = competition_id or get_most_recent_competition().name
     return get_worldrowing_records(
         'race', 
         cached=cached,
@@ -176,10 +181,18 @@ def get_this_years_competitions(fisa=True):
 def get_most_recent_competition(fisa=True):
     competitions = get_this_years_competitions(fisa=True)
     started = competitions.StartDate < datetime.datetime.now()
-    return competitions.loc[started].iloc[-1]
+    competition = competitions.loc[started].iloc[-1]
+    logger.info(
+        f"loaded most recent competition: {competition.DisplayName}"
+        )
+    return competition
 
 def get_last_race_started(fisa=True, competition=None):
-    return get_last_races(n=1, fisa=fisa, competition=competition).iloc[0]
+    race = get_last_races(n=1, fisa=fisa, competition=competition).iloc[0]
+    logger.info(
+        f"loaded last race started: {race.DisplayName}"
+    )
+    return race
 
 def get_last_races(n=1, fisa=True, competition=None):
     competition = competition or get_most_recent_competition(fisa)
@@ -206,9 +219,6 @@ def show_next_races(n=10, fisa=True, competition=None):
         format_timedelta_hours
     )
     return next_races
-
-    
-
 
 def get_boat_types():
     return get_worldrowing_records('boatClass', cached=True)

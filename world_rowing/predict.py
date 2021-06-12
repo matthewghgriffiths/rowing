@@ -3,6 +3,7 @@
 from typing import Dict
 from collections import namedtuple
 from functools import cached_property
+import logging
 
 import numpy as np 
 import pandas as pd
@@ -14,6 +15,11 @@ from .utils import cache, lru_cache
 
 
 def calc_win_probs(times, std):
+    if np.allclose(std, 0):
+        win_prob = np.zeros_like(times)
+        win_prob[times.argmin()] = 1
+        return pd.Series(win_prob, index=times.index) 
+
     norm = stats.norm(
         loc=times.min() - times.values, 
         scale=np.asarray(std)
