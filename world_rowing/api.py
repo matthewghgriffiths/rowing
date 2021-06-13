@@ -80,6 +80,7 @@ else:
         except json.JSONDecodeError:
             return {}  
 
+
 def prepare_request(*endpoints, **kwargs):
     endpoint = "/".join(endpoints)
     url = f"https://world-rowing-api.soticcloud.net/stats/api/{endpoint}"
@@ -92,6 +93,7 @@ def request_worldrowing_data(*endpoints, **kwargs):
 
 
 cached_request_worldrowing_data = cache(request_worldrowing_data)
+
 
 @cache
 def load_competition_best_times(json_url):
