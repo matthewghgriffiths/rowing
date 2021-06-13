@@ -3,4 +3,4 @@ scipy
 pandas
 matplotlib
 requests
-cmd2
+cmd2>=2.0.0
