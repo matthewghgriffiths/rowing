@@ -252,12 +252,11 @@ class Dashboard:
         self.axes[-1, 0].set_xlabel('country')  
         self.axes[-1, 1].set_xlabel('distance (m)')
 
-        self._set_finish_axes()
-        
         self.axes[-1, 0].set_xticklabels(
-            self.axes[-1, -1].get_xticklabels(), 
+            self.axes[-1, 0].get_xticklabels(), 
             rotation=-45,
         )
+        self._set_finish_axes()
         self.fig.tight_layout()
         self.fig.subplots_adjust(**self._subplots_adjust)
 
@@ -265,6 +264,10 @@ class Dashboard:
         for ax in self.right_axes:
             ax.yaxis.tick_right()
             ax.yaxis.set_label_position("right")
+
+        self.right_axes[-1].set_xticks(
+            self.right_axes[-1].get_xticks()
+        )
         self.right_axes[-1].set_xticklabels(
             self.right_axes[-1].get_xticklabels(), 
             rotation=45,
@@ -443,7 +446,7 @@ class Dashboard:
             live_data.distanceTravelled,
             pace,
         )            
-        ylim = (pace.values[-100:].max() + 1, pace.values.min() - 1)
+        ylim = (pace.values[-100:-1].max() + 1, pace.values.min() - 1)
         self.b_pace_ax.set_ylim(ylim)
         format_yaxis_splits(self.b_pace_ax)
         self.b_pace_ax.set_ylim(ylim)

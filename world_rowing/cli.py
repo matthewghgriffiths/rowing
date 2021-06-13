@@ -3,6 +3,7 @@
 import sys
 import argparse 
 import datetime
+import logging
 from typing import (
     Optional, Dict, List, cast, Union, Any, Tuple, Iterable
 )
@@ -13,6 +14,8 @@ import cmd2
 
 from world_rowing import api, dashboard
 from world_rowing.utils import first
+
+logger = logging.getLogger('world_rowing.cli')
 
 year_parser = argparse.ArgumentParser(
     description='Specify which year you want, defaults to current'
@@ -26,7 +29,6 @@ year_parser.add_argument(
     nargs='*', default=()
     )
 
-
 n_parser = argparse.ArgumentParser(
     description='Specify how many results you want'
 )
@@ -34,6 +36,19 @@ n_parser.add_argument(
     'n', type=int, help='number to retrieve', 
     nargs='?', default=5
     )
+
+logging_parser = argparse.ArgumentParser(
+    description='Specify the logging level you want to see'
+)
+logging_parser.add_argument(
+    '--log_file', nargs='?',
+    help='[optional] path to logfile', 
+)
+logging_parser.add_argument(
+    'level', choices=['DEBUG', 'INFO', 'CRITICAL', 'ERROR'],
+    default='INFO', nargs='?',
+    help='the logging level to record', 
+)
 
 
 class RowingApp(cmd2.Cmd):
@@ -45,12 +60,20 @@ class RowingApp(cmd2.Cmd):
         # Make maxrepeats settable at runtime
         self.current_race = api.get_last_race_started().name
         self.current_competition = api.get_most_recent_competition().name
+        self.save_folder = '.'
+        self.block = False
 
         self.add_settable(
             cmd2.Settable('current_race', str, 'id of current race', self)
         )
         self.add_settable(
             cmd2.Settable('current_competition', int, 'id of current competition', self)
+        )
+        self.add_settable(
+            cmd2.Settable('save_folder', str, 'folder to save data', self)
+        )
+        self.add_settable(
+            cmd2.Settable('block', bool, 'give access to cli after plotting?', self)
         )
 
         self.intro = "Welcome try running `pgmts` or `livetracker`"
@@ -103,14 +126,13 @@ class RowingApp(cmd2.Cmd):
         )
         return df.loc[selected_id]
 
-
-    @cmd2.with_argparser(year_parser)
-    def do_select_race(self, args):
-        race, event, competition = self.select_race(args.year, choice=first(args.choices, None))
-        self.current_race = race.name
-        self.current_event = competition.name
-        self.current_competition = competition.name
-        self.poutput(race)
+    @cmd2.with_argparser(logging_parser)
+    def do_log(self, args):
+        self.poutput(args)
+        logging.basicConfig(
+            filename=args.log_file,
+            level=getattr(logging, args.level)
+        )
 
     @cmd2.with_argparser(year_parser)
     def do_pgmts(self, args):
@@ -173,7 +195,7 @@ class RowingApp(cmd2.Cmd):
                 ymin - 0.01, 
                 pgmts.PGMT.max() + .01)
             ax.legend()
-            plt.show()
+            plt.show(block=self.block)
 
     @cmd2.with_argparser(n_parser)
     def do_upcoming(self, args):
@@ -187,9 +209,15 @@ class RowingApp(cmd2.Cmd):
 
     @cmd2.with_argparser(year_parser)
     def do_view(self, args):
+        """
+        Show live tracker details for a specified race
+        """
         race, event, competition = self.select_race(
             args.year, choices=args.choices)
         self.dashboard(race.name)
+
+    do_view_race = do_view 
+    race = do_view
 
     def dashboard(self, race_id):
         import matplotlib.pyplot as plt
@@ -197,15 +225,16 @@ class RowingApp(cmd2.Cmd):
             race_id, 
         )
         dash.live_ion_dashboard()
-        plt.show(block=False)
+        plt.show(block=self.block)
 
     def do_livetracker(self, args):
+        """
+        Show live tracker details for the most recent race
+        """
         import matplotlib.pyplot as plt
         dash = dashboard.Dashboard.load_last_race()
         dash.live_ion_dashboard()
-        plt.show(block=False)
-
-
+        plt.show(block=self.block)
 
     def select_race(self, year: int, choices: Iterable[int] = ()):
         choices = iter(choices)
