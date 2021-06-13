@@ -15,7 +15,7 @@ setup(
     packages=['world_rowing'],
     entry_points={
         'console_scripts': [
-            'world_rowing = world_rowing.cli.run'
+            'world_rowing = world_rowing.cli:run'
         ]
     },
     long_description=long_description, 
