@@ -5,7 +5,7 @@ from collections import namedtuple
 from functools import cached_property
 import logging
 
-import numpy as np 
+import numpy as np
 import pandas as pd
 from scipy import linalg, integrate, stats
 
@@ -18,10 +18,10 @@ def calc_win_probs(times, std):
     if np.allclose(std, 0):
         win_prob = np.zeros_like(times)
         win_prob[times.argmin()] = 1
-        return pd.Series(win_prob, index=times.index) 
+        return pd.Series(win_prob, index=times.index)
 
     norm = stats.norm(
-        loc=times.min() - times.values, 
+        loc=times.min() - times.values,
         scale=np.asarray(std)
     )
 
@@ -32,10 +32,11 @@ def calc_win_probs(times, std):
         return np.exp(logp + logcdf)
 
     win_prob, err = integrate.quad_vec(
-        func, -np.inf, np.inf, 
+        func, -np.inf, np.inf,
     )
     win_prob /= win_prob.sum()
     return pd.Series(win_prob, index=times.index)
+
 
 @cache
 def load_predicter(noise=1., data_path=utils._data_path):
@@ -50,14 +51,14 @@ def load_predicter(noise=1., data_path=utils._data_path):
     )
     cov_pace.columns = cov_pace.columns.astype(int)
     assert (
-        (cov_pace.index == distances).all() and 
+        (cov_pace.index == distances).all() and
         (cov_pace.columns == distances).all()
     )
     mean_cov = mean_pace.values[:, None] * mean_pace.values[None, :]
     K = pd.DataFrame(
-        mean_cov + 0.5*cov_pace, 
-        index=distances, 
-        columns=distances 
+        mean_cov + 0.5*cov_pace,
+        index=distances,
+        columns=distances
     )
     return PredictRace(distances, K, noise=noise)
 
@@ -67,14 +68,14 @@ class PredictRace:
         self.distances = pd.Index(distances, name='distance')
         # Distance travelled between each distance
         # Needed to calculate times
-        deltam = np.diff(self.distances)    
+        deltam = np.diff(self.distances)
         deltam = np.r_[deltam, deltam[0]]
         self.delta_dist = pd.Series(
             deltam, index=self.distances
         )
         # covariance matrix
         self.K = pd.DataFrame(
-            K, 
+            K,
             index=self.distances,
             columns=self.distances
         )
@@ -84,12 +85,12 @@ class PredictRace:
                 K + np.eye(len(K)) * noise
             ),
             index=K.index,
-            columns=K.columns, 
+            columns=K.columns,
         )
         # linear transform to calculate predicted times
         self.pace_time_M = pd.DataFrame(
             np.tril(
-                np.ones_like(K) 
+                np.ones_like(K)
                 * (self.delta_dist.values[:, None]/500)
             ),
             index=self.distances,
@@ -99,7 +100,7 @@ class PredictRace:
     def calc_distance_data(self, live_data):
         distances = self.distances
         columns = [
-            'distanceFromLeader', 'strokeRate', 
+            'distanceFromLeader', 'strokeRate',
             'metrePerSecond', 'PGMT'
         ]
         dist_travelled = live_data.distanceTravelled
@@ -112,7 +113,7 @@ class PredictRace:
             np.vstack(
                 [
                     np.interp(
-                        distances, 
+                        distances,
                         dist_travelled.loc[:boat_lims[cnt], cnt],
                         live_data.loc[:boat_lims[cnt], (col, cnt)],
                         right=np.nan
@@ -124,11 +125,12 @@ class PredictRace:
             index=distances
         )
         for cnt in live_dist_data.metrePerSecond.columns:
-            live_dist_data[('pace', cnt)] = 500 / live_dist_data.metrePerSecond[cnt]
-            
+            live_dist_data[('pace', cnt)] = 500 / \
+                live_dist_data.metrePerSecond[cnt]
+
         for cnt in live_dist_data.metrePerSecond.columns:
             live_dist_data[('time', cnt)] = np.interp(
-                distances, 
+                distances,
                 dist_travelled.loc[:boat_lims[cnt], cnt],
                 live_data.time.loc[:boat_lims[cnt]],
                 right=np.nan
@@ -137,7 +139,7 @@ class PredictRace:
         return live_dist_data
 
     def calc_boat_times(self, live_data):
-        distances = self.distances 
+        distances = self.distances
         dist_travelled = live_data.distanceTravelled
         boat_time_lims = (
             (cnt, dist_travelled[cnt].searchsorted(distances[-1]) + 1)
@@ -147,7 +149,7 @@ class PredictRace:
             np.vstack(
                 [
                     np.interp(
-                        distances, 
+                        distances,
                         dist_travelled[cnt][:i],
                         live_data.time[:i]
                     )
@@ -161,12 +163,12 @@ class PredictRace:
         return boat_times
 
     def calc_boat_pace(self, live_data):
-        distances = self.distances 
+        distances = self.distances
         boat_pace = pd.DataFrame(
             np.vstack(
                 [
                     np.interp(
-                        distances, 
+                        distances,
                         live_data.distanceTravelled[cnt],
                         500 / live_data.metrePerSecond[cnt]
                     )
@@ -189,7 +191,7 @@ class PredictRace:
         pace_predicter = pd.DataFrame(
             linalg.cho_solve((LXX, True), kxX.T).T,
             index=x, columns=X,
-        )        
+        )
         LK = linalg.solve_triangular(
             LXX, kxX.T, lower=True
         )
@@ -200,7 +202,7 @@ class PredictRace:
 
     def predict(self, live_data, match_to_live=True):
         live_dist_data = self.calc_distance_data(live_data)
-        race_pace = live_dist_data.pace 
+        race_pace = live_dist_data.pace
 
         pred_pace = race_pace.copy()
         pred_times = race_pace.copy()
@@ -233,19 +235,20 @@ class PredictRace:
         for cnt in pred_times.columns:
             maxi = pred_times[cnt].searchsorted(leader_time.iloc[-1]) + 1
             pred_distance[cnt] = np.interp(
-                leader_time, 
-                pred_times[cnt].iloc[:maxi], 
-                pred_times.index[:maxi], 
+                leader_time,
+                pred_times[cnt].iloc[:maxi],
+                pred_times.index[:maxi],
             )
             pred_speed = 500 / pred_pace[cnt].values[:, None]
-            pred_distance_cov[cnt] = pred_times_cov[cnt] * pred_speed * pred_speed.T
+            pred_distance_cov[cnt] = pred_times_cov[cnt] * \
+                pred_speed * pred_speed.T
 
         pred_pace_std, pred_times_std, pred_distance_std = (
             pd.DataFrame(
                 {
                     cnt: np.sqrt(cov.values.diagonal())
                     for cnt, cov in pred_pace_cov.items()
-                }, 
+                },
                 index=race_pace.index
             )
             for pred_cov in (
@@ -259,28 +262,27 @@ class PredictRace:
                 pace = live_dist_data.pace[cnt]
                 pred_pace.loc[pace.notna(), cnt] = pace.dropna()
                 pred_pace_std.loc[pace.notna(), cnt] = 0
-                time  = live_dist_data.time[cnt]
+                time = live_dist_data.time[cnt]
                 pred_times.loc[time.notna(), cnt] = time.dropna()
                 pred_times_std.loc[time.notna(), cnt] = 0
                 dist = (
-                    live_dist_data.index 
+                    live_dist_data.index
                     - live_dist_data.distanceFromLeader[cnt])
                 pred_distance.loc[dist.notna(), cnt] = dist.dropna()
                 pred_distance_std.loc[dist.notna(), cnt] = 0
 
         win_probs = calc_win_probs(
-            pred_times.iloc[-1], 
+            pred_times.iloc[-1],
             pred_times_std.iloc[-1]
         )
 
         return (
-            (pred_pace, pred_pace_std), 
+            (pred_pace, pred_pace_std),
             (pred_times, pred_times_std),
             (pred_distance, pred_distance_std),
             win_probs
         )
 
-    
     def predict_pace(self, race_pace, distance=None):
         if distance:
             pace_predictor, pred_pace_cov = self.calc_predicters(distance)
@@ -292,9 +294,10 @@ class PredictRace:
             pred_pace_cov = {}
             for cnt, cnt_pace in race_pace.items():
                 distance = cnt_pace.index[cnt_pace.notna()][-1]
-                pace_predictor, pred_pace_cov[cnt] = self.calc_predicters(distance)
+                pace_predictor, pred_pace_cov[cnt] = self.calc_predicters(
+                    distance)
                 pred_pace[cnt] = pace_predictor.dot(cnt_pace.loc[:distance])
-                
+
             return pd.DataFrame(pred_pace), pd.concat(pred_pace_cov, axis=1)
 
     def predict_pace_times(self, race_pace, distance=None):
@@ -310,25 +313,25 @@ class PredictRace:
                 cnt: M.dot(pred_pace_cov[cnt].dot(M.T))
                 for cnt in pred_times.columns
             }).T
-        
+
         return (pred_pace, pred_pace_cov), (pred_times, pred_time_cov)
-    
+
     def predict_times(
-            self, race_pace, distance=None, 
+            self, race_pace, distance=None,
             pred_pace=None, pred_pace_cov=None
     ):
         if pred_pace is None or pred_pace_cov is None:
             pred_pace, pred_pace_cov = self.predict_pace(
                 race_pace, distance)
-            
+
         M = self.pace_time_M
         pred_times = M.dot(pred_pace)
         pred_time_cov = M.dot(pred_pace_cov.dot(M.T))
-        
+
         return pred_times, pred_time_cov
 
     def predict_finish_time(
-            self, race_pace, distance=None, 
+            self, race_pace, distance=None,
             pred_pace=None, pred_pace_cov=None
     ):
         if pred_pace is None or pred_pace_cov is None:
@@ -339,12 +342,12 @@ class PredictRace:
         pred_finish = v.dot(pred_pace)
         pred_finish_cov = v.dot(pred_pace_cov.dot(v))
         return pred_finish, pred_finish_cov
- 
+
 
 class LivePrediction(RaceTracker):
-    def __init__( 
-        self, race_id, 
-        predicter: PredictRace = None, 
+    def __init__(
+        self, race_id,
+        predicter: PredictRace = None,
         noise=0.3,
         data_path=utils._data_path,
         **kwargs
@@ -358,12 +361,10 @@ class LivePrediction(RaceTracker):
             if self.live_data is None:
                 live_data = self.update_livedata()
             else:
-                live_data = self.live_data 
-            
+                live_data = self.live_data
+
         if len(live_data):
             return self.predicter.predict(live_data, match_to_live=match_to_live)
-
-
 
 
 def fit_factor_analysis_regularised(X, d, F=None, W=None, delta=1, psi=1, niter=100):
@@ -373,7 +374,7 @@ def fit_factor_analysis_regularised(X, d, F=None, W=None, delta=1, psi=1, niter=
     psi: Gaussian magnitude regularisation factor
     """
     n, m = X.shape
-    #initialise factors
+    # initialise factors
     if F is None:
         U, s, Vt = np.linalg.svd(X)
         scale = np.diag(np.sqrt(s[:d]))
@@ -389,12 +390,12 @@ def fit_factor_analysis_regularised(X, d, F=None, W=None, delta=1, psi=1, niter=
 
     # Do Expectation Maximisation
     Psi = psi * np.eye(n)  # Gaussian regularisation
-    B = delta * D.dot(D.T) # Derivative regularisation
+    B = delta * D.dot(D.T)  # Derivative regularisation
     Fp = F.copy()
     Wp = W.copy()
     for i in range(niter):
         A = Wp.T.dot(Psi.dot(Wp))
-        S = A.diagonal()[:, None] +  B.diagonal()[None, :]
+        S = A.diagonal()[:, None] + B.diagonal()[None, :]
         C = 2 * W.T.dot(Psi.dot(X))
         D = (C - A.dot(Fp) - Fp.dot(B))/S/2
         Fp += D

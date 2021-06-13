@@ -1,7 +1,7 @@
 
-import os 
-from pathlib import Path 
-from functools import lru_cache, partial
+import os
+from pathlib import Path
+from functools import lru_cache
 from datetime import timedelta, datetime
 import logging
 from typing import Callable, Dict, TypeVar, Tuple, Any
@@ -12,16 +12,18 @@ import pandas as pd
 from scipy.special import erf
 
 _file_path = Path(os.path.abspath(__file__))
-_module_path = _file_path.parent 
+_module_path = _file_path.parent
 _data_path = _module_path / 'data'
 _flag_path = _data_path / 'flags'
 
 # Make lru_cache 3.7 compatible
 cache = lru_cache(maxsize=128)
 
+
 def Phi(z):
     sq2 = 1.4142135623730951
     return 1/2 + erf(z/sq2)/2
+
 
 CURRENT_TIMEZONE = datetime.now().astimezone().tzinfo
 
@@ -29,16 +31,18 @@ CURRENT_TIMEZONE = datetime.now().astimezone().tzinfo
 def first(it, *args):
     return next(iter(it), *args)
 
+
 def read_times(times):
-     minfmt = ~ times.fillna('').str.match(r"[0-9]+:[0-9][0-9]?:[0-9][0-9]?")
-     new_times = times.copy()
-     new_times[minfmt] = "0:" + times 
-     return pd.to_timedelta(new_times)
+    minfmt = ~ times.fillna('').str.match(r"[0-9]+:[0-9][0-9]?:[0-9][0-9]?")
+    new_times = times.copy()
+    new_times[minfmt] = "0:" + times
+    return pd.to_timedelta(new_times)
 
 
 @cache
 def get_iso_country_data(data_path=_data_path / 'iso_country.json'):
     return pd.read_json(data_path)
+
 
 @cache
 def get_iso2_names(data_path=_data_path / 'iso_country.json'):
@@ -50,6 +54,7 @@ def get_iso2_names(data_path=_data_path / 'iso_country.json'):
         )
         for _, col in iso_country.iteritems()
     ])
+
 
 @cache
 def get_iso3_names(data_path=_data_path / 'iso_country.json'):
@@ -65,14 +70,15 @@ def get_iso3_names(data_path=_data_path / 'iso_country.json'):
 
 @cache
 def find_country_iso2(
-        country, 
-        data_path=_data_path / 'iso_country.json'
-    ):
-        return get_iso2_names(data_path)[country]
+    country,
+    data_path=_data_path / 'iso_country.json'
+):
+    return get_iso2_names(data_path)[country]
+
 
 @cache
 def get_flag_im(
-        country, 
+        country,
         data_path=_data_path / 'iso_country.json',
         flag_path=_flag_path
 ):
@@ -94,41 +100,43 @@ def update_table(table, index, columns, update):
             j, = np.where(columns == col)[0]
             table[i + 1, j].get_text().set_text(val)
 
+
 def make_flag_box(
-        country, 
+        country,
         xy,
-        base_width=900, 
-        zoom=0.04, 
-        resample=True, 
+        base_width=900,
+        zoom=0.04,
+        resample=True,
         frameon=False,
-        xycoords='data',  
+        xycoords='data',
         box_alignment=(0.5, 0.),
         pad=0,
         data_path=_data_path / 'iso_country.json',
         flag_path=_flag_path,
-        offset_kws=None, 
+        offset_kws=None,
         **kwargs
 ):
     from matplotlib.offsetbox import OffsetImage, AnnotationBbox
     im = get_flag_im(
-        country, 
+        country,
         data_path=data_path,
         flag_path=flag_path,
     )
     offset_im = OffsetImage(
-        im, 
-        zoom=zoom * base_width / im.shape[1], 
+        im,
+        zoom=zoom * base_width / im.shape[1],
         resample=resample,
         **(offset_kws or {})
     )
     return AnnotationBbox(
-        offset_im, xy, 
+        offset_im, xy,
         frameon=frameon,
-        xycoords=xycoords,  
+        xycoords=xycoords,
         box_alignment=box_alignment,
         pad=0,
         **kwargs
     )
+
 
 def update_fill_between(poly, x, y0, y1):
     x, y0, y1 = map(np.asarray, (x, y0, y1))
@@ -156,6 +164,7 @@ def update_fill_betweenx(poly, y, x0, x1):
 def format_totalseconds(seconds, hundreths=True):
     return format_timedelta(timedelta(seconds=seconds), hundreths=hundreths)
 
+
 def format_timedelta(td, hours=False, hundreths=True):
     mins, secs = divmod(td.seconds, 60)
     if hours:
@@ -165,14 +174,18 @@ def format_timedelta(td, hours=False, hundreths=True):
         end = f".{(td.microseconds // 10_000):02d}" if hundreths else ''
         return f"{mins}:{secs:02d}{end}"
 
+
 def format_timedelta_hours(td):
     return format_timedelta(td, hours=True)
+
 
 def format_yaxis_splits(ax=None, ticks=True, hundreths=False):
     format_axis_splits(ax=ax, yticks=ticks, hundreths=hundreths)
 
+
 def format_xaxis_splits(ax=None, ticks=True, hundreths=False):
     format_axis_splits(ax=ax, yticks=False, xticks=ticks, hundreths=hundreths)
+
 
 def format_axis_splits(ax=None, yticks=True, xticks=False, hundreths=False):
     import matplotlib.pyplot as plt
@@ -192,18 +205,21 @@ def format_axis_splits(ax=None, yticks=True, xticks=False, hundreths=False):
             [format_totalseconds(s, hundreths) for s in xticks]
         )
 
+
 K = TypeVar("K")
 A = TypeVar('A')
 V = TypeVar('V')
+
+
 def map_concurrent(
-        func: Callable[..., V], 
-        inputs: Dict[K, Tuple], 
-        threaded: bool = True, 
-        max_workers: int = 10, 
-        show_progress: bool = True,
-        raise_on_err: bool = False,
-        **kwargs, 
-    ) -> Tuple[Dict[K, V], Dict[K, Exception]]:
+    func: Callable[..., V],
+    inputs: Dict[K, Tuple],
+    threaded: bool = True,
+    max_workers: int = 10,
+    show_progress: bool = True,
+    raise_on_err: bool = False,
+    **kwargs,
+) -> Tuple[Dict[K, V], Dict[K, Exception]]:
     """
     This function is equalivant to calling,
 
@@ -266,7 +282,7 @@ def map_concurrent(
 
     if show_progress:
         from tqdm.auto import tqdm
-        pbar = tqdm(total=len(inputs)) 
+        pbar = tqdm(total=len(inputs))
     else:
         pbar = nullcontext()
     with Executor(max_workers=max_workers) as executor, pbar:
@@ -284,12 +300,12 @@ def map_concurrent(
                 output[key] = future.result()
             except Exception as exc:
                 if raise_on_err:
-                    raise exc 
+                    raise exc
                 else:
                     logging.warning(f"{key} experienced error {exc}")
-                    errors[key] = exc 
+                    errors[key] = exc
                     status['nerrors'] = len(errors)
-    
+
     return output, errors
 
 
@@ -297,7 +313,7 @@ def getnesteditem(container, *items):
     value = container
     for item in items:
         value = value[item]
-        
+
     return value
 
 
@@ -311,18 +327,19 @@ def merge(dfs, **kwargs):
     import pandas as pd
     left = dfs[0]
     n = len(dfs[1:])
+
     def iterate(val):
         if isinstance(val, tuple):
             return iter(val)
         else:
             return (val for _ in range(n))
-        
+
     iter_kwargs = {k: iterate(val) for k, val in kwargs.items()}
-        
+
     for right in dfs[1:]:
         kws = {
             k: next(val) for k, val in iter_kwargs.items()
         }
         left = pd.merge(left, right, **kws)
-        
+
     return left

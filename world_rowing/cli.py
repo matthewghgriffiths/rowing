@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
 import sys
-import argparse 
+import argparse
 import datetime
 import logging
 from typing import (
     Optional, Dict, List, cast, Union, Any, Tuple, Iterable
 )
 
-import pandas as pd 
+import pandas as pd
 
 import cmd2
 
@@ -21,39 +21,39 @@ year_parser = argparse.ArgumentParser(
     description='Specify which year you want, defaults to current'
 )
 year_parser.add_argument(
-    'year', type=int, help='year to retrieve', 
+    'year', type=int, help='year to retrieve',
     nargs='?', default=datetime.datetime.now().year
-    )
+)
 year_parser.add_argument(
-    'choices', type=int, help='year to retrieve', 
+    'choices', type=int, help='year to retrieve',
     nargs='*', default=()
-    )
+)
 
 n_parser = argparse.ArgumentParser(
     description='Specify how many results you want'
 )
 n_parser.add_argument(
-    'n', type=int, help='number to retrieve', 
+    'n', type=int, help='number to retrieve',
     nargs='?', default=5
-    )
+)
 
 logging_parser = argparse.ArgumentParser(
     description='Specify the logging level you want to see'
 )
 logging_parser.add_argument(
     '--log_file', nargs='?',
-    help='[optional] path to logfile', 
+    help='[optional] path to logfile',
 )
 logging_parser.add_argument(
     'level', choices=['DEBUG', 'INFO', 'CRITICAL', 'ERROR'],
     default='INFO', nargs='?',
-    help='the logging level to record', 
+    help='the logging level to record',
 )
 
 
 class RowingApp(cmd2.Cmd):
     """A simple cmd2 application."""
-    
+
     def __init__(self):
         super().__init__()
 
@@ -67,13 +67,15 @@ class RowingApp(cmd2.Cmd):
             cmd2.Settable('current_race', str, 'id of current race', self)
         )
         self.add_settable(
-            cmd2.Settable('current_competition', int, 'id of current competition', self)
+            cmd2.Settable('current_competition', int,
+                          'id of current competition', self)
         )
         self.add_settable(
             cmd2.Settable('save_folder', str, 'folder to save data', self)
         )
         self.add_settable(
-            cmd2.Settable('block', bool, 'give access to cli after plotting?', self)
+            cmd2.Settable(
+                'block', bool, 'give access to cli after plotting?', self)
         )
 
         self.intro = "Welcome try running `pgmts` or `livetracker`"
@@ -81,15 +83,16 @@ class RowingApp(cmd2.Cmd):
         self.foreground_color = 'cyan'
 
     def select_with_choice(
-        self, 
-        opts: Union[str, List[str], List[Tuple[Any, Optional[str]]]], 
+        self,
+        opts: Union[str, List[str], List[Tuple[Any, Optional[str]]]],
         prompt: str = 'Your choice? ',
         choice: Optional[int] = None,
     ):
         if isinstance(choice, int):
             local_opts: Union[List[str], List[Tuple[Any, Optional[str]]]]
             if isinstance(opts, str):
-                local_opts = cast(List[Tuple[Any, Optional[str]]], list(zip(opts.split(), opts.split())))
+                local_opts = cast(List[Tuple[Any, Optional[str]]], list(
+                    zip(opts.split(), opts.split())))
             else:
                 local_opts = opts
             fulloptions: List[Tuple[Any, Optional[str]]] = []
@@ -110,13 +113,12 @@ class RowingApp(cmd2.Cmd):
                     f"'{choice}' isn't a valid choice. "
                     f"Pick a number between 1 and {len(fulloptions)}:"
                 )
-                
+
         return self.select(opts, prompt)
 
-
     def select_from_dataframe(
-            self, df, 
-            column='DisplayName', name='row', 
+            self, df,
+            column='DisplayName', name='row',
             choice: Optional[int] = None, prompt: Optional[str] = None
     ):
         selected_id = self.select_with_choice(
@@ -144,7 +146,7 @@ class RowingApp(cmd2.Cmd):
         if pgmts.empty:
             self.poutput(
                 f'no results could be loaded for {competition.DisplayName}')
-            return 
+            return
 
         group_boat_pgmts = pgmts.groupby('Boat')
         boat_pgmts = group_boat_pgmts\
@@ -155,14 +157,14 @@ class RowingApp(cmd2.Cmd):
         )
         mode = self.select_with_choice(
             [
-                'by result', 
+                'by result',
                 'by boat class',
                 'by final',
                 'plot by boat class'
             ],
             'How to display PGMTs?',
             choice=next(choices, None)
-        ) 
+        )
         if mode == 'by result':
             pgmts.PGMT = pgmts.PGMT.map("{:.2%}".format)
             self.poutput(pgmts.to_string())
@@ -182,17 +184,18 @@ class RowingApp(cmd2.Cmd):
             ymax = 0
             n = 10
             for boat in boat_pgmts.index:
-                pgmt = group_boat_pgmts.get_group(boat).PGMT.sort_values(ascending=False)
+                pgmt = group_boat_pgmts.get_group(
+                    boat).PGMT.sort_values(ascending=False)
                 ax.step(
-                    range(pgmt.size), pgmt.values, 
+                    range(pgmt.size), pgmt.values,
                     label=boat, where='post'
                 )
                 ymin = min(ymin, pgmt.values[:n].min())
                 ymax = max(ymax, pgmt.values[:n].max())
-                
+
             ax.set_xlim(0, n)
             ax.set_ylim(
-                ymin - 0.01, 
+                ymin - 0.01,
                 pgmts.PGMT.max() + .01)
             ax.legend()
             plt.show(block=self.block)
@@ -216,13 +219,13 @@ class RowingApp(cmd2.Cmd):
             args.year, choices=args.choices)
         self.dashboard(race.name)
 
-    do_view_race = do_view 
+    do_view_race = do_view
     race = do_view
 
     def dashboard(self, race_id):
         import matplotlib.pyplot as plt
         dash = dashboard.Dashboard.from_race_id(
-            race_id, 
+            race_id,
         )
         dash.live_ion_dashboard()
         plt.show(block=self.block)
@@ -239,39 +242,42 @@ class RowingApp(cmd2.Cmd):
     def select_race(self, year: int, choices: Iterable[int] = ()):
         choices = iter(choices)
         competition = self.select_competition(year, next(choices, None))
-        race, event = self.select_competition_race(competition.name, choices=choices)
+        race, event = self.select_competition_race(
+            competition.name, choices=choices)
         return race, event, competition
-        
+
     def select_competition(self, year: int, choice: Optional[int] = None):
         return self.select_from_dataframe(
-            api.get_competitions(year), name='competition', choice=choice, 
+            api.get_competitions(year), name='competition', choice=choice,
         )
 
     def select_competition_race(self, competition_id: str, choices: Iterable[int] = ()):
         events = api.get_competition_events(competition_id)
         if len(events) == 0:
             self.poutput("no races found for {competition.DisplayName}")
-            return 
+            return
 
         choices = iter(choices)
         event = self.select_from_dataframe(
-            events, name='event', choice=next(choices, None), 
+            events, name='event', choice=next(choices, None),
         )
         races = api.get_competition_races(competition_id)
         if len(races) == 0:
             self.poutput("no races found for {event.DisplayName}")
-            return 
+            return
 
         race = self.select_from_dataframe(
-            races.loc[races.eventId == event.name], 
+            races.loc[races.eventId == event.name],
             name='race',
             choice=next(choices, None)
         )
         return race, event
 
+
 def run():
     RowingApp().cmdloop()
-    
+
+
 def main():
     sys.exit(run())
 
