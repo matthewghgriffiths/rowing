@@ -80,7 +80,6 @@ def prepare_params(**kwargs):
 
 
 if use_requests:
-
     def load_json_url(url, params=None, **kwargs):
         r = requests.get(url, params=params)
         r.raise_for_status()
@@ -101,9 +100,8 @@ else:
         req = XMLHttpRequest.new()
         req.open("GET", url, False)
         req.send(None)
-        data = pyodide.open_url(url)
         if req.response:
-            return json.load(req.response)
+            return json.loads(req.response)
         else:
             return {}
 
