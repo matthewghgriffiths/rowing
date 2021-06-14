@@ -78,7 +78,7 @@ class RowingApp(cmd2.Cmd):
                 'block', bool, 'give access to cli after plotting?', self)
         )
 
-        self.intro = "Welcome try running `pgmts` or `livetracker`"
+        self.intro = "Welcome try running `pgmts`, `race` or `livetracker`"
         self.prompt = 'rowing> '
         self.foreground_color = 'cyan'
 

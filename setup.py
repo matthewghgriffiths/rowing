@@ -18,6 +18,7 @@ setup(
             'world_rowing = world_rowing.cli:run'
         ]
     },
+    license='MIT', 
     long_description=long_description, 
     install_requires=[
         'numpy',
