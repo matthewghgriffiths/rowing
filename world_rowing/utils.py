@@ -334,7 +334,7 @@ def _map_singlethreaded(
         pbar = nullcontext()
 
     with pbar:
-        for key, args in inputs:
+        for key, args in inputs.items():
             try:
                 output[key] = func(*args, **kwargs)
             except Exception as exc:
