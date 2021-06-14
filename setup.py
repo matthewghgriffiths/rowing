@@ -29,4 +29,7 @@ setup(
         'cmd2>=2.0.0'
     ],
     python_requires=">=3.8",
+    package_data={
+        'world_rowing': ['data/*.csv.gz', 'data/flags/*.png'],
+    }
 )
