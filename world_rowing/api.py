@@ -20,6 +20,7 @@ from .utils import (
 if _pyodide:
     use_requests = False
     import pyodide
+    from js import XMLHttpRequest
     import json
     from urllib import parse
 else:
@@ -95,11 +96,15 @@ else:
         if params:
             query = parse.urlencode(params)
             url = parse.urlparse(url)._replace(query=query).geturl()
-
+        
+        # Some requests only work asyncronously
+        req = XMLHttpRequest.new()
+        req.open("GET", url, False)
+        req.send(None)
         data = pyodide.open_url(url)
-        try:
-            return json.load(data)
-        except json.JSONDecodeError:
+        if req.response:
+            return json.load(req.response)
+        else:
             return {}
 
 
