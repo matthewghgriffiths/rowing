@@ -1,18 +1,8 @@
-import sys
 import datetime
 from collections.abc import Mapping
 import logging
 
 import pandas as pd
-
-if "pyodide" in sys.modules:
-    use_requests = False
-    import pyodide
-    import json
-    from urllib import parse
-else:
-    use_requests = True
-    import requests
 
 from .utils import (
     getnesteditem,
@@ -24,7 +14,17 @@ from .utils import (
     format_totalseconds,
     merge,
     cache,
+    _pyodide
 )
+
+if _pyodide:
+    use_requests = False
+    import pyodide
+    import json
+    from urllib import parse
+else:
+    use_requests = True
+    import requests
 
 logger = logging.getLogger("world_rowing.api")
 

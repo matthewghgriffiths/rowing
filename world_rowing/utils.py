@@ -1,5 +1,6 @@
 
 import os
+import sys
 from pathlib import Path
 from functools import lru_cache
 from datetime import timedelta, datetime
@@ -16,6 +17,9 @@ except ModuleNotFoundError:
 import numpy as np
 import pandas as pd
 from scipy.special import erf
+
+_pyodide = "pyodide" in sys.modules
+
 
 _file_path = Path(os.path.abspath(__file__))
 _module_path = _file_path.parent
@@ -212,11 +216,10 @@ def format_axis_splits(ax=None, yticks=True, xticks=False, hundreths=False):
         )
 
 
+
 K = TypeVar("K")
 A = TypeVar('A')
 V = TypeVar('V')
-
-
 def map_concurrent(
     func: Callable[..., V],
     inputs: Dict[K, Tuple],
@@ -310,6 +313,46 @@ def map_concurrent(
 
     return output, errors
 
+
+def _map_singlethreaded(
+    func: Callable[..., V],
+    inputs: Dict[K, Tuple],
+    threaded: bool = True,
+    max_workers: int = 10,
+    show_progress: bool = True,
+    raise_on_err: bool = False,
+    **kwargs,
+) -> Tuple[Dict[K, V], Dict[K, Exception]]:
+    output = {}
+    errors = {}
+    
+    status: Dict[str, Any] = {}
+    if show_progress:
+        from tqdm.auto import tqdm
+        pbar = tqdm(total=len(inputs))
+    else:
+        pbar = nullcontext()
+
+    with pbar:
+        for key, args in inputs:
+            try:
+                output[key] = func(*args, **kwargs)
+            except Exception as exc:
+                if raise_on_err:
+                    raise exc
+                else:
+                    logging.warning(f"{key} experienced error {exc}")
+                    errors[key] = exc
+                    status['nerrors'] = len(errors)
+
+            if show_progress:
+                pbar.update(1)
+                pbar.set_postfix(**status)
+
+    return output, errors
+
+if _pyodide:
+    map_concurrent = _map_singlethreaded
 
 def getnesteditem(container, *items):
     value = container
