@@ -10,7 +10,7 @@ from .api import (
     find_world_best_time, INTERMEDIATE_FIELDS
 )
 from .utils import (
-    extract_fields, format_yaxis_splits, make_flag_box, update_fill_betweenx, 
+    extract_fields, format_yaxis_splits, make_flag_box, update_fill_betweenx,
     update_fill_between, read_times, format_totalseconds
 )
 
@@ -34,25 +34,25 @@ RESULTS_FIELDS = {
 class RaceTracker:
     def __init__(
             self, race_id,
-            gmt=None,  
-            colors=None, 
-            live_data=None, 
-            results=None, 
+            gmt=None,
+            colors=None,
+            live_data=None,
+            results=None,
             intermediates=None,
     ):
         self.race_id = race_id
-        
+
         self.gmt = gmt or find_world_best_time(
             race_id=race_id
-        ).ResultTime.total_seconds()   
-        
+        ).ResultTime.total_seconds()
+
         self._colors = colors
-        
-        self.live_data = live_data 
+
+        self.live_data = live_data
         self.results = results
         self.intermediates = intermediates
         self.completed = False
-        
+
     @property
     def final_results(self):
         if self.results is not None:
@@ -62,27 +62,27 @@ class RaceTracker:
             final_results.index.name = 'country'
             return final_results
 
-    @property 
+    @property
     def colors(self):
         if self._colors:
-            return self._colors 
+            return self._colors
         else:
             import matplotlib.pyplot as plt
             return plt.rcParams['axes.prop_cycle'].by_key()['color']
-    
+
     @property
     def intermediate_results(self):
         if self.intermediates is None:
-            return None 
+            return None
         elif len(self.intermediates):
             intermediate_results = pd.merge(
                 self.intermediates[
                     ['raceBoatId', 'distance', 'ResultTime']
-                ], 
+                ],
                 self.results[
                     ['id', 'DisplayName']],
-                left_on='raceBoatId', 
-                right_on='id', 
+                left_on='raceBoatId',
+                right_on='id',
                 how='left'
             ).set_index(
                 ['DisplayName', 'distance']
@@ -101,15 +101,15 @@ class RaceTracker:
             return intermediate_results
         else:
             return self.intermediates
-        
+
     @cached_property
     def race_details(self):
         return get_worldrowing_record('race', self.race_id)
-    
+
     @cached_property
     def race_boats(self):
         return get_race_results(race_id=self.race_id).reset_index()
-    
+
     @cached_property
     def countries(self):
         return self.race_boats.Country
@@ -130,31 +130,31 @@ class RaceTracker:
         )
         colors.index.name = 'country'
         return colors
-    
+
     @cached_property
     def event_id(self):
         return self.race_details.eventId
-    
+
     @cached_property
     def event_details(self):
         return get_worldrowing_record('event', self.event_id)
-    
+
     @cached_property
     def competition_id(self):
         return self.event_details.competitionId
-    
+
     @cached_property
     def competition_details(self):
         return get_worldrowing_record(
             'competition', self.competition_id)
-    
+
     def update_livedata(self):
         self.live_data, self.results, self.intermediates = \
             get_race_livetracker(
-                self.race_id, 
+                self.race_id,
                 gmt=self.gmt,
                 cached=False,
-        )
+            )
 
         if 2000 in self.intermediate_results.columns:
             if self.intermediate_results[2000].notna().all():
@@ -178,8 +178,8 @@ class RaceTracker:
         bars = ax.bar(
             self.lane_country.index,
             heights[self.lane_country],
-            bottom=bottom, 
-            yerr=yerr, 
+            bottom=bottom,
+            yerr=yerr,
             tick_label=self.lane_country,
             color=self.country_colors[self.lane_country],
             **kwargs
@@ -209,8 +209,8 @@ class RaceTracker:
         return (x.min(), x.max()), (y.min(), y.max())
 
     def plot_flags(
-            self, *args, ax=None,  
-            zoom=0.04, 
+            self, *args, ax=None,
+            zoom=0.04,
             box_alignment=(0.5, 0.),
             **kwargs
     ):
@@ -227,12 +227,12 @@ class RaceTracker:
             xy = x[cnt], y[cnt]
             flag = make_flag_box(
                 cnt[:3],
-                xy, 
-                zoom=zoom, 
+                xy,
+                zoom=zoom,
                 box_alignment=box_alignment,
                 **kwargs
             )
-            
+
             ax.add_artist(flag)
             flags[cnt] = flag
 
@@ -251,7 +251,7 @@ class RaceTracker:
             flags[cnt].xybox = flags[cnt].xy = x[cnt], y[cnt]
 
     def violin(
-            self, y_dens, ax=None, width=0.8, alpha=0.6, outline=True, 
+            self, y_dens, ax=None, width=0.8, alpha=0.6, outline=True,
             set_xticks=True, outline_kws=None, **kwargs
     ):
         import matplotlib.pyplot as plt
@@ -259,14 +259,14 @@ class RaceTracker:
         violins = {}
         lines = {}
         if width:
-            y_dens = y_dens / y_dens.max(0) * width /2
+            y_dens = y_dens / y_dens.max(0) * width / 2
 
         for x0, cnt in self.lane_country.items():
             if cnt not in y_dens:
-                continue 
+                continue
 
             violins[cnt] = ax.fill_betweenx(
-                y_dens.index, 
+                y_dens.index,
                 -y_dens[cnt] + x0,
                 y_dens[cnt] + x0,
                 color=self.country_colors[cnt],
@@ -282,7 +282,7 @@ class RaceTracker:
                     label=cnt,
                     **(outline_kws or {})
                 )
-        
+
         if set_xticks:
             ax.set_xticks(self.lane_country.index)
             ax.set_xticklabels(self.lane_country)
@@ -292,14 +292,14 @@ class RaceTracker:
             self, violins, lines, y_dens, width=0.8
     ):
         if width:
-            y_dens = y_dens / y_dens.max(0) * width /2
-            
+            y_dens = y_dens / y_dens.max(0) * width / 2
+
         for x0, cnt in self.lane_country.items():
             if cnt not in y_dens:
-                continue 
+                continue
 
             update_fill_betweenx(
-                violins[cnt], 
+                violins[cnt],
                 y_dens.index,
                 -y_dens[cnt] + x0,
                 y_dens[cnt] + x0,
@@ -320,46 +320,46 @@ class RaceTracker:
         y = np.linspace(*ylim, 1000)
         y_dens = pd.DataFrame({
             cnt: stats.norm(
-                loc=pred_finish[cnt], 
+                loc=pred_finish[cnt],
                 scale=finish_std[cnt]
             ).pdf(y)
             for cnt in self.lane_country
-        }, 
+        },
             index=y
         )
         return y_dens, ylim
 
     def plot_finish(
-            self, pred_finish, finish_std, dy_range=None, 
+            self, pred_finish, finish_std, dy_range=None,
             ax=None, set_lims=True, **kwargs
     ):
-        import matplotlib.pyplot as plt 
+        import matplotlib.pyplot as plt
         y_dens, ylim = self.calc_finish_densities(
             pred_finish, finish_std, dy_range=dy_range
-            )
+        )
         violins, lines = self.violin(y_dens, ax=ax, **kwargs)
         if set_lims:
             ax = ax or plt.gca()
             ax.set_ylim(*ylim)
-            
+
         return violins, lines
 
     def update_plot_finish(
-            self, 
-            violins, lines, 
-            pred_finish, finish_std, dy_range=None, width=0.8, 
+            self,
+            violins, lines,
+            pred_finish, finish_std, dy_range=None, width=0.8,
     ):
         y_dens, ylim = self.calc_finish_densities(
             pred_finish, finish_std, dy_range=dy_range
-            )
+        )
         self.update_violins(
-            violins, lines, y_dens, width=width, 
+            violins, lines, y_dens, width=width,
         )
         return ylim
-        
+
     def plot(
-            self, *args, ax=None, maxdistance=None, 
-            set_lims=True, 
+            self, *args, ax=None, maxdistance=None,
+            set_lims=True,
             **kwargs
     ):
         import matplotlib.pyplot as plt
@@ -374,16 +374,16 @@ class RaceTracker:
 
         for cnt in y.columns:
             lines[cnt], = ax.plot(
-                x[cnt], 
-                y[cnt], 
-                label=cnt, 
-                color=self.country_colors[cnt], 
+                x[cnt],
+                y[cnt],
+                label=cnt,
+                color=self.country_colors[cnt],
                 **kwargs
             )
         if set_lims:
             ax.set_xlim(0, maxdistance or 2000)
         # ax.set_xlabel('distance (m)')
-        
+
         return lines
 
     def update_plot(self, lines, x, y):
@@ -402,8 +402,8 @@ class RaceTracker:
         lines = {}
         collections = {}
         if len(args) == 2:
-            y, yerr = args 
-            distance = y.index 
+            y, yerr = args
+            distance = y.index
         else:
             distance, y, yerr = args
 
@@ -416,33 +416,33 @@ class RaceTracker:
 
         for cnt in y.columns:
             lines[cnt], = ax.plot(
-                distance[cnt], 
-                y[cnt], 
-                label=cnt, 
-                color=self.country_colors[cnt], 
+                distance[cnt],
+                y[cnt],
+                label=cnt,
+                color=self.country_colors[cnt],
                 **kwargs
             )
             collections[cnt] = ax.fill_between(
-                distance[cnt], 
-                y[cnt] - yerr[cnt], 
+                distance[cnt],
+                y[cnt] - yerr[cnt],
                 y[cnt] + yerr[cnt],
-                label=cnt, 
-                color=self.country_colors[cnt], 
+                label=cnt,
+                color=self.country_colors[cnt],
                 alpha=alpha,
                 **(fill_kws or {})
             )
         ax.set_xlim(0, maxdistance or 2000)
         ax.set_xlabel('distance / m')
-        
+
         return lines, collections
 
     def update_plot_uncertainty(
-            self, lines, collections, 
-            *args, 
+            self, lines, collections,
+            *args,
     ):
         if len(args) == 2:
-            y, yerr = args 
-            distance = y.index 
+            y, yerr = args
+            distance = y.index
         else:
             distance, y, yerr = args
 
@@ -454,34 +454,34 @@ class RaceTracker:
         }
         for cnt in y.columns:
             lines[cnt].set_data(
-                distance[cnt], 
-                y[cnt], 
+                distance[cnt],
+                y[cnt],
             )
             update_fill_between(
                 collections[cnt],
-                distance[cnt], 
-                y[cnt] - yerr[cnt], 
+                distance[cnt],
+                y[cnt] - yerr[cnt],
                 y[cnt] + yerr[cnt],
             )
-    
+
     def plot_pace(self, ax=None, **kwargs):
         distance = self.live_data.distanceTravelled
         pace = 500 / self.live_data.metrePerSecond
         ax, lines = self.plot(distance, pace, ax=ax, **kwargs)
         format_yaxis_splits(ax)
         ax.set_ylabel('pace / 500m')
-        
+
         return ax, lines
-    
-    def plot_speed(self, ax=None, **kwargs):        
+
+    def plot_speed(self, ax=None, **kwargs):
         distance = self.live_data.distanceTravelled
         speed = self.live_data.metrePerSecond
         ax, lines = self.plot(distance, speed, ax=ax, **kwargs)
         ax.set_ylabel('speed / m/s')
-        
+
         return ax, lines
-    
-    def plot_distance_from_leader(self, ax=None, **kwargs):  
+
+    def plot_distance_from_leader(self, ax=None, **kwargs):
         distance = self.live_data.distanceTravelled
         speed = self.live_data.distanceFromLeader
         ax, lines = self.plot(distance, speed, ax=ax, **kwargs)
@@ -507,12 +507,12 @@ def get_race_livetracker(race_id, gmt=None, cached=True, race_distance=2000):
             race_id=race_id
         ).ResultTime.total_seconds()
         live_data = calculate_pgmts(
-            live_data, gmt=gmt, 
+            live_data, gmt=gmt,
             race_distance=race_distance
-            )
+        )
     else:
         live_data = pd.DataFrame([])
-    
+
     if data and data['intermediates']:
         results, intermediates = parse_livetracker_results(data)
     else:
@@ -552,7 +552,7 @@ def parse_livetracker_data(data):
     lane_cnt = {r: lane['DisplayName'] for r, lane in lane_boat.items()}
     rank_cnt = {r: lane['DisplayName'] for r, lane in rank_boat.items()}
     countries = [lane_cnt[i] for i in sorted(lane_cnt)]
-    
+
     live_boat_data = {
         'currentPosition': {},
         'distanceTravelled': {},
@@ -584,7 +584,7 @@ def parse_livetracker_data(data):
 
     live_boat_data = pd.concat(
         {
-            key: pd.DataFrame.from_dict(live_data) 
+            key: pd.DataFrame.from_dict(live_data)
             for key, live_data in live_boat_data.items()
         },
         axis=1
@@ -595,15 +595,15 @@ def parse_livetracker_data(data):
 def calculate_pgmts(live_boat_data, gmt, race_distance=2000):
     n_countries = len(live_boat_data.distanceTravelled.columns)
     distances = np.c_[
-        np.zeros(n_countries), 
+        np.zeros(n_countries),
         live_boat_data.distanceTravelled.values.T
     ].T
     boat_diffs = np.diff(distances, axis=0)
     boat_times = boat_diffs / live_boat_data.metrePerSecond
     live_boat_data['time'] = np.ma.masked_array(
-        boat_times, mask = boat_diffs==0
-        ).mean(1).data.cumsum()
-    
+        boat_times, mask=boat_diffs == 0
+    ).mean(1).data.cumsum()
+
     gmt_speed = race_distance / gmt
     countries = live_boat_data.distanceTravelled.columns
     for cnt in countries:
@@ -613,22 +613,20 @@ def calculate_pgmts(live_boat_data, gmt, race_distance=2000):
         live_boat_data['PGMT', cnt] = \
             live_boat_data.GMT[cnt] / live_boat_data.time
 
-    
     leader_distance = live_boat_data.distanceTravelled.max(1)
     imax = leader_distance.searchsorted(leader_distance.max())
     for cnt, dist in live_boat_data.distanceTravelled.items():
         delta = (
-            live_boat_data.time 
+            live_boat_data.time
             - np.interp(
-                dist, 
-                leader_distance.loc[:imax], 
+                dist,
+                leader_distance.loc[:imax],
                 live_boat_data.time.loc[:imax]
             )
         )
         jlast = dist.searchsorted(leader_distance.max())
         delta[jlast:] = delta[jlast]
         live_boat_data[('timeFromLeader', cnt)] = delta
-
 
     return live_boat_data
 
@@ -642,10 +640,10 @@ def estimate_intermediate_times1(live_data):
     return pd.concat({
         country: pd.Series(
             np.interp(
-                distances, 
-                live_data.distanceTravelled[country][:i], 
+                distances,
+                live_data.distanceTravelled[country][:i],
                 live_data.time[country][:i]
-            ), 
+            ),
             index=distances
         )
         for country, i in clips
@@ -661,10 +659,10 @@ def estimate_intermediate_times(live_data):
     return pd.concat({
         country: pd.Series(
             np.interp(
-                distances, 
-                live_data.distanceTravelled[country][:i], 
+                distances,
+                live_data.distanceTravelled[country][:i],
                 live_data.time[:i]
-            ), 
+            ),
             index=distances
         )
         for country, i in clips
@@ -674,7 +672,7 @@ def estimate_intermediate_times(live_data):
 def extract_intermediate_times(results, intermediates):
     true_intermediates = pd.merge(
         intermediates, results,
-        left_on='raceBoatId', 
+        left_on='raceBoatId',
         right_on='id',
         suffixes=(None, '_r')
     )[['DisplayName', 'distance', 'ResultTime']].set_index(
@@ -685,7 +683,7 @@ def extract_intermediate_times(results, intermediates):
     true_intermediates.columns = [500, 1000, 1500, 2000]
     return true_intermediates
 
-    
+
 def plot_livedata(live_data):
     import matplotlib.pyplot as plt
 
@@ -695,22 +693,22 @@ def plot_livedata(live_data):
     for c in countries:
         lines[0].extend(
             axes[0].plot(
-            live_data.distanceTravelled[c], 
-            live_data.PGMT[c], 
-            label=c
+                live_data.distanceTravelled[c],
+                live_data.PGMT[c],
+                label=c
             )
         )
         lines[1].extend(
             axes[1].plot(
-                live_data.distanceTravelled[c], 
-                live_data.metrePerSecond[c], 
+                live_data.distanceTravelled[c],
+                live_data.metrePerSecond[c],
                 label=c
             )
         )
         lines[2].extend(
             axes[2].plot(
-                live_data.distanceTravelled[c], 
-                live_data.strokeRate[c], 
+                live_data.distanceTravelled[c],
+                live_data.strokeRate[c],
                 label=c
             )
         )
@@ -722,10 +720,10 @@ def plot_livedata(live_data):
     axes[2].set_ylabel('stroke rate')
     axes[2].set_xlabel('Distance')
     axes[0].legend(
-        bbox_to_anchor=(0., 1.02, 1., .152), 
-        loc='upper left', 
+        bbox_to_anchor=(0., 1.02, 1., .152),
+        loc='upper left',
         ncol=len(countries),
-        mode="expand", 
+        mode="expand",
         borderaxespad=0.)
 
     return f, axes, lines
