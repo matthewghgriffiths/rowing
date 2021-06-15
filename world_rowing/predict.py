@@ -359,7 +359,7 @@ class LivePrediction(RaceTracker):
     def predict(self, live_data=None, match_to_live=True):
         if live_data is None:
             if self.live_data is None:
-                live_data = self.update_livedata()
+                live_data, _ = self.update_livedata()
             else:
                 live_data = self.live_data
 
