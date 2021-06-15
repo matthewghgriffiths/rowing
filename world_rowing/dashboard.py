@@ -209,7 +209,7 @@ class Dashboard:
         self.b_distance_flags = self.race_tracker.plot_flags(
             self.race_tracker.country_lane * 0,
             zoom=0.015,
-            zorder=10,
+            # zorder=10,
             ax=self.b_behind_ax
         )
 
