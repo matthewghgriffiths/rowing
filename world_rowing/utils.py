@@ -39,12 +39,12 @@ CURRENT_TIMEZONE = datetime.now().astimezone().tzinfo
 
 
 def ignore_nans(func):
-    @wraps
+    @wraps(func)
     def nan_func(arg, *args, **kwargs):
         if np.isnan(arg):
             return arg
         else:
-            return func(arg)
+            return func(arg, *args, **kwargs)
 
     return nan_func
 
