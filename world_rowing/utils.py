@@ -2,7 +2,7 @@
 import os
 import sys
 from pathlib import Path
-from functools import lru_cache
+from functools import lru_cache, wraps
 from datetime import timedelta, datetime
 import logging
 from typing import Callable, Dict, TypeVar, Tuple, Any
@@ -36,6 +36,17 @@ def Phi(z):
 
 
 CURRENT_TIMEZONE = datetime.now().astimezone().tzinfo
+
+
+def ignore_nans(func):
+    @wraps
+    def nan_func(arg, *args, **kwargs):
+        if np.isnan(arg):
+            return arg
+        else:
+            return func(arg)
+
+    return nan_func
 
 
 def first(it, *args):
@@ -216,10 +227,11 @@ def format_axis_splits(ax=None, yticks=True, xticks=False, hundreths=False):
         )
 
 
-
 K = TypeVar("K")
 A = TypeVar('A')
 V = TypeVar('V')
+
+
 def map_concurrent(
     func: Callable[..., V],
     inputs: Dict[K, Tuple],
@@ -325,7 +337,7 @@ def _map_singlethreaded(
 ) -> Tuple[Dict[K, V], Dict[K, Exception]]:
     output = {}
     errors = {}
-    
+
     status: Dict[str, Any] = {}
     if show_progress:
         from tqdm.auto import tqdm
@@ -351,8 +363,10 @@ def _map_singlethreaded(
 
     return output, errors
 
+
 if _pyodide:
     map_concurrent = _map_singlethreaded
+
 
 def getnesteditem(container, *items):
     value = container

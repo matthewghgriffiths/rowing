@@ -11,7 +11,7 @@ import matplotlib.gridspec as gridspec
 
 from .api import get_last_race_started
 from .utils import (
-    format_yaxis_splits, update_table, format_totalseconds, CURRENT_TIMEZONE
+    format_yaxis_splits, update_table, format_totalseconds, CURRENT_TIMEZONE, ignore_nans
 )
 from .livetracker import get_current_data, RaceTracker
 from .predict import LivePrediction
@@ -404,8 +404,8 @@ class Dashboard:
             self.race_tracker.lane_country,
             [500, 1000, 1500, 2000],
             intermediates.applymap(
-                format_totalseconds,
-                na_action='ignore'
+                ignore_nans(format_totalseconds),
+                # na_action='ignore'
             ).fillna('-')
         )
         if 2000 in intermediates.columns:

@@ -95,7 +95,7 @@ else:
         if params:
             query = parse.urlencode(params)
             url = parse.urlparse(url)._replace(query=query).geturl()
-        
+
         # Some requests only work asyncronously
         req = XMLHttpRequest.new()
         req.open("GET", url, False)
@@ -183,18 +183,20 @@ def get_competition_races(competition_id=None, cached=True):
     )
 
 
-@cache
-def get_competitions(year=None, fisa=True, **kwargs):
+def get_competitions(year=None, fisa=True, has_results=True, cached=True, **kwargs):
     year = year or datetime.date.today().year
-    kwargs.setdefault("filter", {})["Year"] = year
-    kwargs.setdefault("filter", {})["IsFisa"] = 1 if fisa else ""
+    kwargs['filter'] = tuple(dict(kwargs.get('filter', ())).items())
+    kwargs['filter'] += ('Year', year),
+    kwargs['filter'] += ('IsFisa', (1 if fisa else "")),
+    kwargs['filter'] += ('HasResults', (1 if has_results else '')),
     kwargs.setdefault("sort", {"StartDate": "asc"})
-    return get_worldrowing_records("competition", **kwargs)
+    kwargs.setdefault("sort", {"StartDate": "asc"})
+    return get_worldrowing_records("competition", cached=cached, **kwargs)
 
 
-def get_this_years_competitions(fisa=True):
+def get_this_years_competitions(fisa=True, has_results=True):
     year = datetime.date.today().year
-    return get_competitions(year=year, fisa=fisa)
+    return get_competitions(year=year, fisa=fisa, has_results=has_results)
 
 
 def get_most_recent_competition(fisa=True):
@@ -210,6 +212,7 @@ def get_last_race_started(fisa=True, competition=None):
     logger.info(f"loaded last race started: {race.DisplayName}")
     return race
 
+get_most_recent_race = get_last_race_started
 
 def get_last_races(n=1, fisa=True, competition=None):
     competition = competition or get_most_recent_competition(fisa)
