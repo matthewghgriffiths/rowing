@@ -15,7 +15,7 @@ setup(
     packages=['world_rowing'],
     entry_points={
         'console_scripts': [
-            'world_rowing = world_rowing.cli:run'
+            'world_rowing = world_rowing.cli:run [CLI]'
         ]
     },
     license='MIT', 
@@ -25,9 +25,11 @@ setup(
         'scipy',
         'pandas',
         'matplotlib',
-        'requests',
-        'cmd2>=2.0.0'
     ],
+    extras_require={
+        'CLI': ['cmd2>=2.0.0'],
+        'REQ': ['requests'], # Requests is not required if using pyodide
+    },
     python_requires=">=3.8",
     package_data={
         'world_rowing': [
