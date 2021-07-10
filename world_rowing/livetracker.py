@@ -494,7 +494,7 @@ def get_current_data(live_data):
     current_data.PGMT = current_data.PGMT.applymap("{:.1%}".format)
     current_data.time = current_data.time.apply(format_totalseconds)
     current_data.GMT = current_data.GMT.applymap(format_totalseconds)
-    current = current_data.set_index("time").astype('string').T.unstack(1)
+    current = current_data.set_index("time").T.unstack(1)
     current.columns.names = ['time elapsed', 'Country']
     return current
 
