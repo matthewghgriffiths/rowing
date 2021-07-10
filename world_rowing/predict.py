@@ -31,23 +31,16 @@ def calc_win_probs(times, std):
         logp = norm.logpdf(x)
         return np.exp(logp + logcdf)
 
-    win_prob, err = quad_vec(
-        func, -np.inf, np.inf,
-    )
+    if hasattr(integrate, 'quad_vec'):
+        win_prob, err = integrate.quad_vec(
+            func, -np.inf, np.inf,
+        )
+    else:
+        x = np.linspace(-6 * std.max(), 6 * std.max(), 1000)
+        win_prob = integrate.trapz([func(x_) for x_ in x], x, axis=0)
+
     win_prob /= win_prob.sum()
     return pd.Series(win_prob, index=times.index)
-
-def quad_vec(func, a, b, **kwargs):
-    if hasattr(integrate, 'quad_vec'):
-        return integrate.quad_vec(func, a, b, **kwargs)
-    else:
-        y = np.empty_like(func(a))
-        for i in range(y.size):
-            y[i] = integrate.quad(
-                lambda x: func(x)[i], a, b, **kwargs
-            )
-
-        return y
 
 
 @cache
