@@ -624,7 +624,9 @@ def calculate_pgmts(live_boat_data, gmt, race_distance=2000):
                 live_boat_data.time.loc[:imax]
             )
         )
-        jlast = dist.searchsorted(leader_distance.max())
+        jlast = min(
+            dist.searchsorted(leader_distance.max()),
+            len(delta) - 1)
         delta[jlast:] = delta[jlast]
         live_boat_data[('timeFromLeader', cnt)] = delta
 
