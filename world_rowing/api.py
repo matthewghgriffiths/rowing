@@ -169,7 +169,7 @@ def get_competition_events(competition_id=None, cached=True):
         "event",
         cached=True,
         filter=(("competitionId", competition_id),),
-        sort=(("Date", "asc"),),
+        # sort=(("Date", "asc"),),
     )
 
 

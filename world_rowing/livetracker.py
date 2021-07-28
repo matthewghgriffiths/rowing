@@ -1,4 +1,5 @@
 
+import logging
 from functools import cached_property
 
 import numpy as np
@@ -13,6 +14,8 @@ from .utils import (
     extract_fields, format_yaxis_splits, make_flag_box, update_fill_betweenx,
     update_fill_between, read_times, format_totalseconds
 )
+
+logger = logging.getLogger("world_rowing.livetracker")
 
 RESULTS_FIELDS = {
     'id': ('id',),
@@ -225,16 +228,19 @@ class RaceTracker:
         flags = {}
         for cnt in y.index:
             xy = x[cnt], y[cnt]
-            flag = make_flag_box(
-                cnt[:3],
-                xy,
-                zoom=zoom,
-                box_alignment=box_alignment,
-                **kwargs
-            )
+            try:
+                flag = make_flag_box(
+                    cnt[:3],
+                    xy,
+                    zoom=zoom,
+                    box_alignment=box_alignment,
+                    **kwargs
+                )
+                ax.add_artist(flag)
+                flags[cnt] = flag
+            except KeyError:
+                logger.info("could not find flag for %s", cnt)
 
-            ax.add_artist(flag)
-            flags[cnt] = flag
 
         return flags
 
@@ -247,7 +253,7 @@ class RaceTracker:
         else:
             x, y = args
 
-        for cnt in y.index:
+        for cnt in flags:
             flags[cnt].xybox = flags[cnt].xy = x[cnt], y[cnt]
 
     def violin(
