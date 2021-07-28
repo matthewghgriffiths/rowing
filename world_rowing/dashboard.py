@@ -328,6 +328,7 @@ class Dashboard:
         self.p_times = None
         self.p_finish = None
         self.p_win = None
+        xlims = self.left_axes[2].get_xlim()
 
         dist = 2000
         finish_times = intermediates[dist]
@@ -347,7 +348,6 @@ class Dashboard:
             rotation=45,
         )
 
-        xlims = axes[2].get_xlim()
         # Plot finish delta lines
         finish_deltas = pd.DataFrame(
             [finish_times - finish_times.min()]*2,
