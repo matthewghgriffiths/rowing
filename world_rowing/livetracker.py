@@ -239,7 +239,7 @@ class RaceTracker:
                 ax.add_artist(flag)
                 flags[cnt] = flag
             except KeyError:
-                logger.info("could not find flag for %s", cnt)
+                logger.warning("could not find flag for %s", cnt)
 
 
         return flags
