@@ -6,16 +6,18 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name='world_rowing',
+    name='rowing',
     version='0.1.15',
     description='Library for loading and presenting data from the worldrowing.com',
     author='Matthew Grifiths',
     author_email='matthewghgriffiths@gmail.com',
     url='https://github.com/matthewghgriffiths/rowing',
-    packages=['world_rowing'],
+    packages=['rowing'],
     entry_points={
         'console_scripts': [
-            'world_rowing = world_rowing.cli:run [CLI]'
+            'world_rowing = rowing.world_rowing.cli:run [CLI]'
+            'garmin = rowing.analysis.garmin:main [GARMIN]',
+            'gpx = rowing.analysis.files:main',
         ]
     },
     license='MIT', 
@@ -25,17 +27,21 @@ setup(
         'scipy',
         'pandas',
         'matplotlib',
+        'tqdm'
     ],
     extras_require={
         'CLI': ['cmd2>=2.0.0'],
         'REQ': ['requests'], # Requests is not required if using pyodide
+        'GARMIN': ['garminconnect', 'fitparse'],
+        "GPX": ['gpxpy', 'fitparse']
     },
     python_requires=">=3.8",
     package_data={
-        'world_rowing': [
-            'data/*.csv.gz', 
-            'data/iso_country.json', 
-            'data/flags/*.png'
+        'rowing': [
+            'world_rowing/data/*.csv.gz', 
+            'world_rowing/data/iso_country.json', 
+            'world_rowing/data/flags/*.png', 
+            'analysis/data/*.tsv'
         ],
     }
 )
