@@ -217,19 +217,22 @@ def get_most_recent_competition(fisa=True):
 
 
 def get_last_race_started(fisa=True, competition=None):
-    race = get_last_races(n=1, fisa=fisa, competition=competition).iloc[0]
-    logger.info(f"loaded last race started: {race.DisplayName}")
-    return race
+    races = get_last_races(n=1, fisa=fisa, competition=competition)
+    if races is not None:    
+        race = races.iloc[0]
+        logger.info(f"loaded last race started: {race.DisplayName}")
+        return race
 
 get_most_recent_race = get_last_race_started
 
 def get_last_races(n=1, fisa=True, competition=None):
     if competition is None:
         competition = get_most_recent_competition(fisa)
-        
     races = get_competition_races(competition.name)
-    started = races.DateString < datetime.datetime.now().astimezone()
-    return races.loc[started].sort_values("DateString").iloc[-n:]
+    print(races)
+    if not races.empty:
+        started = races.DateString < datetime.datetime.now().astimezone()
+        return races.loc[started].sort_values("DateString").iloc[-n:]
 
 
 def get_next_races(n=1, fisa=True, competition=None):

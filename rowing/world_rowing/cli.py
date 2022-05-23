@@ -58,7 +58,8 @@ class RowingApp(cmd2.Cmd):
         super().__init__()
 
         # Make maxrepeats settable at runtime
-        self.current_race = api.get_last_race_started().name
+        race = api.get_last_race_started()
+        self.current_race = None if race is None else race.name
         self.current_competition = api.get_most_recent_competition().name
         self.save_folder = '.'
         self.block = False
