@@ -7,9 +7,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='rowing',
-    version='0.0.1',
+    version='0.2.0',
     description='Library for loading and presenting data from the worldrowing.com',
-    author='Matthew Grifiths',
+    author='Matthew Griffiths',
     author_email='matthewghgriffiths@gmail.com',
     url='https://github.com/matthewghgriffiths/rowing',
     packages=['rowing.world_rowing', 'rowing.analysis'],
@@ -23,7 +23,7 @@ setup(
     license='MIT', 
     long_description=long_description, 
     install_requires=[
-        'numpy>=1.22.0',
+        'numpy>=1.21.0',
         'scipy>=1.8.0',
         'pandas>=1.4.0',
         'matplotlib>=3.0.0',
