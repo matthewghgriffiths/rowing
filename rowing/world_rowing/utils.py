@@ -23,7 +23,7 @@ _pyodide = "pyodide" in sys.modules
 
 _file_path = Path(os.path.abspath(__file__))
 _module_path = _file_path.parent
-_data_path = _module_path / 'data'
+_data_path = _module_path.parent.parent / 'data'
 _flag_path = _data_path / 'flags'
 
 # Make lru_cache 3.7 compatible

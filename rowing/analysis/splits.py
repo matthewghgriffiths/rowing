@@ -1,4 +1,5 @@
 
+import os 
 from pathlib import Path
 from functools import lru_cache
 
@@ -21,7 +22,9 @@ _STANDARD_DISTANCES = {
     '10km': 10, 
 }
 
-_DATA_PATH = (Path(__file__) / "../../data").resolve()
+_file_path = Path(os.path.abspath(__file__))
+_module_path = _file_path.parent
+_DATA_PATH = _module_path.parent.parent / 'data'
 
 _LOCATION_DATA = {
     'cam': _DATA_PATH / 'cam_locations.tsv',

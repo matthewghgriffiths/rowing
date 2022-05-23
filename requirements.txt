@@ -8,4 +8,5 @@ cmd2>=2.0.0
 gpxpy>=1.5.0
 fitparse>=1.2.0
 garminconnect>=0.1.45
+pyarrow>=7.0.0
 pyqt5>=5.0.0

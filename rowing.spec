@@ -7,10 +7,14 @@ block_cipher = None
 
 project = 'rowing'
 scripts = {
+    'world_rowing': 'rowing/world_rowing/cli.py',
     'garmin': 'garmin.py', 
     'gpx': 'gpx.py'
 }
-datas = [('rowing/analysis/data', 'rowing/analysis/data'), ('cloudscraper', 'cloudscraper')]
+datas = [
+    ('data', 'data'), 
+    ('cloudscraper', 'cloudscraper')
+]
 
 analyses = {
     n: Analysis(

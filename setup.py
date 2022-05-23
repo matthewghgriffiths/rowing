@@ -12,7 +12,7 @@ setup(
     author='Matthew Griffiths',
     author_email='matthewghgriffiths@gmail.com',
     url='https://github.com/matthewghgriffiths/rowing',
-    packages=['rowing.world_rowing', 'rowing.analysis'],
+    packages=['rowing'],
     entry_points={
         'console_scripts': [
             'world_rowing = rowing.world_rowing.cli:run [CLI]', 
@@ -33,16 +33,16 @@ setup(
     extras_require={
         'CLI': ['cmd2>=2.0.0', 'pyqt5>=5.0.0'],
         'REQ': ['requests>=2.0.0'], # Requests is not required if using pyodide
-        'GARMIN': ['garminconnect>=0.1.45', 'fitparse>=1.2.0'],
+        'GARMIN': ['garminconnect>=0.1.45', 'fitparse>=1.2.0', "pyarrow>=7.0.0"],
         "GPX": ['gpxpy>=1.5.0', 'fitparse>=1.2.0'],
     },
     python_requires=">=3.8",
     package_data={
         'rowing': [
-            'world_rowing/data/*.csv.gz', 
-            'world_rowing/data/iso_country.json', 
-            'world_rowing/data/flags/*.png', 
-            'analysis/data/*.tsv'
+            'data/*.csv.gz', 
+            'data/iso_country.json', 
+            'data/flags/*.png', 
+            'data/*.tsv'
         ],
     }
 )
