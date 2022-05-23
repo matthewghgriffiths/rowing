@@ -54,8 +54,8 @@ class Dashboard:
         return cls(race_tracker, **kwargs)
 
     @classmethod
-    def load_last_race(cls, **kwargs):
-        last_race = get_last_race_started()
+    def load_last_race(cls, fisa=True, competition=None, **kwargs):
+        last_race = get_last_race_started(fisa=fisa, competition=competition)
         return cls.from_race_id(last_race.name, **kwargs)
 
     def live_notebook_dashboard(self):
@@ -336,7 +336,7 @@ class Dashboard:
         final_pos[:] = range(1, len(final_pos) + 1)
 
         # Plot finish postitions
-        last = final_pos.max() + 1
+        last = int(final_pos.max() + 1)
         self.race_tracker.bar(
             final_pos - last, bottom=last,
             ax=axes[2]
@@ -648,7 +648,7 @@ class Dashboard:
 
 def main(block=True):
     import matplotlib.pyplot as plt
-    from world_rowing.api import show_next_races
+    from rowing.world_rowing.api import show_next_races
 
     dash = Dashboard.load_last_race(figsize=(12, 8))
     dash.live_ion_dashboard(block=False)

@@ -2,15 +2,20 @@
 
 import pytest
 
-from world_rowing import dashboard 
+from rowing.world_rowing import dashboard, api
 
+def get_2021_olympics():
+    return api.get_competitions(2021).loc["e807bba5-6475-4f1a-9434-26704585bf19"]
 
 def test_dashboard_main():
-    dashboard.main(block=False)
-
+    competition = get_2021_olympics()
+    dash = dashboard.Dashboard.load_last_race(competition=competition)
+    dash.update()
+    # dashboard.main(block=False)
 
 def test_dashboard_predict():
-    dash = dashboard.Dashboard.load_last_race()
+    competition = get_2021_olympics()
+    dash = dashboard.Dashboard.load_last_race(competition=competition)
     live_data, intermediates = dash.race_tracker.update_livedata()
 
     dash.update(

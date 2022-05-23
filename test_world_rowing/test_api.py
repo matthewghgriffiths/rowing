@@ -3,12 +3,15 @@
 
 import pytest
 
-from world_rowing import api
+from rowing.world_rowing import api
 
 
 def test_data_retrieval():
     competitions = api.get_competitions()
     competition = api.get_most_recent_competition()
+
+    # Load 2021 olympics for consistency
+    competition = api.get_competitions(2021).loc["e807bba5-6475-4f1a-9434-26704585bf19"]
 
     events = api.get_competition_events(competition.name) 
     races = api.get_competition_races(competition.name)
@@ -38,8 +41,11 @@ def test_data_retrieval():
     )
 
 def test_get_stats():
-    api.get_last_races()
-    api.get_next_races()
+    # Load 2021 olympics for consistency
+    competition = api.get_competitions(2021).loc["e807bba5-6475-4f1a-9434-26704585bf19"]
+
+    api.get_last_races(competition=competition)
+    api.get_next_races(competition=competition)
     api.get_boat_types()
     api.get_competition_types()
     api.get_statistics()

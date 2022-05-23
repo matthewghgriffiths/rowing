@@ -12,12 +12,12 @@ setup(
     author='Matthew Grifiths',
     author_email='matthewghgriffiths@gmail.com',
     url='https://github.com/matthewghgriffiths/rowing',
-    packages=['rowing'],
+    packages=['rowing.world_rowing', 'rowing.analysis'],
     entry_points={
         'console_scripts': [
-            'world_rowing = rowing.world_rowing.cli:run [CLI]'
+            'world_rowing = rowing.world_rowing.cli:run [CLI]', 
             'garmin = rowing.analysis.garmin:main [GARMIN]',
-            'gpx = rowing.analysis.files:main',
+            'gpx = rowing.analysis.files:main [GPX]',
         ]
     },
     license='MIT', 

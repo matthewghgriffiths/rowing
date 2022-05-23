@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from world_rowing import api, livetracker, utils
+from rowing.world_rowing import api, livetracker, utils
 
 data_store = 'live_tracker.h5'
 

@@ -36,6 +36,25 @@ jobs:
         run: |
           python setup.py sdist bdist_wheel
       
+      - name: Create windows executable
+        uses: JackMcKew/pyinstaller-action-windows@main
+        with:
+          path: "."
+          spec: "rowing.spec"
+
+      - name: Copy windows executable files
+        run: cp -r dist/windows/rowing ./
+
+      - name: Zip windows executable
+        uses: montudor/action-zip@v1
+        with:
+          args: zip -qq -r dist/rowing.zip rowing
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: rowing
+          path: ./dist/windows # or path/to/artifact
+
       - name: Release
         if: contains(github.ref, 'tags/v')
         id: release

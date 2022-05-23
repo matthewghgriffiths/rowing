@@ -12,8 +12,8 @@ import pandas as pd
 
 import cmd2
 
-from world_rowing import api, dashboard
-from world_rowing.utils import first
+from rowing.world_rowing import api, dashboard
+from rowing.world_rowing.utils import first
 
 logger = logging.getLogger('world_rowing.cli')
 

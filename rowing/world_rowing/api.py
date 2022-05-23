@@ -199,9 +199,18 @@ def get_this_years_competitions(fisa=True, has_results=True):
     return get_competitions(year=year, fisa=fisa, has_results=has_results)
 
 
+def get_last_years_competitions(fisa=True, has_results=True):
+    year = datetime.date.today().year
+    return get_competitions(year=year - 1, fisa=fisa, has_results=has_results)
+
+
 def get_most_recent_competition(fisa=True):
-    competitions = get_this_years_competitions(fisa=True)
+    competitions = get_this_years_competitions(fisa=fisa)
     started = competitions.StartDate < datetime.datetime.now()
+    if not started.any():
+        competitions = get_last_years_competitions(fisa=fisa)
+        started = competitions.StartDate < datetime.datetime.now()
+
     competition = competitions.loc[started].iloc[-1]
     logger.info(f"loaded most recent competition: {competition.DisplayName}")
     return competition
@@ -215,14 +224,17 @@ def get_last_race_started(fisa=True, competition=None):
 get_most_recent_race = get_last_race_started
 
 def get_last_races(n=1, fisa=True, competition=None):
-    competition = competition or get_most_recent_competition(fisa)
+    if competition is None:
+        competition = get_most_recent_competition(fisa)
+        
     races = get_competition_races(competition.name)
     started = races.DateString < datetime.datetime.now().astimezone()
     return races.loc[started].sort_values("DateString").iloc[-n:]
 
 
 def get_next_races(n=1, fisa=True, competition=None):
-    competition = competition or get_most_recent_competition(fisa)
+    if competition is None:
+        competition = get_most_recent_competition(fisa)
     races = get_competition_races(competition.name)
     to_race = races.DateString > datetime.datetime.now().astimezone()
     return races.loc[to_race].sort_values("DateString").iloc[:n]
