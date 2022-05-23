@@ -25,13 +25,13 @@ setup(
     long_description_content_type="text/markdown",
     install_requires=[
         'numpy>=1.21.0',
-        'scipy>=1.8.0',
-        'pandas>=1.4.0',
+        'scipy>=1.7.0',
+        'pandas>=1.3.0',
         'matplotlib>=3.0.0',
         'tqdm>=4.0.0',
     ],
     extras_require={
-        'CLI': ['cmd2>=2.0.0'],
+        'CLI': ['cmd2>=2.0.0', 'pyqt5>=5.0.0'],
         'REQ': ['requests>=2.0.0'], # Requests is not required if using pyodide
         'GARMIN': ['garminconnect>=0.1.45', 'fitparse>=1.2.0'],
         "GPX": ['gpxpy>=1.5.0', 'fitparse>=1.2.0'],
