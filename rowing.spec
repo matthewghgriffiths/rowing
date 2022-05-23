@@ -10,7 +10,7 @@ scripts = {
     'garmin': 'garmin.py', 
     'gpx': 'gpx.py'
 }
-datas = [('data', 'data'), ('cloudscraper', 'cloudscraper')]
+datas = [('rowing/analysis/data', 'rowing/analysis/data'), ('cloudscraper', 'cloudscraper')]
 
 analyses = {
     n: Analysis(
