@@ -33,7 +33,12 @@ setup(
     extras_require={
         'CLI': ['cmd2>=2.0.0', 'pyqt5>=5.0.0'],
         'REQ': ['requests>=2.0.0'], # Requests is not required if using pyodide
-        'GARMIN': ['garminconnect>=0.1.45', 'fitparse>=1.2.0', "pyarrow>=7.0.0"],
+        'GARMIN': [
+            'garminconnect>=0.1.45', 
+            'fitparse>=1.2.0', 
+            "openpyxl>=3.0.0",
+            "pyarrow>=7.0.0"
+        ],
         "GPX": ['gpxpy>=1.5.0', 'fitparse>=1.2.0'],
     },
     python_requires=">=3.8",
