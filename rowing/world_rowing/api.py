@@ -229,7 +229,6 @@ def get_last_races(n=1, fisa=True, competition=None):
     if competition is None:
         competition = get_most_recent_competition(fisa)
     races = get_competition_races(competition.name)
-    print(races)
     if not races.empty:
         started = races.DateString < datetime.datetime.now().astimezone()
         return races.loc[started].sort_values("DateString").iloc[-n:]

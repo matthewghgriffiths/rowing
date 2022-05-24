@@ -56,7 +56,8 @@ class Dashboard:
     @classmethod
     def load_last_race(cls, fisa=True, competition=None, **kwargs):
         last_race = get_last_race_started(fisa=fisa, competition=competition)
-        return cls.from_race_id(last_race.name, **kwargs)
+        if last_race is not None:
+            return cls.from_race_id(last_race.name, **kwargs)
 
     def live_notebook_dashboard(self):
         from IPython.display import display, clear_output
@@ -118,14 +119,16 @@ class Dashboard:
         ])
         all_axes = (left_axes, middle_axes, right_axes)
         for axes in all_axes:
+            ax0 = axes[0]
             for ax in axes[1:]:
-                ax.sharex(axes[0])
+                ax0.get_shared_x_axes().join(ax0,ax)
             for ax in axes[:-1]:
                 ax.get_xaxis().set_visible(False)
 
         for axes in zip(*all_axes):
+            ax0 = axes[0]
             for ax in axes[1:-1]:
-                ax.sharey(axes[0])
+                ax0.get_shared_y_axes().join(ax0,ax)
                 ax.get_yaxis().set_visible(False)
 
         self.fig = fig
@@ -137,7 +140,8 @@ class Dashboard:
         self.b_behind_ax = self.left_axes[0]
         self.l_behind_ax = self.middle_axes[0]
         self.p_behind_ax = self.right_axes[0]
-        self.p_behind_ax.sharey(self.left_axes[0])
+        self.left_axes[0].get_shared_y_axes().join(self.left_axes[0], self.p_behind_ax)
+        # self.p_behind_ax.sharey(self.left_axes[0])
 
         self.b_pace_ax = self.left_axes[1]
         self.l_pace_ax = self.middle_axes[1]
@@ -244,8 +248,6 @@ class Dashboard:
         else:
             progression = ''
 
-        fig_title = f"{comp_name}: {race_name}, {date}{progression}"
-        self.fig.suptitle(fig_title)
 
         self.b_behind_ax.set_ylabel('time behind leader (s)')
         self.b_pace_ax.set_ylabel('split (/500m)')
@@ -258,6 +260,10 @@ class Dashboard:
             rotation=-45,
         )
         self._set_finish_axes()
+        
+        fig_title = f"{comp_name}: {race_name}, {date}{progression}"
+        self.fig.suptitle(fig_title, y=1.03)
+
         self.fig.tight_layout()
         self.fig.subplots_adjust(**self._subplots_adjust)
 
@@ -296,6 +302,7 @@ class Dashboard:
         if self.finished:
             logger.debug('creating finished axes')
             self.update_finish_axes(live_data, intermediates)
+            
         else:
             logger.debug('updating prediction axes')
             self.update_predictions(
@@ -315,7 +322,7 @@ class Dashboard:
             self.update_behind(live_data)
             self.update_pos(live_data)
             self.update_intermediates(intermediates)
-
+ 
         return live_data, intermediates
 
     def update_finish_axes(self, live_data, intermediates):
@@ -354,6 +361,11 @@ class Dashboard:
             index=xlims
         )
         self.race_tracker.plot(finish_deltas, ax=axes[0])
+        finish_max = finish_deltas.max().max()
+        axes[0].set_ylim(
+            finish_max, - finish_max * 0.1
+        )
+
         # Plot finish speeds
         average_pace = pd.DataFrame(
             [finish_times / dist * 500]*2,
@@ -566,6 +578,7 @@ class Dashboard:
             ymax = pred_dist_behind.values.max() + 5
         else:
             ymax = pred_dist_behind.iloc[-1].max() + 5
+
         self.right_axes[0].set_ylim(ymax, -9)
 
     def update_pred_pace(self, pred_pace, pred_pace_std):
@@ -601,15 +614,15 @@ class Dashboard:
                     pred_times.iloc[-1], pred_times_std.iloc[-1],
                     ax=ax
                 )
-            ylims = ax.get_ylim()
+            ylims = sorted(ax.get_ylim())
             format_yaxis_splits(ax)
             ax.set_ylim(*ylims[::-1])
 
         else:
             from matplotlib.ticker import AutoLocator
-            ylims = self.race_tracker.update_plot_finish(
+            ylims = sorted(self.race_tracker.update_plot_finish(
                 *self.p_times, pred_times.iloc[-1], pred_times_std.iloc[-1],
-            )
+            ))
             self.right_axes[1].yaxis.set_major_locator(AutoLocator())
             format_yaxis_splits(self.right_axes[1])
             self.right_axes[1].set_ylim(*ylims[::-1])
@@ -651,14 +664,17 @@ def main(block=True):
     from rowing.world_rowing.api import show_next_races
 
     dash = Dashboard.load_last_race(figsize=(12, 8))
-    dash.live_ion_dashboard(block=False)
+    if dash:
+        dash.live_ion_dashboard(block=False)
 
-    logger.info('race results:')
-    logger.info(dash.race_tracker.intermediate_results)
+        logger.info('race results:')
+        logger.info(dash.race_tracker.intermediate_results)
 
-    logger.info('\nupcoming races:')
-    logger.info(show_next_races())
-    plt.show(block=block)
+        logger.info('\nupcoming races:')
+        logger.info(show_next_races())
+        plt.show(block=block)
+    else:
+        logger.info('no race could be loaded')
 
 
 if __name__ == "__main__":

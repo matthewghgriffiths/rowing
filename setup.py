@@ -16,6 +16,7 @@ setup(
     entry_points={
         'console_scripts': [
             'world_rowing = rowing.world_rowing.cli:run [CLI]', 
+            'rowing_live_tracker = rowing.world_rowing.dashboard:main [CLI]', 
             'garmin = rowing.analysis.garmin:main [GARMIN]',
             'gpx = rowing.analysis.files:main [GPX]',
         ]

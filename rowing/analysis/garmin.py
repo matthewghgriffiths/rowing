@@ -16,6 +16,7 @@ import re
 import numpy as np
 import pandas as pd
 import gpxpy
+import cloudscraper
 from garminconnect import (
     Garmin,
     GarminConnectConnectionError,
@@ -23,12 +24,12 @@ from garminconnect import (
     GarminConnectAuthenticationError,
 )
 
-from .utils import (
+from rowing.analysis.utils import (
     map_concurrent, unflatten_json, strfsplit, 
     add_logging_argument, set_logging, _YMD
 )
-from .files import parse_gpx_data, read_fit_zipfile, parse_fit_data, activity_data_to_excel
-from . import splits
+from rowing.analysis.files import parse_gpx_data, read_fit_zipfile, parse_fit_data, activity_data_to_excel
+from rowing.analysis import splits
 
 
 logger = logging.getLogger(__name__)

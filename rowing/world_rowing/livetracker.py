@@ -507,8 +507,18 @@ def get_current_data(live_data):
 
 def get_race_livetracker(race_id, gmt=None, cached=True, race_distance=2000):
     data = get_worldrowing_data('livetracker', race_id, cached=cached)
+    
+    if data and data['intermediates']:
+        results, intermediates = parse_livetracker_results(data)
+    else:
+        results = pd.DataFrame([])
+        intermediates = pd.DataFrame([])
+
     if data and data['live']:
         live_data = parse_livetracker_data(data)
+        if not results.empty:
+            last = live_data.index[-1]
+
         gmt = gmt or find_world_best_time(
             race_id=race_id
         ).ResultTime.total_seconds()
@@ -519,11 +529,6 @@ def get_race_livetracker(race_id, gmt=None, cached=True, race_distance=2000):
     else:
         live_data = pd.DataFrame([])
 
-    if data and data['intermediates']:
-        results, intermediates = parse_livetracker_results(data)
-    else:
-        results = pd.DataFrame([])
-        intermediates = pd.DataFrame([])
 
     return live_data, results, intermediates
 
@@ -549,6 +554,7 @@ def parse_livetracker_results(data):
 
 
 def parse_livetracker_data(data):
+    total_length = data['config']['plot']
     lane_boat = {
         lane['Lane']: lane for lane in data['config']['lanes']
     }
@@ -558,6 +564,21 @@ def parse_livetracker_data(data):
     lane_cnt = {r: lane['DisplayName'] for r, lane in lane_boat.items()}
     rank_cnt = {r: lane['DisplayName'] for r, lane in rank_boat.items()}
     countries = [lane_cnt[i] for i in sorted(lane_cnt)]
+
+    id_cnt = {}
+    for i, last_data in enumerate(reversed(data['live'])):
+        if last_data['distanceOfLeaderFromFinish']:
+            break 
+
+    for tracker in last_data['raceBoatTrackers']:
+        id_cnt[tracker['raceBoatId']] = rank_cnt[tracker['currentPosition']]
+
+    pos_ids = {}
+    for live_data in data['live']:
+        for tracker in live_data['raceBoatTrackers']:
+            pos_ids.setdefault(
+                tracker['raceBoatId'], set()
+            ).add(tracker['startPosition'])
 
     live_boat_data = {
         'currentPosition': {},
@@ -572,21 +593,33 @@ def parse_livetracker_data(data):
 
     for live_data in data['live']:
         for tracker in live_data['raceBoatTrackers']:
-            cnt = lane_cnt[tracker['startPosition']]
-            for key, live_data in live_boat_data.items():
-                live_data[cnt].append(tracker[key])
+            # cnt = lane_cnt[tracker['startPosition']]
+            cnt = id_cnt[tracker['raceBoatId']]
+            for key, boat_data in live_boat_data.items():
+                boat_data[cnt].append(tracker[key])
 
     maxlen = max(
         max(map(len, live_data.values()))
         for live_data in live_boat_data.values()
     )
-    for key, live_data in live_boat_data.items():
-        for cnt, cnt_data in list(live_data.items()):
-            cnt_len = len(cnt_data)
-            if cnt_len == 0:
-                del live_data[cnt]
-            elif cnt_len < maxlen:
-                cnt_data.extend(cnt_data[-1:] * (maxlen - cnt_len))
+    if not live_data['distanceOfLeaderFromFinish']:
+        total_distance = live_data['distanceOfLeader']
+        for cnt, dists in live_boat_data['distanceTravelled'].items():
+            for key, live_data in live_boat_data.items():
+                cnt_data = live_data[cnt]
+                cnt_len = len(cnt_data)
+                if key == 'distanceTravelled':
+                    cnt_data.extend([total_distance] * (maxlen - cnt_len + 1))
+                else:
+                    cnt_data.extend(cnt_data[-1:] * (maxlen - cnt_len + 1))
+    else:
+        for key, live_data in live_boat_data.items():
+            for cnt, cnt_data in list(live_data.items()):
+                cnt_len = len(cnt_data)
+                if cnt_len == 0:
+                    del live_data[cnt]
+                elif cnt_len < maxlen:
+                    cnt_data.extend(cnt_data[-1:] * (maxlen - cnt_len))
 
     live_boat_data = pd.concat(
         {

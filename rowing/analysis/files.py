@@ -10,7 +10,7 @@ import fitparse
 import pandas as pd
 import numpy as np
 
-from . import geodesy, utils, splits
+from rowing.analysis import geodesy, utils, splits
 
 _SEMICIRCLE_SCALE = 180 / 2**31
 

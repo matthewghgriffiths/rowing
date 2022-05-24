@@ -8,8 +8,9 @@ block_cipher = None
 project = 'rowing'
 scripts = {
     'world_rowing': 'rowing/world_rowing/cli.py',
-    'garmin': 'garmin.py', 
-    'gpx': 'gpx.py'
+    #'rowing_live_tracker': 'rowing/world_rowing/dashboard.py',
+    #'garmin': 'rowing/analysis/garmin.py', 
+    #'gpx': 'rowing/analysis/files.py'
 }
 datas = [
     ('data', 'data'), 
@@ -22,7 +23,16 @@ analyses = {
         pathex=[SPECPATH],
         binaries=[],
         datas=datas,
-        hiddenimports=['cloudscraper'],
+        hiddenimports=[
+            'cloudscraper',
+            'scipy.stats',
+            'scipy.spatial.distance',
+            'scipy.spatial.transform._rotation_groups',
+            'scipy.special.cython_special',
+            'scipy.special',
+            'scipy.linalg',
+            'scipy.integrate',
+        ],
         hookspath=[],
         runtime_hooks=[],
         excludes=[],

@@ -10,6 +10,8 @@ from typing import (
 
 import pandas as pd
 
+from scipy import stats, spatial, special, linalg, integrate
+
 import cmd2
 
 from rowing.world_rowing import api, dashboard
@@ -79,7 +81,7 @@ class RowingApp(cmd2.Cmd):
                 'block', bool, 'give access to cli after plotting?', self)
         )
 
-        self.intro = "Welcome try running `pgmts`, `race` or `livetracker`"
+        self.intro = "Welcome try running `pgmts`, `view`, `view_race` or `livetracker`"
         self.prompt = 'rowing> '
         self.foreground_color = 'cyan'
 
@@ -124,7 +126,7 @@ class RowingApp(cmd2.Cmd):
     ):
         selected_id = self.select_with_choice(
             list(df[column].items()),
-            prompt or f"Select which {name} you want ",
+            prompt or f"Select which {name} you want: ",
             choice=choice
         )
         return df.loc[selected_id]
