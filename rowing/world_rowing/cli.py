@@ -239,8 +239,12 @@ class RowingApp(cmd2.Cmd):
         """
         import matplotlib.pyplot as plt
         dash = dashboard.Dashboard.load_last_race()
-        dash.live_ion_dashboard()
-        plt.show(block=self.block)
+        
+        if dash:
+            dash.live_ion_dashboard()
+            plt.show(block=self.block)
+        else:
+            self.poutput("no live race could be loaded")
 
     def select_race(self, year: int, choices: Iterable[int] = ()):
         choices = iter(choices)

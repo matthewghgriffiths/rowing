@@ -9,12 +9,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-from .api import get_last_race_started
-from .utils import (
+from rowing.world_rowing.api import get_last_race_started
+from rowing.world_rowing.utils import (
     format_yaxis_splits, update_table, format_totalseconds, CURRENT_TIMEZONE, ignore_nans
 )
-from .livetracker import get_current_data, RaceTracker
-from .predict import LivePrediction
+from rowing.world_rowing.livetracker import get_current_data, RaceTracker
+from rowing.world_rowing.predict import LivePrediction
 
 logger = logging.getLogger('world_rowing.dashboard')
 
@@ -88,6 +88,49 @@ class Dashboard:
                 break
 
         plt.show(block=block)
+
+    def make_animation(
+            self, 
+            filename='animation.gif', 
+            frames=None, 
+            fps=3,
+            dpi=300, 
+            save=True, 
+            writer=None,
+            **kwargs
+    ):
+        from matplotlib.animation import FuncAnimation, PillowWriter
+        from celluloid import Camera        
+        live_data, intermediates = self.race_tracker.update_livedata()
+        
+        if frames is None:
+            frames = live_data.index + 1
+
+        camera = Camera(self.fig)
+        def update(i):
+            self.finished = False
+            new_data = live_data.loc[:i]
+            dist = new_data.distanceTravelled.max().min()
+            new_intermediates = intermediates.loc[:, :dist]
+            if new_intermediates.empty:
+                new_intermediates=None
+
+            self.update(new_data, new_intermediates)
+            camera.snap()
+
+        ani = FuncAnimation(
+            self.fig, 
+            update, 
+            frames=live_data.index + 1,
+            interval=1000/fps
+        )
+        if save:
+            if writer is None:
+                writer = PillowWriter(fps=fps, **kwargs)
+            ani.save(filename, writer=writer, dpi=dpi)
+
+        return ani 
+
 
     def _init(self, **kwargs):
         self._init_fig(**kwargs)

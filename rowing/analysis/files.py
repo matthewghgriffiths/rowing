@@ -124,6 +124,8 @@ def activity_data_to_excel(
                 timings.applymap(utils.strfsplit).to_excel(
                     xlf, sheet_names.loc[actid])
 
+    return best_times, location_timings
+
 def get_parser():
     parser = argparse.ArgumentParser(
         description='Analyse gpx data files')

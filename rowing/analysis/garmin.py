@@ -434,6 +434,10 @@ def run(args=None):
             endDate=options.end_date,
             api=api
         )
+        additional_info.columns = [
+            ".".join(str(i) for i in col if i != '') 
+            for col in additional_info.columns
+        ]
         selected = additional_info.activityId
         all_activities = download_and_process(
             additional_info, folder, save_file, api=api)
@@ -480,12 +484,15 @@ def run(args=None):
     }).sort_values("startTime", ascending=False)
 
     if 'excel' in options.actions:
-        activity_data_to_excel(
+        best_times, location_timings = activity_data_to_excel(
             activities,
             cols=['heart_rate', 'cadence', 'bearing'],
             additional_info=additional_info,
             xlpath=options.excel_file
         )
+        print("best times: ")
+        with pd.option_context('display.max_rows', None):
+            print(best_times)
 
     if "heartrate" in options.actions:
         hrs = pd.RangeIndex(
@@ -508,6 +515,8 @@ def run(args=None):
             time_above_hr.groupby(
                 pd.Grouper(freq='M')
             ).sum().to_excel(xlf, f"time above hr per month")
+
+        print(f"saved heart rate data to {options.hr_file}")
 
         rolling_time_above_hr = time_above_hr.sort_index().rolling(
             pd.Timedelta(days=7), 
@@ -553,6 +562,9 @@ def run(args=None):
 
         f.tight_layout()
         f.savefig(options.hr_plot, dpi=options.dpi)
+
+        
+        print(f"saved heart rate plot to {options.hr_plot}")
 
 
     return activities, additional_info

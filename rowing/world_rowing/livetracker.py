@@ -557,27 +557,16 @@ def parse_livetracker_data(data):
     lane_boat = {
         lane['Lane']: lane for lane in data['config']['lanes']
     }
-    rank_boat = {
-        lane['Rank']: lane for lane in data['config']['lanes']
-    }
     lane_cnt = {r: lane['DisplayName'] for r, lane in lane_boat.items()}
-    rank_cnt = {r: lane['DisplayName'] for r, lane in rank_boat.items()}
     countries = [lane_cnt[i] for i in sorted(lane_cnt)]
 
-    id_cnt = {}
-    for i, last_data in enumerate(reversed(data['live'])):
-        if last_data['distanceOfLeaderFromFinish']:
-            break 
-
-    for tracker in last_data['raceBoatTrackers']:
-        id_cnt[tracker['raceBoatId']] = rank_cnt[tracker['currentPosition']]
-
-    pos_ids = {}
-    for live_data in data['live']:
-        for tracker in live_data['raceBoatTrackers']:
-            pos_ids.setdefault(
-                tracker['raceBoatId'], set()
-            ).add(tracker['startPosition'])
+    id_cnt = {
+        tracker['raceBoatId']: lane['DisplayName']
+        for tracker, lane in zip(
+            data['live'][0]['raceBoatTrackers'],
+            data['config']['lanes']
+        )
+    }
 
     live_boat_data = {
         'currentPosition': {},
