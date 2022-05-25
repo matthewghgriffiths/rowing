@@ -2,7 +2,6 @@
 
 from typing import Dict
 from collections import namedtuple
-from functools import cached_property
 import logging
 
 import numpy as np
@@ -11,7 +10,7 @@ from scipy import linalg, integrate, stats
 
 from . import api, utils, livetracker
 from .livetracker import RaceTracker
-from .utils import cache, lru_cache
+from .utils import cache, lru_cache, cached_property
 
 
 def calc_win_probs(times, std):

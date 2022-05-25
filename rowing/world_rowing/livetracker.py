@@ -1,6 +1,5 @@
 
 import logging
-from functools import cached_property
 
 import numpy as np
 import pandas as pd
@@ -12,7 +11,7 @@ from .api import (
 )
 from .utils import (
     extract_fields, format_yaxis_splits, make_flag_box, update_fill_betweenx,
-    update_fill_between, read_times, format_totalseconds
+    update_fill_between, read_times, format_totalseconds, cached_property
 )
 
 logger = logging.getLogger("world_rowing.livetracker")
