@@ -48,11 +48,11 @@ jobs:
       - name: Zip windows executable
         uses: montudor/action-zip@v1
         with:
-          args: zip -qq -r dist/rowing-windows.zip rowing
+          args: zip -qq -r dist/rowing.zip rowing
 
       - uses: actions/upload-artifact@v2
         with:
-          name: rowing
+          name: rowing-windows
           path: ./dist/windows # or path/to/artifact
 
       - name: Release
