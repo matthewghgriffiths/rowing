@@ -19,17 +19,24 @@ from rowing.world_rowing.utils import first
 
 logger = logging.getLogger('world_rowing.cli')
 
+def add_years_args(parser):
+    parser.add_argument(
+        'year', type=int, help='year to retrieve',
+        nargs='?', default=datetime.datetime.now().year
+    )
+
+def add_choices(parser):
+    parser.add_argument(
+        'choices', type=int, help='year to retrieve',
+        nargs='*', default=()
+    )
+
+
 year_parser = argparse.ArgumentParser(
     description='Specify which year you want, defaults to current'
 )
-year_parser.add_argument(
-    'year', type=int, help='year to retrieve',
-    nargs='?', default=datetime.datetime.now().year
-)
-year_parser.add_argument(
-    'choices', type=int, help='year to retrieve',
-    nargs='*', default=()
-)
+add_years_args(year_parser)
+add_choices(year_parser)
 
 n_parser = argparse.ArgumentParser(
     description='Specify how many results you want'
@@ -139,6 +146,42 @@ class RowingApp(cmd2.Cmd):
             level=getattr(logging, args.level)
         )
 
+    def save_excel(self, df, name='sheet1'):
+        filename = self.read_input(
+            "enter name of file to save to (leave blank to not save): "
+        )
+        if filename:
+            df.to_excel(
+                filename, name
+            )
+
+    @cmd2.with_argparser(year_parser)
+    def do_full_results(self, args):
+        choices = iter(args.choices)
+        competition = self.select_competition(
+            args.year, choice=next(choices, None)
+        )
+        full_results = api.get_competition_results(
+            competition_id=competition.name, 
+            with_intermediates=True
+        )
+        self.poutput(full_results.to_string())
+        self.save_excel(full_results, competition.DisplayName)
+
+    @cmd2.with_argparser(year_parser)
+    def do_results(self, args):
+        choices = iter(args.choices)
+        competition = self.select_competition(
+            args.year, choice=next(choices, None)
+        )
+        results = api.get_competition_results(
+            competition_id=competition.name, 
+            with_intermediates=False
+        )
+        self.poutput(results.to_string())
+        self.save_excel(results, competition.DisplayName)
+        
+
     @cmd2.with_argparser(year_parser)
     def do_pgmts(self, args):
         choices = iter(args.choices)
@@ -227,9 +270,7 @@ class RowingApp(cmd2.Cmd):
 
     def dashboard(self, race_id):
         import matplotlib.pyplot as plt
-        dash = dashboard.Dashboard.from_race_id(
-            race_id,
-        )
+        dash = dashboard.Dashboard.from_race_id(race_id)
         dash.live_ion_dashboard()
         plt.show(block=self.block)
 

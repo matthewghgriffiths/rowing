@@ -9,7 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-from rowing.world_rowing.api import get_last_race_started
+from rowing.world_rowing.api import get_last_race_started, get_live_race, show_next_races
 from rowing.world_rowing.utils import (
     format_yaxis_splits, update_table, format_totalseconds, CURRENT_TIMEZONE, ignore_nans
 )
@@ -33,7 +33,7 @@ class Dashboard:
         self._subplots_adjust = subplots_adjust or {
             'hspace': 0.05, 'wspace': 0.05}
 
-        kwargs.setdefault('figsize', (12, 8))
+        kwargs.setdefault('figsize', (14, 10))
         self._init(**kwargs)
 
         self.finished = False
@@ -58,6 +58,30 @@ class Dashboard:
         last_race = get_last_race_started(fisa=fisa, competition=competition)
         if last_race is not None:
             return cls.from_race_id(last_race.name, **kwargs)
+    
+    @classmethod
+    def load_live_race(cls, fisa=True, competition=None, **kwargs):
+        live_race = get_live_race(fisa=fisa, competition=competition)
+        if live_race is not None:
+            return cls.from_race_id(live_race.name, **kwargs)
+
+    @classmethod
+    def load_notebook_dashboard(cls, fisa=True, competition=None, block=True, **kwargs):
+        dash = cls.load_live_race(
+            fisa=fisa, competition=competition, **kwargs)
+        if dash:
+            dash.live_ion_dashboard(block=False)
+
+            logger.info('race results:')
+            logger.info(dash.race_tracker.intermediate_results)
+
+            logger.info('\nupcoming races:')
+            logger.info(show_next_races())
+            plt.show(block=block)
+        else:
+            logger.info('no live race could be loaded')
+
+        return dash 
 
     def live_notebook_dashboard(self):
         from IPython.display import display, clear_output
@@ -305,7 +329,7 @@ class Dashboard:
         self._set_finish_axes()
         
         fig_title = f"{comp_name}: {race_name}, {date}{progression}"
-        self.fig.suptitle(fig_title, y=1.03)
+        self.fig.suptitle(fig_title, y=1.06)
 
         self.fig.tight_layout()
         self.fig.subplots_adjust(**self._subplots_adjust)
@@ -491,7 +515,14 @@ class Dashboard:
 
     def update_pace(self, live_data):
         logger.debug('update_pace')
-        pace = 500 / live_data.metrePerSecond
+        speed = 0.5 * (
+            live_data.metrePerSecond + 
+            live_data.metrePerSecond.shift(-1).fillna(0)
+        )
+        speed.iloc[-1] *= 2
+        pace = 500 / speed 
+        distance = live_data.distanceTravelled
+
         self.race_tracker.update_bar(
             self.b_pace,
             pace.iloc[-1],
@@ -501,7 +532,7 @@ class Dashboard:
             live_data.distanceTravelled,
             pace,
         )
-        ylim = (pace.values[-100:-1].max() + 1, pace.values.min() - 1)
+        ylim = find_limits(pace, distance, n=50, f=0.1, stretch=0.3)
         self.b_pace_ax.set_ylim(ylim)
         format_yaxis_splits(self.b_pace_ax)
         self.b_pace_ax.set_ylim(ylim)
@@ -517,10 +548,11 @@ class Dashboard:
             live_data.distanceTravelled,
             live_data.strokeRate,
         )
-
-        self.b_stroke_rates_ax.set_ylim(
-            25, live_data.strokeRate.values.max() + 1
+        ylim = find_limits(
+            live_data.strokeRate, live_data.distanceTravelled, 
+            n=50, f=0.1, stretch=0.3
         )
+        self.b_stroke_rates_ax.set_ylim(ylim)
 
     def plot_predictions(self, predictions):
         preds_pace, preds_time, preds_dist, win_probs = predictions
@@ -702,22 +734,18 @@ class Dashboard:
         self.p_win_ax.set_ylim(0, ymax)
 
 
+def find_limits(data, distance, n=50, f=0.1, stretch=0.3):
+    sort_data = np.sort(data.values[distance.diff(-1).values < 0])
+    m = min(n, int(sort_data.size * f))
+    dmin, dmax = sort_data[
+            [m, -m-1]
+        ]
+    drange = (dmax - dmin) * stretch
+    return (dmin - drange, dmax + drange)
+
+
 def main(block=True):
-    import matplotlib.pyplot as plt
-    from rowing.world_rowing.api import show_next_races
-
-    dash = Dashboard.load_last_race(figsize=(12, 8))
-    if dash:
-        dash.live_ion_dashboard(block=False)
-
-        logger.info('race results:')
-        logger.info(dash.race_tracker.intermediate_results)
-
-        logger.info('\nupcoming races:')
-        logger.info(show_next_races())
-        plt.show(block=block)
-    else:
-        logger.info('no race could be loaded')
+    Dashboard.load_notebook_dashboard(figsize=(12, 8))
 
 
 if __name__ == "__main__":

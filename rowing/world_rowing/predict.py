@@ -123,9 +123,15 @@ class PredictRace:
             columns=parse_cols,
             index=distances
         )
+        speed = (
+            live_dist_data.metrePerSecond 
+            + live_dist_data.metrePerSecond.shift(-1).fillna(0)
+        ) / 2
+        for cnt, i in zip(dist_travelled, distances.searchsorted(dist_travelled.iloc[-1])):
+            speed.loc[distances[i - 1], cnt] *= 2
+            
         for cnt in live_dist_data.metrePerSecond.columns:
-            live_dist_data[('pace', cnt)] = 500 / \
-                live_dist_data.metrePerSecond[cnt]
+            live_dist_data[('pace', cnt)] = 500 / speed[cnt]
 
         for cnt in live_dist_data.metrePerSecond.columns:
             live_dist_data[('time', cnt)] = np.interp(

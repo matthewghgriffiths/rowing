@@ -78,7 +78,8 @@ class RaceTracker:
             return None
         elif len(self.intermediates):
             intermediate_results = pd.merge(
-                self.intermediates[
+                self.intermediates.loc[
+                    self.intermediates.ResultTime > pd.Timedelta(0),
                     ['raceBoatId', 'distance', 'ResultTime']
                 ],
                 self.results[

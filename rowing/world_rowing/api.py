@@ -132,7 +132,7 @@ def get_worldrowing_data(*endpoints, cached=True, **kwargs):
     if cached:
         hashable_kws = {
             k: vals
-            if isinstance(vals, (str, int, float))
+            if isinstance(vals, (str, int, float, tuple))
             else tuple(dict(vals).items())
             for k, vals in kwargs.items()
         }
@@ -214,6 +214,44 @@ def get_most_recent_competition(fisa=True):
     competition = competitions.loc[started].iloc[-1]
     logger.info(f"loaded most recent competition: {competition.DisplayName}")
     return competition
+
+
+def get_live_races(fisa=True, competition=None):
+    if competition is None:
+        competition = get_most_recent_competition(fisa)
+
+    return get_worldrowing_records(
+        "race",
+        cached=False,
+        filter=(
+            ("event.competitionId", competition.name),
+            ('raceStatus.displayName', 'LIVE'),
+        ),
+        include='event.competition,raceStatus',
+        sort=(("eventId", "asc"), ("Date", "asc")),
+    )
+
+def get_live_race(fisa=True, competition=None):
+    finished = False 
+    live_races = get_live_races(fisa=fisa, competition=competition)
+    for race_id, race in live_races.iterrows():
+        data = get_worldrowing_data(
+            'livetracker', race_id, cached=False
+        )
+        started = len(data['live'])
+        if started:
+            live_race = race 
+            
+            finished = all(
+                lane['_finished'] for lane in data['config']['lanes']
+            )
+            if not finished:
+                break 
+        elif finished:
+            break
+    else:
+        return None
+    return live_race
 
 
 def get_last_race_started(fisa=True, competition=None):
@@ -435,6 +473,79 @@ def find_world_best_time(
 
     return get_world_best_times().loc[boat_class]
 
+def get_raw_competition_results(competition_id=None, with_intermediates=True):
+    competition_id = competition_id or get_most_recent_competition().name
+    competition_races = get_competition_races(competition_id)
+    competition_events = get_competition_events(competition_id)
+    if with_intermediates:
+        race_results = get_intermediate_results(competition_id=competition_id)
+
+    else:
+        race_results = get_race_results(competition_id=competition_id)
+
+    boat_classes = get_boat_types()
+    wbts = get_world_best_times().ResultTime
+    wbts.index.name, wbts.name = "id", "worldBestTime"
+
+    race_data = pd.merge(
+        race_results.loc[
+            race_results.Rank.notna()
+            & (race_results.ResultTime > pd.Timedelta(0))
+        ], 
+        pd.merge(
+            competition_races.reset_index(), 
+            pd.merge(
+                competition_events.reset_index(), 
+                pd.merge(
+                    boat_classes.reset_index(), 
+                    wbts, 
+                    left_on='DisplayName', 
+                    right_on='id'
+                ), 
+                left_on='boatClassId', 
+                right_on='id', 
+                suffixes = ('_event', '_boat'),
+            ),
+            left_on='eventId', 
+            right_on='id_event', 
+            suffixes = ('_race', '_event')
+        ),
+        left_on='raceId', 
+        right_on='id' 
+    )
+    race_data.Rank = race_data.Rank.astype(int)
+    if with_intermediates:
+        race_data.distance = race_data.distance.str.extract("([0-9]+)")[0].astype(int)
+        race_data['PGMT'] = (
+            race_data.worldBestTime.dt.total_seconds() * race_data.distance 
+            / race_data.ResultTime.dt.total_seconds() / 2000
+        )
+    else:
+        race_data['PGMT'] = race_data.worldBestTime.dt.total_seconds() / race_data.ResultTime.dt.total_seconds()
+    race_data.worldBestTime = race_data.worldBestTime.dt.total_seconds().apply(format_totalseconds)
+    race_data.ResultTime = race_data.ResultTime.dt.total_seconds().apply(format_totalseconds)
+    return race_data
+
+def get_competition_results(competition_id=None, with_intermediates=True):
+    race_data = get_raw_competition_results(
+        competition_id=competition_id,
+        with_intermediates=with_intermediates
+    )
+    if with_intermediates:
+        race_summaries = race_data.set_index(
+            ['DisplayName_boat', 'DisplayName_event', 'DisplayName', 'Progression', 'distance', 'Rank']
+        )[['Country', 'Lane', 'ResultTime', 'PGMT']].sort_index()
+        race_summaries.index.names = [
+            'BoatClass', 'Event', 'Race', 'Progression', 'Distance', 'Rank'
+        ]
+    else:
+        race_summaries = race_data.set_index(
+            ['DisplayName_boat', 'DisplayName_event', 'DisplayName', 'Progression', 'Rank']
+        )[['Country', 'Lane', 'ResultTime', 'worldBestTime', 'PGMT', 'Date']].sort_index()
+        race_summaries.index.names = [
+            'BoatClass', 'Event', 'Race', 'Progression', 'Rank'
+        ]
+    return race_summaries
 
 def get_competition_pgmts(competition_id=None, finals_only=False):
     competition_id = competition_id or get_most_recent_competition().name
