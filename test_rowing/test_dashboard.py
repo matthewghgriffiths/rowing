@@ -20,7 +20,7 @@ def test_dashboard_predict():
 
     dash.update(
         live_data.loc[:300],
-        intermediates[[500, 1000]]
+        intermediates.loc[[500, 1000]]
     )
 
     dash.update(

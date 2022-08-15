@@ -718,6 +718,7 @@ def estimate_live_times(live_boat_data, gmt, race_distance=2000):
         "metrePerSecond": live_boat_data.metrePerSecond.fillna(method='ffill'),
         "strokeRate": live_boat_data.strokeRate.fillna(method='ffill'),
         "currentPosition": live_boat_data.currentPosition.fillna(method='ffill').astype(int),
+        'distanceFromLeader': live_boat_data.distanceFromLeader.fillna(method='ffill').astype(int),
     }, axis=1)
     
     n_countries = len(countries)

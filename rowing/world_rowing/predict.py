@@ -137,7 +137,7 @@ class PredictRace:
             live_dist_data[('time', cnt)] = np.interp(
                 distances,
                 dist_travelled.loc[:boat_lims[cnt], cnt],
-                live_data.time.loc[:boat_lims[cnt]],
+                live_data.time.loc[:boat_lims[cnt], cnt],
                 right=np.nan
             )
 
