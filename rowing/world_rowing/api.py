@@ -80,8 +80,8 @@ def prepare_params(**kwargs):
 
 
 if use_requests:
-    def load_json_url(url, params=None, **kwargs):
-        r = requests.get(url, params=params)
+    def load_json_url(url, params=None, timeout=20., **kwargs):
+        r = requests.get(url, params=params, timeout=timeout, **kwargs)
         r.raise_for_status()
         if r.text:
             return r.json()
@@ -113,22 +113,22 @@ def prepare_request(*endpoints, **kwargs):
     return url, params
 
 
-def request_worldrowing_data(*endpoints, **kwargs):
-    return load_json_url(*prepare_request(*endpoints, **kwargs))
+def request_worldrowing_data(*endpoints, request_kws=None, **kwargs):
+    return load_json_url(*prepare_request(*endpoints, **kwargs), **dict(request_kws or {}))
 
 
 cached_request_worldrowing_data = cache(request_worldrowing_data)
 
 
 @cache
-def load_competition_best_times(json_url):
+def load_competition_best_times(json_url, **kwargs):
     return pd.DataFrame.from_records(
         extract_fields(record, WBT_RECORDS)
-        for record in load_json_url(json_url)["BestTimes"]
+        for record in load_json_url(json_url, **kwargs)["BestTimes"]
     )
 
 
-def get_worldrowing_data(*endpoints, cached=True, **kwargs):
+def get_worldrowing_data(*endpoints, cached=True, request_kws=None, **kwargs):
     if cached:
         hashable_kws = {
             k: vals
@@ -138,7 +138,7 @@ def get_worldrowing_data(*endpoints, cached=True, **kwargs):
         }
         data = cached_request_worldrowing_data(*endpoints, **hashable_kws)
     else:
-        data = request_worldrowing_data(*endpoints, **kwargs)
+        data = request_worldrowing_data(*endpoints, **kwargs, request_kws=request_kws)
 
     return data.get("data", [])
 
@@ -148,9 +148,10 @@ def get_worldrowing_record(*endpoints, **kwargs):
     return pd.Series(data, name=data.pop("id", data.get("DisplayName", "")))
 
 
-def get_worldrowing_records(*endpoints, **kwargs):
+def get_worldrowing_records(*endpoints, request_kws=None, **kwargs):
     records = pd.DataFrame.from_records(
-        get_worldrowing_data(*endpoints, **kwargs))
+        get_worldrowing_data(*endpoints, **kwargs, request_kws=request_kws)
+    )
     if "id" in records.columns:
         records.set_index("id", inplace=True)
 
@@ -175,12 +176,24 @@ def get_competition_events(competition_id=None, cached=True):
 
 def get_competition_races(competition_id=None, cached=True):
     competition_id = competition_id or get_most_recent_competition().name
-    return get_worldrowing_records(
-        "race",
-        cached=cached,
-        filter=(("event.competitionId", competition_id),),
-        sort=(("eventId", "asc"), ("Date", "asc")),
-    )
+    records = get_worldrowing_data(
+            "race",
+            cached=cached,
+            filter=(("event.competitionId", competition_id),),
+            sort=(("eventId", "asc"), ("Date", "asc")),
+            include=("event.competition,raceStatus")
+        )
+    races = pd.concat(
+        [pd.json_normalize(r) for r in records]
+    ).set_index('id')
+    
+    for col in races.columns:
+        if "Date" in col:
+            dates = pd.to_datetime(races[col])
+            if dates.notna().all():
+                races[col] = dates
+
+    return races 
 
 
 def get_competitions(year=None, fisa=True, has_results=True, cached=True, **kwargs):
@@ -424,7 +437,7 @@ def _extract_wbt_record(record):
 
 
 @cache
-def get_competition_best_times():
+def get_competition_best_times(timeout=2.):
     wbt_stats = get_worldrowing_records(
         "statistic", cached=True, filter=(("Category", "WBT"),)
     )
@@ -432,6 +445,7 @@ def get_competition_best_times():
         load_competition_best_times,
         dict(zip(wbt_stats.description, zip(wbt_stats.url))),
         show_progress=False,
+        timeout=timeout, 
     )
     wbts = (
         pd.concat(wbts, names=["CompetitionType"]).reset_index(

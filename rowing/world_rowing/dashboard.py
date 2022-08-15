@@ -73,7 +73,7 @@ class Dashboard:
             dash.live_ion_dashboard(block=False)
 
             logger.info('race results:')
-            logger.info(dash.race_tracker.intermediate_results)
+            logger.info(dash.race_tracker.intermediate_results.T)
 
             logger.info('\nupcoming races:')
             logger.info(show_next_races())
@@ -404,8 +404,9 @@ class Dashboard:
         self.p_win = None
         xlims = self.left_axes[2].get_xlim()
 
-        dist = 2000
-        finish_times = intermediates[dist]
+        finish_times = intermediates.loc[
+            self.race_tracker.race_distance
+        ].dt.total_seconds()
         final_pos = finish_times.sort_values()
         final_pos[:] = range(1, len(final_pos) + 1)
 
@@ -428,14 +429,14 @@ class Dashboard:
             index=xlims
         )
         self.race_tracker.plot(finish_deltas, ax=axes[0])
-        finish_max = finish_deltas.max().max()
+        finish_max = live_data.timeFromLeader.max().max()
         axes[0].set_ylim(
             finish_max, - finish_max * 0.1
         )
 
         # Plot finish speeds
         average_pace = pd.DataFrame(
-            [finish_times / dist * 500]*2,
+            [finish_times * 500 / self.race_tracker.race_distance]*2,
             index=xlims
         )
         self.race_tracker.plot(average_pace, ax=axes[1])
@@ -446,7 +447,7 @@ class Dashboard:
 
         # update right table
         countries = self.race_tracker.lane_country
-        finish_times = intermediates.reindex(countries)[2000]
+        # finish_times = intermediates.T.reindex(countries)[self.race_tracker.race_distance]
         finish_pos = finish_times.sort_values()
         finish_pos[:] = np.arange(1, len(finish_pos) + 1)
         pgmt = (self.race_tracker.gmt / finish_times).apply("{:.1%}".format)
@@ -481,13 +482,14 @@ class Dashboard:
         update_table(
             self.middle_table,
             self.race_tracker.lane_country,
-            [500, 1000, 1500, 2000],
-            intermediates.applymap(
+            self.race_tracker.intermediate_distances,
+            intermediates.T.apply(
+                lambda s: s.dt.total_seconds()
+            ).applymap(
                 ignore_nans(format_totalseconds),
-                # na_action='ignore'
             ).fillna('-')
         )
-        if 2000 in intermediates.columns:
+        if self.race_tracker.race_distance in intermediates.index:
             self.finished = True
         else:
             self.finished = False

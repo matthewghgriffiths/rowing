@@ -219,14 +219,13 @@ def process_activities(activities, locations=None, cols=None):
             x.droplevel(0),
             cols=cols
         )
-    ).join(activity_info).reset_index().set_index(
+    ).join(activity_info).reset_index().sort_values(
+        ["startTime", "length", "split"],
+        key=lambda s: s.map(distance_to_km) if s.name == 'length' else s
+    ).set_index(
         [activity_id, 'startTime', 'totalDistance', 'length', 'distance']
-    ).sort_index(
-        level=['startTime', "length"],
-        key=lambda index: 
-            index if isinstance(index, pd.DatetimeIndex) 
-            else index.map(distance_to_km)
     )
+
     location_timings = (
         (actid, get_location_timings(activity.droplevel(0)))
         for actid, activity in each_activity if not activity.empty

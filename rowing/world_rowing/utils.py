@@ -111,12 +111,13 @@ def get_flag_im(
 
 
 def update_table(table, index, columns, update):
-    index, columns = map(np.asarray, (index, columns))
+    index = dict(map(reversed, enumerate(index)))
+    columns = dict(map(reversed, enumerate(columns)))
     for row, rowvals in update.iterrows():
-        i, = np.where(index == row)[0]
+        i = index[row] + 1
         for col, val in rowvals.items():
-            j, = np.where(columns == col)[0]
-            table[i + 1, j].get_text().set_text(val)
+            j = columns[col]
+            table[i, j].get_text().set_text(val)
 
 
 def make_flag_box(
