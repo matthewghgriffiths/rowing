@@ -4,12 +4,17 @@ import string
 from datetime import timedelta  
 import re 
 import numpy as np
+from typing import Optional 
 
 from ..utils import (
     cached_property, map_concurrent, format_totalseconds,
     format_timedelta, format_timedelta_hours, 
-    format_yaxis_splits, format_xaxis_splits, format_axis_splits
+    format_yaxis_splits, format_xaxis_splits, format_axis_splits,
+    _to_merge_index, load_gsheet, to_gspread, cached_map_concurrent,
+    json_cache, parquet_cache, format_series_timedelta, format_gsheet, 
+    CachedClient
 )
+from .. import utils 
 
 _YMD = "%Y-%m-%d"
 
@@ -35,6 +40,33 @@ def add_logging_argument(parser):
         ),
     )
 
+def add_credentials_arguments(parser):
+    parser.add_argument(
+        '-u', '--user', '--email',
+        type=str, nargs='?',
+        help='Email address to use'
+    )
+    parser.add_argument(
+        '-p', '--password',
+        type=str, nargs='?',
+        help='Password'
+    )
+    parser.add_argument(
+        '-c', '--credentials',
+        type=str, nargs='?',
+        help='path to json file containing credentials (email and password)'
+    )
+
+def add_gspread_arguments(parser):
+    parser.add_argument(
+        '--gspread', 
+        type=str, nargs='?', 
+        help='name, url, or id of the spreadsheet'
+    )
+
+def load_gspread(options):
+    if options.gspread:
+        return load_gsheet(options.gspread)
 
 def set_logging(options):
     level = _LOGGING_LEVELS.get(options.log.lower())
@@ -76,6 +108,7 @@ def unflatten_json(entity, key=()):
             yield from unflatten_json(elem, key + (i,))
     else:
         yield key, entity
+
 
 def is_pareto_efficient(costs, return_mask = True):
     """

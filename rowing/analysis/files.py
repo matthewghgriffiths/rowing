@@ -67,12 +67,30 @@ def peak_fit_file(fit_file):
     return {f.name: f.value for f in record.fields}
 
 
+def fit_to_json(fit_file):
+    fit_data = fitparse.FitFile(fit_file)
+    return [
+        {f.name: f.raw_value for f in record.fields}
+        for record in fit_data.get_messages("record")
+    ]
+
+
+def zipfit_to_json(zip_file):
+    with zipfile.ZipFile(zip_file, 'r') as zipf:
+        fit_file, = (f for f in zipf.filelist if f.filename.endswith("fit"))
+        with zipf.open(fit_file) as f:
+            return fit_to_json(f)
+
+
 def parse_fit_data(fit_file):
     fit_data = fitparse.FitFile(fit_file)
     positions = pd.DataFrame.from_records(
         {f.name: f.value for f in record.fields}
         for record in fit_data.get_messages("record")
     ).rename(columns={'timestamp': 'time'})
+    return _parse_fit_positions(positions)
+
+def _parse_fit_positions(positions):
     if 'position_lat' in positions.columns:
         positions = positions.dropna(
             subset=['position_lat', 'position_long']

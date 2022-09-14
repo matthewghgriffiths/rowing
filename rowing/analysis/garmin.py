@@ -26,13 +26,18 @@ from garminconnect import (
 
 from rowing.analysis.utils import (
     map_concurrent, unflatten_json, strfsplit, 
-    add_logging_argument, set_logging, _YMD
+    add_logging_argument, set_logging, _YMD, add_credentials_arguments
 )
 from rowing.analysis.files import parse_gpx_data, read_fit_zipfile, parse_fit_data, activity_data_to_excel
-from rowing.analysis import splits
+from rowing.analysis import splits, files, utils 
 
 
 logger = logging.getLogger(__name__)
+
+GARMIN_EPOCH = pd.Timestamp('1989-12-31 00:00:00')
+UNIX_EPOCH = pd.Timestamp(0)
+GARMIN_TIMESTAMP = (GARMIN_EPOCH - UNIX_EPOCH) // pd.Timedelta('1s')
+
 
 _API: Optional[Garmin] = None
 
@@ -49,8 +54,232 @@ _ACTIVITY_TYPES = {
     }
 }
 
+class GarminClient(utils.CachedClient):
+    def __init__(
+            self, username=None, password=None,
+            local_cache=None, path="ludum_data", map_kws=None, 
+    ):
+        self.client = None
+        super().__init__(
+            username=username,
+            password=password, 
+            path=path, 
+            local_cache=local_cache, 
+            map_kws=map_kws
+        )
+
+    def login(self, username=None, password=None, max_retries=5):
+        username = username or self.username 
+        password = password or self.password
+        self.client = login(username, password, max_retries=max_retries)
+        return self 
+
+    def get(self, url, **kwargs):
+        return self.client.modern_rest_client.get(url, **kwargs)
+
+    def get_json(self, url, **kwargs):
+        r = self.get(url, **kwargs)
+        r.raise_for_status()
+        return r.json()
+
+    def cached_json(self, key, url, path=None, local_cache=None, reload=False, **kwargs):
+        local_cache = local_cache or self.local_cache 
+        path = path or self.path 
+        if local_cache:
+            if reload:
+                return local_cache.update(
+                    key, path, self.get_json, url, **kwargs
+                )
+            
+            return local_cache.get(
+                key, path, self.get_json, url, **kwargs
+            )
+
+        return self.get_json(url, **kwargs)
+
+    def get_activities(self, start=None, end=None, period="7d", reload=False):
+        end = end and pd.Timestamp(end)
+        start = start and pd.Timestamp(start)
+        period = period and pd.Timedelta(period)
+        if not end and not start:
+            end = pd.Timestamp.today().date()
+        if end and not start:
+            start = end - period
+        elif start and not end:
+            end = start + period
+
+        dates = pd.date_range(start, end)
+        activities, errors = self.map_concurrent(
+            self.get_day_activities, 
+            dict(zip(dates, dates)), 
+            singleton=True,
+            reload=reload
+        )
+        errors and logger.warning("get_activities had errors %s", errors)
+        activities = pd.concat(map(pd.json_normalize, activities.values()), ignore_index=True)
+        activities['time'] = pd.to_datetime(activities.startTimeLocal)
+        return activities
+        
+    def get_day_activities(self, date, limit=1000, reload=False):
+        date = pd.to_datetime(date).strftime("%Y-%m-%d")
+        params = {'start': 0, 'limit': limit, 'startDate': date, 'endDate': date}
+        url = self.client.garmin_connect_activities
+        path = self.path / "activity"
+        return self.cached_json(date, url, params=params, path=path, reload=reload)
+        
+    def load_fits(self, activity_ids):
+        positions, errors = self.map_concurrent(
+            self.load_fit, 
+            dict(zip(activity_ids, activity_ids)), 
+            singleton=True,
+        )
+        return pd.concat(positions, names=[''])
+
+    def load_fit(self, activity_id):
+        return parse_garmin_fit_json(self.load_fit_json(activity_id))
+    
+    def load_fit_json(self, activity_id):
+        path = self.path / "fit"
+        local_cache = self.local_cache 
+        if local_cache:
+            return local_cache.get(
+                activity_id, path, self.download_fit_json, activity_id
+            )
+        return self.download_fit_json(activity_id)
+
+    def download_fit_json(self, activity_id):
+        zip_data = self.client.download_activity(
+            activity_id, dl_fmt=self.client.ActivityDownloadFormat.ORIGINAL)
+        return files.zipfit_to_json(BytesIO(zip_data))
+
+    def get_weather(self, activity_id, **kwargs):
+        # temp in F
+        # wind speed in mph
+        return self.cached(
+            ("weather", activity_id), 
+            self.client.get_activity_weather, activity_id, **kwargs
+        )
+
+    def get_stats(self, day, **kwargs):
+        date = pd.Timestamp(day).date().isoformat()
+        return self.cached(
+            ("stats", date), self.client.get_stats, day, **kwargs
+        )
+
+    def get_heart_rates(self, day, **kwargs):
+        date = pd.Timestamp(day).date().isoformat()
+        return self.cached(
+            ("heart_rate", date), self.client.get_heart_rates, day, **kwargs
+        )
+        
+    def get_rhr_day(self, day, **kwargs):
+        date = pd.Timestamp(day).date().isoformat()
+        return self.cached(
+            ("rhr", date), self.client.get_rhr_day, day, **kwargs
+        )
+
+    def get_sleep_data(self, day, **kwargs):
+        date = pd.Timestamp(day).date().isoformat()
+        return self.cached(
+            ("sleep", date), self.client.get_sleep_data, day, **kwargs
+        )
+
+    def get_stress_data(self, day, **kwargs):
+        date = pd.Timestamp(day).date().isoformat()
+        return self.cached(
+            ("stress", date), self.client.get_stress_data, day, **kwargs
+        )
+
+    def get_heart_rate_values(self, start=None, end=None, periods=None):
+        heart_rate_data, errors = utils.map_concurrent(
+            self.get_heart_rates, 
+            list(pd.date_range(start, end, periods, freq='D')), 
+            singleton=True
+        )
+        hr_values = (hr['heartRateValues'] for hr in heart_rate_data)
+        heart_rates = pd.DataFrame(sum(
+            (hr for hr in hr_values if hr), [])
+        )
+        heart_rates.columns = ["timestamp", "heart_rate"]
+        heart_rates["time"] = pd.to_datetime(heart_rates.timestamp, unit='ms')
+        return heart_rates
+
+    def get_hourly_heart_rates(self, start=None, end=None, periods=None):
+        heart_rates = self.get_heart_rate_values(start, end, periods)
+
+        hourly_heart_rates = heart_rates.groupby(
+            pd.Grouper(key="time", freq='H')
+        ).heart_rate.mean()
+        hourly_heart_rates.index = pd.MultiIndex.from_arrays([
+            hourly_heart_rates.index.date, hourly_heart_rates.index.hour
+        ])
+        hourly_heart_rates = hourly_heart_rates.unstack()
+        hourly_heart_rates.columns = [f"{h:02d}:00" for h in hourly_heart_rates.columns]
+        return hourly_heart_rates
+
+
+def merge_index(index, activities):
+    return pd.MultiIndex.from_frame(
+        index.to_frame().reset_index(drop=True).join(
+            activities[
+                ['activityId', 'activityName', "time", 'activityType.typeKey']
+            ].set_index("activityId").rename(columns={
+                'activityName': "name", 
+                'activityType.typeKey': "activity", 
+            }), 
+            on="activity_id"
+        )[["activity", "time", "name", "data"]]
+    )
+
+def find_best_times(positions, activities, max_distance=20, max_group=4, max_order=20):
+    session_positions = positions.groupby(level=0)
+    session_best_times, errors = utils.map_concurrent(
+        splits.find_all_best_times, 
+        session_positions, 
+        singleton=True, 
+        total=session_positions.ngroups, 
+        cols=["bearing", "cadence", "heart_rate"],
+        threaded=False, 
+    )
+    best_times = pd.concat(
+        session_best_times, 
+        names=['activity_id', 'length', 'distance']
+    ).reset_index()
+    best_times.columns.name = "data"
+    
+    best_times['order'] = best_times.groupby(["activity_id", "length"]).cumcount() + 1
+    best_times = best_times.set_index([
+        "activity_id", "length", "order"
+    ]).unstack(level=[1,2]).T.unstack(level=0)
+
+    best_times.columns = merge_index(best_times.columns, activities)
+
+    
+    distance_orders = (
+        (s, d, i * max_group + j) for i in range(max_order // max_group)
+        for s, d in splits._STANDARD_DISTANCES.items() for j in range(max_group)
+    )
+    distance_orders = pd.MultiIndex.from_tuples([
+        (s, n + 1) for s, d, n in distance_orders 
+        if n * d <= max_distance
+    ], names=["interval", "rank"])
+
+    return best_times.sort_index(
+        axis=1, ascending=[False] + [True] * (best_times.columns.nlevels - 1)
+    ).reindex(distance_orders)
+
+def parse_garmin_fit_json(fit_json):
+    positions = pd.DataFrame.from_records(fit_json)
+    positions['time'] = pd.to_datetime(
+        positions.timestamp + GARMIN_TIMESTAMP, unit='s'
+    )
+    positions['distance'] /= 100
+    return files._parse_fit_positions(positions)
+
+
 def get_api(api=None):
     return api or _API or login()
+
 
 def login(email=None, password=None, credentials=None, max_retries=5):
     creds = {
@@ -59,7 +288,9 @@ def login(email=None, password=None, credentials=None, max_retries=5):
     }
     if credentials:
         with open(credentials, 'r') as f:
-            creds.update(json.load(f))
+            data = json.load(f)
+            data['email'] = data.pop("username")
+            creds.update(data)
             
 
     if creds['email'] is None:
@@ -236,6 +467,8 @@ def _get_activities(start=0, limit=20, *, api=None, **params):
     params['start'] = start 
     params['limit'] = limit 
 
+    print(params)
+
     return api.modern_rest_client.get(url, params=params).json()
     
 
@@ -313,21 +546,7 @@ def get_parser():
         help="if loading large number of activities, sets when to "
         "start loading the activities from "
     )
-    parser.add_argument(
-        '-u', '--user', '--email',
-        type=str, nargs='?',
-        help='Email address to use'
-    )
-    parser.add_argument(
-        '-p', '--password',
-        type=str, nargs='?',
-        help='Password'
-    )
-    parser.add_argument(
-        '-c', '--credentials',
-        type=str, nargs='?',
-        help='path to json file containing credentials (email and password)'
-    )
+    add_credentials_arguments(parser)
     parser.add_argument(
         '--actions', 
         choices=['excel', "heartrate", 'download'],

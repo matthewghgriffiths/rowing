@@ -45,28 +45,51 @@ def load_place_locations(loc=None):
         for l in loc
     }
 
-def load_locations(loc=None):        
-    return pd.concat(list(
-        load_place_locations(loc).values()
-    ))#.set_index('location', drop=True)
+def load_landmarks(loc=None):        
+    return load_location_landmarks(loc).droplevel(0)
+
+
+def load_location_landmarks(loc=None):
+    return pd.concat(load_place_locations(loc), names=["location", "landmark"])
 
 
 def find_all_crossing_times(positions, locations=None, thresh=0.15):
-    locations = load_locations() if locations is None else locations
+    locations = load_location_landmarks() if locations is None else locations
+
+    positions = positions.reset_index(drop=True)
+    names = list(locations.index.names) + ["distance"]
 
     times = pd.concat({
         loc: find_crossing_times(positions, pos, thresh=thresh)
         for loc, pos in locations.iterrows()
     },
-        names = ['location', 'distance']
-    ).sort_index(level=1).reset_index()
-    times['leg'] = (times.location == times.location.shift()).cumsum()
+        names = names
+    ).sort_index(level=-1).reset_index()
+    times['leg'] = (times[names[-2]] == times[names[-2]].shift()).cumsum() + 1
 
-    return times.set_index(['leg', 'location', 'distance'])[0]
+    return times.set_index(['leg'] + names)[0]
+
+def find_all_crossing_data(positions, locations=None, thresh=0.15, cols=None):
+    crossing_times = find_all_crossing_times(positions, locations, thresh)
+    crossing_data = crossing_times.to_frame("time")
+
+    if cols:
+        crossings = pd.concat([
+            crossing_times, 
+            pd.Series([pd.NaT], [("",) * crossing_times.index.nlevels])
+        ]).index
+        intervals = pd.IntervalIndex.from_breaks(crossing_times, closed='neither')
+        groups = crossings[intervals.get_indexer(positions.time)]
+        crossing_groups = positions.groupby(groups)
+        for c in cols:
+            crossing_data[c] = crossing_groups[c].mean().reindex(crossing_times.index)
+
+    return crossing_data
+
 
 
 def get_location_timings(positions, locations=None, thresh=0.15):
-    locations = load_locations() if locations is None else locations
+    locations = load_landmarks() if locations is None else locations
 
     loc_times = find_all_crossing_times(
         positions, locations, thresh=thresh
@@ -157,14 +180,21 @@ def get_closest_locations(loc_dists, locs=None):
 
 
 def find_best_times(positions, distance, cols=None):
-    total_distance = positions.distance.iloc[-1]
+    positions = positions.reset_index()
+
+    pos_distances = (
+        positions.distance 
+        + np.minimum(positions.distance.diff(), 0).fillna(0)
+    )
+
+    total_distance = pos_distances.iloc[-1]
     time_elapsed = positions.timeElapsed.dt.total_seconds()
-    sel = positions.distance + distance < total_distance
-    distances = positions.distance[sel]
+    sel = pos_distances + distance < total_distance
+    distances = pos_distances[sel]
     end_distances = distances + distance
 
     dist_elapsed = np.interp(
-        end_distances, positions.distance, time_elapsed    
+        end_distances, pos_distances, time_elapsed    
     )
 
     dist_times = dist_elapsed - time_elapsed[sel] 
@@ -172,12 +202,18 @@ def find_best_times(positions, distance, cols=None):
 
     best = []
     unblocked = np.ones_like(best_ordering, dtype=bool)
+    n = unblocked.size
     while unblocked.any():
         next_best = best_ordering[unblocked[best_ordering]][0]
         best.append(next_best)
         i0 = end_distances.searchsorted(distances[next_best])
         i1 = distances.searchsorted(end_distances[next_best])
         unblocked[i0:i1] = False
+        n1 = unblocked.sum()
+        if n == n1:
+            best = []
+            break 
+        n = n1
     
     best_times = pd.to_timedelta(dist_times[best], 'S')
     best_timesplits = pd.DataFrame.from_dict({
@@ -199,12 +235,14 @@ def find_best_times(positions, distance, cols=None):
 
 def find_all_best_times(positions, distances=None, cols=None):
     distances = distances or _STANDARD_DISTANCES
-    return pd.concat({
-        name: find_best_times(positions, distance, cols=cols)
-        for name, distance in distances.items()
-    },
-        names = ('length', 'distance'),
-    )
+    if pd.Index(positions.distance).is_monotonic_increasing:
+        return pd.concat({
+            name: find_best_times(positions, distance, cols=cols)
+            for name, distance in distances.items()
+        },
+            names = ('length', 'distance'),
+        )
+    return pd.DataFrame([])
 
 
 def process_activities(activities, locations=None, cols=None):

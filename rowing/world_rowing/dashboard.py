@@ -428,10 +428,12 @@ class Dashboard:
             [finish_times - finish_times.min()]*2,
             index=xlims
         )
+        print(finish_deltas)
         self.race_tracker.plot(finish_deltas, ax=axes[0])
         finish_max = live_data.timeFromLeader.max().max()
+        finish_max = finish_deltas.max().max()
         axes[0].set_ylim(
-            finish_max, - finish_max * 0.1
+            finish_max * 1.1, - finish_max * 0.1
         )
 
         # Plot finish speeds
