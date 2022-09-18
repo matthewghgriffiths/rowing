@@ -12,7 +12,7 @@ from ..utils import (
     format_yaxis_splits, format_xaxis_splits, format_axis_splits,
     _to_merge_index, load_gsheet, to_gspread, cached_map_concurrent,
     json_cache, parquet_cache, format_series_timedelta, format_gsheet, 
-    CachedClient
+    CachedClient, to_timestamp, from_timestamp
 )
 from .. import utils 
 

@@ -65,7 +65,13 @@ def find_all_crossing_times(positions, locations=None, thresh=0.15):
     },
         names = names
     ).sort_index(level=-1).reset_index()
-    times['leg'] = (times[names[-2]] == times[names[-2]].shift()).cumsum() + 1
+
+    times['leg'] = 0
+    legs = times[names[:-1] + ['leg']]
+    duplicates = times[names[:-1] + ['leg']].duplicated(keep='first')
+    while duplicates.any():
+        times['leg'] += np.maximum.accumulate(duplicates)
+        duplicates = times[names[:-1] + ['leg']].duplicated(keep='first')
 
     return times.set_index(['leg'] + names)[0]
 
@@ -167,6 +173,7 @@ def get_distance_to_locations(activity_data, locs=None):
     )
     return loc_dists, locs
 
+
 def get_closest_locations(loc_dists, locs=None):
     if not isinstance(locs, pd.DataFrame):
         locs = pd.concat({
@@ -177,6 +184,33 @@ def get_closest_locations(loc_dists, locs=None):
         'location': locs.index[loc_dists.values.argmin(1)],
         'distance': loc_dists.values.min(1),
     }, index=loc_dists.index)
+
+
+def group_positions(positions, locations=None, freq='1h', thresh=10, update=False):
+    if locations is None:
+        locations = load_location_landmarks().groupby(level=0).mean()
+
+    if not update:
+        positions = positions.copy()
+    location_distances = get_distance_to_locations(
+        positions, locations
+    )[0]
+    closest_location = location_distances.idxmin(1)
+    closest_distance = location_distances.min(1)
+    closest_location[closest_distance > thresh] = np.nan
+    
+    positions['location'] = closest_location.reindex(
+        positions.index
+    )
+    position_groups = positions.groupby(
+        ["location", pd.Grouper(key="time", freq=freq)]
+    ).size().index.to_frame(False)
+    grouped_locations = locations.loc[
+        position_groups["location"]
+    ].reset_index()
+    
+
+    return pd.concat([position_groups, grouped_locations], axis=1)
 
 
 def find_best_times(positions, distance, cols=None):

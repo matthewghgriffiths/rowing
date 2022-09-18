@@ -284,10 +284,13 @@ class LudumClient(utils.CachedClient):
             start = pd.to_datetime(end) - timedelta(days=days)
 
         dates = pd.date_range(start, end)
+        logger.info(
+            "getting agenda from %s to %s", start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
         agenda, errors = utils.map_concurrent(
             self.get_date_agenda, 
             dict(zip(dates, zip(dates))), 
         )
+        errors and logger.warning("get_agenda had errors %r", errors)
         return agenda 
 
     def _get_agenda(self, start=None, end=None, days=60, **kwargs):
@@ -330,6 +333,7 @@ class LudumClient(utils.CachedClient):
         agenda = self.load_agenda(
             start=start, end=end, days=days, **kwargs
         )
+        logger.info("loading %d sessions", len(agenda))
         sessions, errors = self.map_concurrent(
             self.get_session_data, 
             dict(zip(agenda.id, zip(agenda.id))), 
@@ -365,6 +369,7 @@ class LudumClient(utils.CachedClient):
             (k, [data.get(c) for c in arg_names]) for k, data in sessions.items()
         )
         inputs = {k: args for k, args in inputs if any(args[2:])}
+        logger.info("loading %d activities", len(inputs))
         activity_files, errors = self.map_concurrent(
             self.load_session_activity_files, inputs,
         )
@@ -383,6 +388,7 @@ class LudumClient(utils.CachedClient):
             (k, [data.get(c) for c in arg_names]) for k, data in sessions.items()
         )
         inputs = {k: args for k, args in inputs if args[2]}
+        logger.info("loading %d gps tracks", len(inputs))
         activities, errors = self.map_concurrent(
             self.load_session_gps_data, inputs,
         )
@@ -621,6 +627,10 @@ def merge_index(index, activity_info):
 
 def find_best_times(positions, activity_info, cols=None, max_distance=20, max_group=4, max_order=20):
     session_positions = positions.groupby(level=0)
+    logger.info(
+        "finding best times for %d sessions with %d points", 
+        session_positions.ngroups, len(positions)
+    )
     session_best_times, errors = utils.map_concurrent(
         splits.find_all_best_times, 
         session_positions, 
@@ -687,6 +697,10 @@ def find_best_times(positions, activity_info, cols=None, max_distance=20, max_gr
 def find_crossings(positions, activity_info, loc=None):
     locations = splits.load_location_landmarks(loc)
     session_positions = positions.groupby(level=0)
+    logger.info(
+        "finding best times for %d sessions with %d points", 
+        session_positions.ngroups, len(positions)
+    )
     session_crossing_data, errors = utils.map_concurrent(
         splits.find_all_crossing_data, 
         session_positions, 
@@ -734,8 +748,7 @@ def find_crossings(positions, activity_info, loc=None):
     return crossings.swaplevel(-2, -1, axis=1).sort_index(
         axis=1, ascending=[False] + [True] * (crossings.columns.nlevels - 1)
     )
-    # return crossings.sort_index(axis=1, ascending=[False] + [True] * 7)
-
+    
     
 def load_morning_monitoring(
     api: LudumClient, start, end=None, squad_name=None, squad_id=None, **kwargs
@@ -758,7 +771,7 @@ def load_morning_monitoring(
         'standing_hr', 'sleep_quality', 'sleep_time', 'percived_shape',
         'weight', 'temperature', 'waking_hr', 'healthy', 'ill', 'injured',
     ]
-
+    logger.info("loading morning_monitoring from %s to %s", dates[0], dates[-1])
     mm_data = api.load_morning_monitoring(dates, **kwargs)
     return mm_data.loc[
         mm_data.athlete_entered_monitoring, mm_cols
@@ -843,12 +856,6 @@ def run(args):
     if not options.start_date:
         options.start_date = options.end_date - options.period
 
-    logger.info(
-        "loading data from %s to %s",
-        options.start_date.strftime("%Y-%m-%d"),
-        options.end_date.strftime("%Y-%m-%d"),
-    )
-
     morning_monitoring = "morning_monitoring" in options.actions
     calc_best_times = "best_times" in options.actions
     calc_crossings = "crossings" in options.actions
@@ -864,54 +871,58 @@ def run(args):
     crossings = None 
 
     if morning_monitoring:
-        logger.info("loading morning_monitoring")
         athlete_data = load_morning_monitoring(
             api, options.start_date, options.end_date, 
         )
 
     if calc_best_times or calc_crossings or reload:
-        logger.info("loading agenda and sessions")
         agenda, sessions = api.load_sessions(
             options.start_date, options.end_date, reload=options.login
         )
 
     if calc_best_times or calc_crossings:
         activity_info = extract_activity_info(agenda, sessions)
-        logger.info("loading gps data")
         metadata, positions = api.load_sessions_gps_data(
             activity_info.loc[activity_info.sport_name == "Rowing"].set_index("id").T
         )
 
     if calc_best_times:
-        logger.info("finding best times")
-        best_times = find_best_times(
-            positions, activity_info, cols=['cadence', 'bearing', 'heart_rate']
-        )
+        try:
+            best_times = find_best_times(
+                positions, activity_info, cols=['cadence', 'bearing', 'heart_rate']
+            )
+        except Exception as e:
+            logger.warning("find_best_times experienced error %r", e)
+            best_times = e
+
 
     if calc_crossings:
-        logger.info("finding crossings")
-        crossings = find_crossings(positions, activity_info, loc='ely')
+        try:
+            crossings = find_crossings(positions, activity_info)
+        except Exception as e:
+            logger.warning("find_crossings experienced error %r", e)
+            best_times = e
 
     if any([morning_monitoring, calc_best_times, calc_crossings]):
-        if options.excel_file:
+        if options.excel_file.name:
             logger.info("saving results to %s", options.excel_file)
             with pd.ExcelWriter(options.excel_file) as xlf: 
-                if morning_monitoring:
+                if isinstance(athlete_data, pd.Dataframe):
                     athlete_data.to_excel(xlf, "morning_monitoring")
                     
-                if calc_best_times:
+                if isinstance(best_times, pd.Dataframe):
                     best_times.to_excel(xlf, "best_times")
 
-                if calc_crossings:
+                if isinstance(crossings, pd.Dataframe):
                     crossings.to_excel(xlf, "crossings")
 
         if options.gspread:
             spread = options.gspread
             logger.info("saving results to %s", spread)
-            if morning_monitoring:
+            if isinstance(athlete_data, pd.Dataframe):
                 utils.to_gspread(athlete_data, spread, "morning_monitoring")
             
-            if calc_best_times:
+            if isinstance(best_times, pd.Dataframe):
                 gsheet_best_times = utils.format_gsheet(best_times)
                 gsheet_best_times.loc[
                     :, (slice(None),)* 6 + ("pgmt",)
@@ -920,7 +931,7 @@ def run(args):
                 ].fillna(0).applymap("{:.2%}".format).replace("0.00%", "")
                 utils.to_gspread(gsheet_best_times.T, spread, "best_times")
 
-            if calc_crossings:
+            if isinstance(crossings, pd.Dataframe):
                 gsheet_crossings = utils.format_gsheet(
                     crossings.swaplevel(-2, -1, axis=1).sort_index(axis=1, ascending=False)
                 )

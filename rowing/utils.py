@@ -179,6 +179,14 @@ def to_a1_notation(*args):
         raise ValueError("incorrect number of arguments passed")
 
 
+def to_timestamp(time, unit="1s"):
+    return (pd.to_datetime("today") - pd.Timestamp(0)) // pd.Timedelta(unit)
+
+
+def from_timestamp(timestamp, epoch=pd.Timestamp(0), unit="1s"):
+    return epoch + pd.to_timedelta(timestamp, unit=unit)
+
+
 def format_totalseconds(seconds, hundreths=True):
     return format_timedelta(timedelta(seconds=seconds), hundreths=hundreths)
 
@@ -337,6 +345,8 @@ def map_concurrent(
     elif isinstance(inputs, list):
         items = enumerate(inputs)
         total = len(inputs)
+        if not total:
+            return [], {}
     else:
         items = inputs
 
