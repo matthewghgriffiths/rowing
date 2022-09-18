@@ -331,7 +331,7 @@ def download_activity(activity_id, path=None, api=None):
     return path
 
 
-def download_activities(activities, folder='./', max_workers=4, api=None, show_progress=True):
+def download_activities(activities, folder='./', max_workers=4, api=None, **kwargs):
     api = get_api(api)
 
     activity_ids = (act["activityId"] for act in activities)
@@ -342,7 +342,7 @@ def download_activities(activities, folder='./', max_workers=4, api=None, show_p
     return map_concurrent(
         download_activity, inputs, 
         threaded=True, max_workers=max_workers, 
-        show_progress=show_progress, raise_on_err=False
+        raise_on_err=False, **kwargs
     )
 
 def load_activity(activity_id, api=None):
@@ -352,7 +352,7 @@ def load_activity(activity_id, api=None):
         activity_id, dl_fmt=api.ActivityDownloadFormat.GPX)
     return parse_gpx_data(gpxpy.parse(f))
 
-def load_activities(activity_ids, max_workers=4, api=None, show_progress=True):
+def load_activities(activity_ids, max_workers=4, api=None, **kwargs):
     api = get_api(api)
     inputs = {
         act_id: (act_id, api) for act_id in activity_ids
@@ -360,7 +360,7 @@ def load_activities(activity_ids, max_workers=4, api=None, show_progress=True):
     return map_concurrent(
         load_activity, inputs, 
         threaded=True, max_workers=max_workers, 
-        show_progress=show_progress, raise_on_err=False
+        raise_on_err=False, **kwargs
     )
 
 def download_fit(activity_id, path, api=None):
@@ -425,7 +425,7 @@ def load_fit_activity(activity_id, api=None):
         activity_id, dl_fmt=api.ActivityDownloadFormat.ORIGINAL)
     return read_fit_zipfile(BytesIO(zip_data))
 
-def load_fit_activities(activity_ids, max_workers=4, api=None, show_progress=True):
+def load_fit_activities(activity_ids, max_workers=4, api=None, **kwargs):
     api = get_api(api)
     inputs = {
         act_id: (act_id, api) for act_id in activity_ids
@@ -433,7 +433,7 @@ def load_fit_activities(activity_ids, max_workers=4, api=None, show_progress=Tru
     return map_concurrent(
         load_fit_activity, inputs, 
         threaded=True, max_workers=max_workers, 
-        show_progress=show_progress, raise_on_err=False
+        raise_on_err=False, **kwargs
     )
 
 def get_activities(start=0, limit=20, *, api=None, activityType=None, startDate=None, endDate=None, minDistance=None, maxDistance=None, **params):

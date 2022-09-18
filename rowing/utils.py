@@ -389,20 +389,15 @@ def _map_singlethreaded(
     inputs: Dict[K, Tuple],
     threaded: bool = True,
     max_workers: int = 10,
-    show_progress: bool = True,
+    progress_bar=tqdm,
     raise_on_err: bool = False,
     **kwargs,
 ) -> Tuple[Dict[K, V], Dict[K, Exception]]:
     output = {}
     errors = {}
 
-    status: Dict[str, Any] = {}
-    if show_progress:
-        from tqdm.auto import tqdm
-        pbar = tqdm(total=len(inputs))
-    else:
-        pbar = nullcontext()
-
+    status: Dict[str, Any] = {}    
+    pbar = progress_bar(len(inputs)) if progress_bar else nullcontext()
     with pbar:
         for key, args in inputs.items():
             try:

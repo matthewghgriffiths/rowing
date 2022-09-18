@@ -444,7 +444,7 @@ def get_competition_best_times(timeout=2.):
     wbts, _ = map_concurrent(
         load_competition_best_times,
         dict(zip(wbt_stats.description, zip(wbt_stats.url))),
-        show_progress=False,
+        progress_bar=None,
         timeout=timeout, 
     )
     wbts = (
