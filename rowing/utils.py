@@ -555,17 +555,17 @@ class CachedClient:
     def map_concurrent(self, func, *args, **kwargs):
         return map_concurrent(func, *args, **{**self.map_kws, **kwargs})
 
-    def cached(self, key, func, *arg, local_cache=None, path=None, reload=False, **kwargs):
+    def cached(self, key, func, *args, local_cache=None, path=None, reload=False, **kwargs):
         local_cache = local_cache or self.local_cache 
         path = path or self.path 
         if local_cache:
             if reload:
                 return local_cache.update(
-                    key, path, func, *arg, **kwargs
+                    key, path, func, *args, **kwargs
                 )
             else:
                 return local_cache.get(
-                    key, path, func, *arg, **kwargs
+                    key, path, func, *args, **kwargs
                 )
         else:
             func(*args, **kwargs)
