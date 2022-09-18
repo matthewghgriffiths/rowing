@@ -397,7 +397,7 @@ def _map_singlethreaded(
     errors = {}
 
     status: Dict[str, Any] = {}    
-    pbar = progress_bar(len(inputs)) if progress_bar else nullcontext()
+    pbar = progress_bar(total=len(inputs)) if progress_bar else nullcontext()
     with pbar:
         for key, args in inputs.items():
             try:
@@ -410,7 +410,7 @@ def _map_singlethreaded(
                     errors[key] = exc
                     status['nerrors'] = len(errors)
 
-            if show_progress:
+            if pbar:
                 pbar.update(1)
                 pbar.set_postfix(**status)
 
