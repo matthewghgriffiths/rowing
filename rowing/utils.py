@@ -180,10 +180,10 @@ def to_a1_notation(*args):
 
 
 def to_timestamp(time, unit="1s"):
-    return (pd.to_datetime("today") - pd.Timestamp(0)) // pd.Timedelta(unit)
+    return (pd.to_datetime(time) - pd.Timestamp(0)) // pd.Timedelta(unit)
 
 
-def from_timestamp(timestamp, epoch=pd.Timestamp(0), unit="1s"):
+def from_timestamp(timestamp, epoch=pd.Timestamp(0), unit="s"):
     return epoch + pd.to_timedelta(timestamp, unit=unit)
 
 
