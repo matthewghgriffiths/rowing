@@ -13,7 +13,8 @@ from . import api, utils
 from .api import (
     get_worldrowing_data, get_race_results, get_worldrowing_record,
     find_world_best_time, INTERMEDIATE_FIELDS, get_most_recent_competition,
-    get_competition_races, get_competition_events, get_world_best_times
+    get_competition_races, get_competition_events, get_world_best_times, 
+    get_live_race
 )
 from .utils import (
     extract_fields, format_yaxis_splits, make_flag_box, update_fill_betweenx,
@@ -49,9 +50,11 @@ class RaceTracker:
             results=None,
             intermediates=None,
             race_distance=None,
-            intermediate_distances=None
+            intermediate_distances=None,
+            live=False, 
     ):
         self.race_id = race_id
+        self.live = live
 
         self.gmt = gmt or find_world_best_time(
             race_id=race_id
@@ -65,6 +68,13 @@ class RaceTracker:
         self.race_distance = race_distance
         self.completed = False
         self.intermediate_distances = intermediate_distances or [500, 1000, 1500, 2000]
+
+    @classmethod
+    def load_live_race(cls, fisa=True, competition=None, **kwargs):
+        live_race = get_live_race(fisa=fisa, competition=competition)
+        if live_race is not None:
+            kwargs.setdefault('live', True)
+            return cls(live_race.name, **kwargs)
 
     @property
     def final_results(self):
@@ -144,7 +154,7 @@ class RaceTracker:
                 self.race_id,
                 gmt=self.gmt,
                 cached=False,
-
+                live=self.live, 
             )
 
         if self.race_distance in self.intermediate_results.index:
@@ -154,8 +164,12 @@ class RaceTracker:
         return self.live_data, self.intermediate_results
 
     def stream_livedata(self):
+        live = self.live
         while not self.completed:
+            self.live = True
             yield self.update_livedata()
+
+        self.live = live
 
     def _by_country(self, values):
         try:
@@ -491,8 +505,10 @@ def get_current_data(live_data):
     return current_data.set_index('time elapsed').astype('string').T.unstack(1)
 
 
-def get_race_livetracker(race_id, gmt=None, cached=True):
-    data = get_worldrowing_data('livetracker', race_id, cached=cached)
+def get_race_livetracker(race_id, gmt=None, cached=True, live=False):
+    endpoint = ('livetracker', "live") if live else ("livetracker",)
+    print(endpoint)
+    data = get_worldrowing_data(*endpoint, race_id, cached=cached)
     
     if data and data['config']['lanes']:
         live_boat_data = parse_livetracker_data(data)
@@ -508,9 +524,10 @@ def get_race_livetracker(race_id, gmt=None, cached=True):
             gmt=gmt,
             race_distance=race_distance
         )
-        live_data = match_intermediate_times(
-            live_data, get_intermediate_times(intermediates), race_distance
-        )
+        if "resultTime" in intermediates.columns:
+            live_data = match_intermediate_times(
+                live_data, get_intermediate_times(intermediates), race_distance
+            )
     else:
         live_boat_data = pd.DataFrame([])
         intermediates = pd.DataFrame([])
@@ -589,8 +606,9 @@ def parse_intermediates_data(data):
     intermediates = parse_livetracker_raw_data(
         data, 'intermediates', 'distance.DisplayName'
     ).rename(columns={"raceConfig.value": "distance"})
-    for c, times in intermediates.ResultTime.items():
-        intermediates[("ResultTime", c)] = pd.to_timedelta(times)
+    if 'ResultTime' in intermediates:
+        for c, times in intermediates.ResultTime.items():
+            intermediates[("ResultTime", c)] = pd.to_timedelta(times)
 
     return intermediates
 

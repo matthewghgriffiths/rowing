@@ -81,6 +81,7 @@ def prepare_params(**kwargs):
 
 if use_requests:
     def load_json_url(url, params=None, timeout=20., **kwargs):
+        logger.debug("requesting: %s\nparams: %s", url, params)
         r = requests.get(url, params=params, timeout=timeout, **kwargs)
         r.raise_for_status()
         if r.text:
@@ -110,6 +111,7 @@ def prepare_request(*endpoints, **kwargs):
     endpoint = "/".join(endpoints)
     url = f"https://world-rowing-api.soticcloud.net/stats/api/{endpoint}"
     params = prepare_params(**kwargs) or None
+    logger.debug("preparing: %s\nparams: %s", url, params)
     return url, params
 
 
@@ -249,19 +251,25 @@ def get_live_race(fisa=True, competition=None):
     live_races = get_live_races(fisa=fisa, competition=competition)
     for race_id, race in live_races.iterrows():
         data = get_worldrowing_data(
-            'livetracker', race_id, cached=False
+            'livetracker', "live", race_id, cached=False
         )
-        started = len(data['live'])
+        lanes = data['config'].get("lanes", [])
+        started = (
+            data.get('live') 
+            or any(lane.get("live") for lane in lanes)
+        )
+        
         if started:
             live_race = race 
             
-            finished = all(
-                lane['_finished'] for lane in data['config']['lanes']
-            )
+            finished = all(lane['_finished'] for lane in lanes)
             if not finished:
                 break 
         elif finished:
             break
+        else:
+            pass
+            
     else:
         return None
     return live_race

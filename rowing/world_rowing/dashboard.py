@@ -24,6 +24,7 @@ class Dashboard:
             self, race_tracker: RaceTracker,
             subplots_adjust=None, alpha=0.1,
             table_bbox=(0, 1.05, 1, 0.6),
+            live=False, 
             **kwargs
     ):
         self.race_tracker = race_tracker
@@ -44,8 +45,8 @@ class Dashboard:
         self.p_finish = None
 
     @classmethod
-    def from_race_id(cls, race_id, **kwargs):
-        race_tracker = LivePrediction(race_id, noise=1.)
+    def from_race_id(cls, race_id, live=False, **kwargs):
+        race_tracker = LivePrediction(race_id, noise=1., live=live)
         race_name = race_tracker.race_details.DisplayName
         race_start = pd.to_datetime(
             race_tracker.race_details.DateString
@@ -63,7 +64,7 @@ class Dashboard:
     def load_live_race(cls, fisa=True, competition=None, **kwargs):
         live_race = get_live_race(fisa=fisa, competition=competition)
         if live_race is not None:
-            return cls.from_race_id(live_race.name, **kwargs)
+            return cls.from_race_id(live_race.name, live=True, **kwargs)
 
     @classmethod
     def load_notebook_dashboard(cls, fisa=True, competition=None, block=True, **kwargs):
@@ -380,6 +381,7 @@ class Dashboard:
         if live_data is None:
             logger.debug("loading live data")
             live_data, intermediates = self.race_tracker.update_livedata()
+
         if intermediates is None:
             intermediates = self.race_tracker.intermediate_results
 
