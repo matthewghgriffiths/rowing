@@ -1,7 +1,6 @@
 
 from abc import ABC, abstractmethod
 
-import jax
 import jax.numpy as jnp
 import haiku as hk
 
@@ -56,3 +55,7 @@ class DiagMultiKernel(AbstractMultiKernel):
         X0, X1 = to_2d(X0, X1)
         K = jnp.array([kernel.K(X0, X1) for kernel in self.kernels])
         return MatrixProduct("kij,kl->ijkl", K, jnp.eye(self.n_output))
+
+class CorrMultiKernel(DiagMultiKernel):
+    def __init__(self, kernels, name=None):
+        pass

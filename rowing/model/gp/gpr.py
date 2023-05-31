@@ -1,9 +1,7 @@
 
 import numpy
-import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-from jax.flatten_util import ravel_pytree
 import haiku as hk
 
 from .utils import transform, solve_triangular, to_2d
@@ -77,7 +75,7 @@ class GaussianProcessRegression(hk.Module):
         k1 = self.k(X1)
         pred = k1.dot(a) + self.mean(X1)
 
-        Lk1 = linalg.solve_triangular(
+        Lk1 = jsp.linalg.solve_triangular(
             L[0] if L[1] else L[0].T, k1.T, lower=True
         )
         pred_var = self.kernel.k(X1, X1) - jnp.square(Lk1).sum(0)
@@ -90,7 +88,7 @@ class GaussianProcessRegression(hk.Module):
         k1 = self.k(X1)
         pred = k1.dot(a) + self.mean(X1)
 
-        Lk1 = linalg.solve_triangular(
+        Lk1 = jsp.linalg.solve_triangular(
             L[0] if L[1] else L[0].T, k1.T, lower=True
         )
         pred_covar = self.kernel.K(X1, X1) - Lk1.T.dot(Lk1)

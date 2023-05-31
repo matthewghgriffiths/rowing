@@ -1,17 +1,24 @@
 
-import jax
+
 import jax.numpy as jnp
 import jax.scipy as jsp
-import haiku as hk
 
 from .gpr import GaussianProcessRegression
-from .kernels import SEKernel, IntSEKernel, Constant, AbstractKernel
+from .kernels import SEKernel, IntSEKernel, Bias, AbstractKernel
 from .multi_kernel import AbstractMultiKernel, CovMultiKernel, DiagMultiKernel
-from .utils import solve_triangular, transform 
+from .utils import solve_triangular, transform, MatrixProduct
 
 
 class LinearGPCorrelatedRegression(GaussianProcessRegression):
-    def __init__(self, X, W, y, *, t0=None, name=None, kernel=None, **kwargs):
+    kernel: AbstractMultiKernel
+    
+    def K(self) -> MatrixProduct:
+        return self.kernel.K(self.X, self.X)
+
+    def k(self, X1) -> MatrixProduct:
+        return self.kernel.K(X1, self.X)
+
+    def __init__(self, X, W, y, *, name=None, kernel=None, **kwargs):
         super().__init__(X, W, name=name, kernel=kernel, **kwargs)
         self.W = self.y
         self.y = jnp.asarray(y)
@@ -32,19 +39,15 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
         k1 = self.k(X1)
         return k1.einsum("ijkl,jl,j->ik", self.W, a) + self.mean(X1)
 
-    def __linear_gp_init(self):
-        K = self.K()
-        covW = self.W.dot(self.coef_cov)
-        Kf = covW.dot(self.W.T) * K + jnp.eye(self.n_obs) * self.obs_var
-        L = jsp.linalg.cho_factor(Kf)
-        y = self.y - (self.W * self.mean(self.X)).sum(1)
-        a = jsp.linalg.cho_solve(L, y)
-        acovW = a[:, None] * covW
-        return Kf, L, y, a, covW, acovW
-
     def predict(self, X1, W1):
         Z1 = self.predict_coef(X1)
         return (W1 * Z1).sum(1)
+
+    def predict_var(self, X1, W1):
+        Z1, Z1_var = self.predict_coef_var(X1)
+        y = (W1 * Z1).sum(-1) 
+        y_var = (W1**2 * Z1_var).sum(-1)
+        return y, y_var
 
     def predict_coef_covar(self, X1):
         Kf, L, y, a = self._gp_init()
@@ -55,7 +58,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
         )
         K11 = self.kernel.K(X1, X1)
         Z1_covar = (
-            K11.einsum("ijkl") - jnp.einsum("ijk,ilm->jlkm", LWk1, LWk1)
+            K11.values - jnp.einsum("ijk,ilm->jlkm", LWk1, LWk1)
         )
         return Z1, Z1_covar
         
@@ -77,12 +80,12 @@ def get_linear_gpr(times, X, observations, kernel=None, multi_kernel='cov', **kw
         if multi_kernel == 'cov':
             kernel = CovMultiKernel(
                 jnp.shape(X)[1], 
-                kernel=IntSEKernel.with_constant()
+                kernel=IntSEKernel()
             )
         elif multi_kernel == 'diag':
             kernel = DiagMultiKernel(
                 [
-                    IntSEKernel.with_constant() for i in range(jnp.shape(X)[1])
+                    IntSEKernel() for i in range(jnp.shape(X)[1])
                 ]
             )
 
