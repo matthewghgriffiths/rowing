@@ -70,6 +70,7 @@ def get_client_id():
 
 
 class LudumClient(utils.CachedClient):
+    timeout = 10
     https_base_url = "https://api.ludum.com"
     _default_headers = {
         "Accept": "application/json, text/plain, */*",
@@ -81,6 +82,10 @@ class LudumClient(utils.CachedClient):
             "Chrome/101.0.4951.67 Safari/537.36"
         ),
     }
+    concurrent_kws = {
+        "max_workers": 4, 
+    }
+
     def __init__(
             self, username=None, password=None, club_id=None, client_secret=None, 
             local_cache=None, path="ludum_data", map_kws=None, 
@@ -141,7 +146,8 @@ class LudumClient(utils.CachedClient):
         s = self.session.post(
             self.https_base_url + "/api/v2/login", 
             data=payload, 
-            headers=self._default_headers
+            headers=self._default_headers,
+            timeout=self.timeout
         )
         s.raise_for_status()
 
@@ -171,7 +177,8 @@ class LudumClient(utils.CachedClient):
         return self.session.post(
             self.https_base_url + endpt,
             data=data,
-            json=json, 
+            json=json,
+            timeout=self.timeout,
             **kwargs
         )
 
@@ -185,6 +192,7 @@ class LudumClient(utils.CachedClient):
         self.n_requests += 1
         return self.session.get(
             self.https_base_url + endpt,
+            timeout=self.timeout,
             **kwargs
         )
 
@@ -275,20 +283,20 @@ class LudumClient(utils.CachedClient):
             reload=reload, 
         )
 
-    def get_agenda(self, start=None, end=None, days=60, **kwargs):
-        if start and not end:
-            end = pd.to_datetime(start) - days 
-        elif not end:
+    def get_agenda(self, start=None, end=None, period="60d", **kwargs):
+        if not end:
             end = datetime.today()
-        elif not start:
-            start = pd.to_datetime(end) - timedelta(days=days)
+        if not start:
+            start = pd.to_datetime(end) - pd.to_timedelta(period)
 
+        start, end = pd.to_datetime(start), pd.to_datetime(end) 
         dates = pd.date_range(start, end)
         logger.info(
             "getting agenda from %s to %s", start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
         agenda, errors = utils.map_concurrent(
             self.get_date_agenda, 
             dict(zip(dates, zip(dates))), 
+            **self.concurrent_kws
         )
         errors and logger.warning("get_agenda had errors %r", errors)
         return agenda 
@@ -338,6 +346,7 @@ class LudumClient(utils.CachedClient):
             self.get_session_data, 
             dict(zip(agenda.id, zip(agenda.id))), 
             reload=True, 
+            **self.concurrent_kws
         )
         errors and logger.warning("load_sessions experienced %r", errors)
         return agenda, sessions 
@@ -371,7 +380,8 @@ class LudumClient(utils.CachedClient):
         inputs = {k: args for k, args in inputs if any(args[2:])}
         logger.info("loading %d activities", len(inputs))
         activity_files, errors = self.map_concurrent(
-            self.load_session_activity_files, inputs,
+            self.load_session_activity_files, inputs, 
+            **self.concurrent_kws,
         )
         errors and logger.warning("load_session_activities_files experienced %r", errors)
         return activity_files
@@ -390,7 +400,8 @@ class LudumClient(utils.CachedClient):
         inputs = {k: args for k, args in inputs if args[2]}
         logger.info("loading %d gps tracks", len(inputs))
         activities, errors = self.map_concurrent(
-            self.load_session_gps_data, inputs,
+            self.load_session_gps_data, inputs, 
+            **self.concurrent_kws,
         )
         errors and logger.warning("load_sessions_gps_data experienced %r", errors)
         metadata = pd.concat({
@@ -410,7 +421,8 @@ class LudumClient(utils.CachedClient):
         mm_data, errors = utils.map_concurrent(
             load_date, 
             dict(zip(dates, zip(dates))),
-            path = self.path / "morning_monitoring",
+            path = self.path / "morning_monitoring", 
+            **self.concurrent_kws,
             **kwargs  
         )
         errors and logger.warning("load_morning_monitoring dataframe errors %r", errors)
@@ -477,6 +489,32 @@ class LudumClient(utils.CachedClient):
         params.update(kwargs)
         user_data = self.cached_get("club_users", "/api/v2/club-users", params=params)
         return pd.json_normalize(user_data['data']['data'])
+
+    def get_ergo_data(self, start_date=None, end_date=None, period="365d", distances=(2000, 5000), times=(), **kwargs):
+        end_date = pd.to_datetime(end_date or pd.Timestamp.today())
+        start_date = pd.to_datetime(start_date or end_date - pd.to_timedelta(period))
+        params = {
+            "club_id": self.club_id,
+            "start_date": "2017-01-01",
+            "end_date": end_date.strftime("%Y-%m-%d"),
+            "distances": distances,
+            "times": times,
+            **kwargs
+        }
+        headers={'Content-Type': 'application/json'}
+        raw_data = self.cached_post(
+            "ergo_data", "/api/v2/ergo-report", json=params, headers=headers
+        )
+        ergo_data = pd.concat({
+            athlete['user_name'] : pd.json_normalize(sum(
+                (event['pieces'] for event in athlete['events'].values()), 
+                []
+            ))
+            for athlete in raw_data['data']
+        }, axis=0).droplevel(1)
+        ergo_data.index.name = "Name"
+        return ergo_data
+
 
 
 def extract_session_data(sessions):
@@ -698,7 +736,7 @@ def find_crossings(positions, activity_info, loc=None):
     locations = splits.load_location_landmarks(loc)
     session_positions = positions.groupby(level=0)
     logger.info(
-        "finding best times for %d sessions with %d points", 
+        "finding crossings for %d sessions with %d points", 
         session_positions.ngroups, len(positions)
     )
     session_crossing_data, errors = utils.map_concurrent(
@@ -842,8 +880,8 @@ def run(args):
         )
     else:
         api = LudumClient(
-            username=args.user, 
-            password=args.password,
+            username=options.user, 
+            password=options.password,
             local_cache=local_cache, 
             path=options.folder
         )
@@ -919,10 +957,10 @@ def run(args):
         if options.gspread:
             spread = options.gspread
             logger.info("saving results to %s", spread)
-            if isinstance(athlete_data, pd.Dataframe):
+            if isinstance(athlete_data, pd.DataFrame):
                 utils.to_gspread(athlete_data, spread, "morning_monitoring")
             
-            if isinstance(best_times, pd.Dataframe):
+            if isinstance(best_times, pd.DataFrame):
                 gsheet_best_times = utils.format_gsheet(best_times)
                 gsheet_best_times.loc[
                     :, (slice(None),)* 6 + ("pgmt",)
@@ -931,7 +969,7 @@ def run(args):
                 ].fillna(0).applymap("{:.2%}".format).replace("0.00%", "")
                 utils.to_gspread(gsheet_best_times.T, spread, "best_times")
 
-            if isinstance(crossings, pd.Dataframe):
+            if isinstance(crossings, pd.DataFrame):
                 gsheet_crossings = utils.format_gsheet(
                     crossings.swaplevel(-2, -1, axis=1).sort_index(axis=1, ascending=False)
                 )
