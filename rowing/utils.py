@@ -188,11 +188,17 @@ def from_timestamp(timestamp, epoch=pd.Timestamp(0), unit="s"):
 
 
 def format_totalseconds(seconds, hundreths=True):
+    if pd.isna(seconds):
+        return ""
     return format_timedelta(timedelta(seconds=seconds), hundreths=hundreths)
 
 
 def format_timedelta(td, hours=False, hundreths=True):
     mins, secs = divmod(td.seconds, 60)
+    if np.isnan(secs):
+        return ""
+        # return ("--:" if hours else '') + "--:--" + ('' if hundreths else ".--")
+    
     secs = int(secs)
     end = f".{(td.microseconds // 10_000):02d}" if hundreths else ''
     if hours:
