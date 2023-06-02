@@ -36,7 +36,7 @@ def modal_button(label1, label2, key=None, mode=False):
 
 
 def filter_dataframe(
-        df: pd.DataFrame, options=None, key=None, categories=(), filters=True,
+        df: pd.DataFrame, options=None, default=None, key=None, categories=(), filters=True,
         **kwargs
 ) -> pd.DataFrame:
     """
@@ -48,9 +48,7 @@ def filter_dataframe(
     Returns:
         pd.DataFrame: Filtered dataframe
     """
-    # key = key or "filter_dataframe_%d" % next(key_counter)
-    # modify = st.checkbox("Add filters", True, key=(key, None, "modify"))
-    model_key = key + ".modal"
+    model_key = f"{key}.modal"
     modify = modal_button("Remove Filters", "Add filters", key=model_key, mode=filters)
 
     if not modify:
@@ -60,7 +58,10 @@ def filter_dataframe(
     modification_container = st.container()
     with modification_container:
         to_filter_columns = st.multiselect(
-            "Filter dataframe on", df.columns, options, key=f"{key}.filter_columns"
+            "Filter dataframe on", 
+            options or df.columns, 
+            default, 
+            key=f"{key}.filter_columns"
         )
         for column in to_filter_columns:
             left, right = st.columns((1, 20))
@@ -116,3 +117,4 @@ def filter_dataframe(
                     df = df[df[column].astype(str).str.contains(user_text_input)]
 
     return df
+

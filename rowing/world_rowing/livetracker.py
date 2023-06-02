@@ -507,7 +507,6 @@ def get_current_data(live_data):
 
 def get_race_livetracker(race_id, gmt=None, cached=True, live=False):
     endpoint = ('livetracker', "live") if live else ("livetracker",)
-    print(endpoint)
     data = get_worldrowing_data(*endpoint, race_id, cached=cached)
     
     if data and data['config']['lanes']:

@@ -45,4 +45,11 @@ def update_query_params():
     st.experimental_set_query_params(**update_params)
 
 
+def reset():
+    if st.button("reset"):
+        st.experimental_set_query_params()
+        st.cache_resource.clear()
+        st.experimental_rerun()
+
+
 atexit.register(update_query_params)

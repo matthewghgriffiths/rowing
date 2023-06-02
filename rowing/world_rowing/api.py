@@ -84,6 +84,56 @@ WBT_TYPES = {
     'World best time for: WorldRowingCup': 'World Rowing Cup'
 }
 
+def _rsc_phase_names():
+    phase_name = {
+        'FNL-': "Final", 
+        'HEAT': "Heat", 
+        'REP-': "Repechage", 
+        'SFNL': "Semifinal", 
+        'PREL': "Preliminary",
+        'QFNL': "Quarterfinal"
+    }
+    default_codes = {f"000{i + 1}00": "" for i in range(26)}
+    final_codes = {f"000{i + 1}00": " " + chr(i + 65) for i in range(26)}
+    semi_codes = {
+        f"000{2 * i + 1}00": " " + chr(2 * i + 65) + "/" + chr(2 * i + 66) 
+        for i in range(13)
+    }
+    semi_codes.update(
+        (f"000{2 * i + 2}00", " " + chr(2 * i + 65) + "/" + chr(2 * i + 66) )
+        for i in range(13)
+    )
+    phase_codes = {
+        'FNL-': final_codes, 
+        'SFNL': semi_codes, 
+    }
+    return {
+        p + c: name + code
+        for p, name in phase_name.items()
+        for c, code in phase_codes.get(p, default_codes).items()
+    }
+
+PHASE_NAMES = _rsc_phase_names()
+
+def parse_race_codes(race_codes):
+    race_codes = pd.Series(race_codes)
+    codes = race_codes.str.extract(
+        r"ROW([MWX])([A-Z]+[0-9])-+([A-Z0-9]*)-+([A-Z]+-?[0-9]+)", 
+        expand=True
+    )
+    return pd.concat({
+        "Gender": codes[0].replace({
+            "W": "Women",
+            "M": "Men",
+            "X": "Mixed",
+        }),
+        "Category": codes[2].replace({
+            "": "Open", 
+            "L": "Lightweight", 
+        }),
+        "Phase": codes[3].replace(PHASE_NAMES)
+    }, axis=1)
+
 def stringify_value(value):
     if isinstance(value, (str, int, float)):
         return str(value)
@@ -215,10 +265,12 @@ def get_competition_races(competition_id=None, cached=True):
             include=(
                 "event.competition,raceStatus,racePhase,"
                 "raceBoats.raceBoatIntermediates.distance"
+                # "event.boatClassId"
             )
         )
+    race_codes = parse_race_codes(races['RscCode'])
 
-    return races 
+    return pd.concat([races, race_codes], axis=1) 
 
 
 def get_competitions(year=None, fisa=True, has_results=True, cached=True, **kwargs):
