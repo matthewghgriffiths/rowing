@@ -11,3 +11,5 @@ garminconnect>=0.1.45
 openpyxl>=3.0.0
 pyarrow>=7.0.0
 pyqt5>=5.0.0
+streamlit>=1.22.0
+plotly>=5.14.1
