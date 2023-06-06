@@ -31,6 +31,16 @@ races = races.set_index("race.id").join(
     gmts.dt.total_seconds().rename("GMT"), on="boatClass.DisplayName"
 )
 
+with st.sidebar:
+    download = st.checkbox(
+        "load livetracker data", len(races) < 30
+    )
+
+if not download:
+    st.caption(f"Selected {len(races)} races")
+    st.caption("Check load livetracker data in sidebar to view race data")
+    st.stop()
+
 live_data, intermediates = select.get_races_livedata(races)
 
 with st.expander("Filter livetracker data"):

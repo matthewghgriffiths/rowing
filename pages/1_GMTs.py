@@ -14,8 +14,12 @@ logger = logging.getLogger(__name__)
 # logging.basicConfig(level=logging.DEBUG)
 # logging.getLogger().setLevel(logging.DEBUG)
 
-
-st.set_page_config(layout='wide')
+st.set_page_config(
+    page_title="PGMTs",
+    layout='wide'
+    # page_icon="👋",
+)
+st.title("PGMTs")
 
 with st.expander("Select competition"):
     competition = select.select_competition()
@@ -40,8 +44,6 @@ with st.expander("Set GMTs"):
 
     gmts = select.set_gmts(cbts, competition_type)
 
-st.subheader("View PGMTs")
-
 merged_results = api.merge_competition_results(
     results, races, events, boat_classes, gmts)
 
@@ -57,6 +59,7 @@ with st.expander("Filter Races"):
 
 results['crew'] = results['Country'] + " " + results['boatClass']
 
+st.subheader("View PGMTs")
 st.dataframe(results.style.format({"PGMT": "{:,.2%}"}))
 
 name = f"{competition.DisplayName} results"
