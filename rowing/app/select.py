@@ -11,30 +11,30 @@ from rowing.app import state, inputs, threads
 
 logger = logging.getLogger(__name__)
 
-@st.cache_data
+@st.cache_data(persist=True)
 def get_competitions(**kwargs):
     return api.get_competitions(**kwargs)
 
-@st.cache_data
+@st.cache_data(persist=True)
 def get_races(competition_id):
     logger.debug("get_races(%s)", competition_id)
     return api.get_competition_races(competition_id=competition_id).reset_index().add_prefix("race.")
 
-@st.cache_data
+@st.cache_data(persist=True)
 def get_events(competition_id):
     logger.debug("get_events(%s)", competition_id)
     return api.get_competition_events(competition_id=competition_id).add_prefix("event.")
 
-@st.cache_data
+@st.cache_data(persist=True)
 def get_results(competition_id):
     logger.debug("get_results(%s)", competition_id)
     return api.get_intermediate_results(competition_id=competition_id)
 
-@st.cache_data
+@st.cache_data(persist=True)
 def get_boat_classes():
     return api.get_boat_types().reset_index().add_prefix("boatClass.")
 
-@st.cache_data
+@st.cache_data(persist=True)
 def get_competition_boat_classes(competition_id):
     logger.debug("get_competition_boat_classes(%s)", competition_id)
     events = get_events(competition_id)
@@ -45,21 +45,21 @@ def get_competition_boat_classes(competition_id):
     return event_boat_classes
 
 
-@st.cache_data
+@st.cache_data(persist=True)
 def get_cbts(boat_classes=None):
     cbts = api.get_competition_best_times()
     if boat_classes is None:
         return cbts
     return cbts[cbts.BoatClass.isin(boat_classes)]
 
-@st.cache_data 
+@st.cache_data(persist=True)
 def get_livedata(race_id, gmt=None):
     logger.debug("get_livedata(%s)", race_id)
     live_data, live_boat_data, intermediates, race_distance = \
         livetracker.get_race_livetracker(race_id, gmt=gmt, live=False)
     return live_data, live_boat_data, intermediates, race_distance
 
-@st.cache_data 
+@st.cache_data(persist=True)
 def load_livetracker(race_id, cached=True):
     logger.debug("load_livetracker(%s)", race_id)
     return livetracker.load_livetracker(race_id, cached=cached)
@@ -71,7 +71,7 @@ def load_livetracker(race_id, cached=True):
 #         race_ids, max_workers=max_workers, load_livetracker=load_livetracker
 #     )
 
-@st.cache_data
+# @st.cache_data(persist=True)
 def get_races_livedata(races, max_workers=10):
     logger.debug("get_races_livedata(race_ids[%d])", len(races))
     live_data, intermediates = livetracker.get_races_livetracks(
@@ -344,9 +344,12 @@ def filter_livetracker(live_data):
             "Rank": sorted(live_data.Rank.unique())
         }
     )
-    live_data['split'] = pd.to_datetime(500 / live_data.metrePerSecond, unit='s')
-    live_data['avg split'] = pd.to_datetime(500 / live_data.avg_speed, unit='s')
-    live_data["ResultTime"] = live_data.ResultTime.dt.total_seconds()
+    live_data['split'] = pd.to_datetime(
+        500 / live_data.metrePerSecond, unit='s', errors='coerce') 
+    live_data['avg split'] = pd.to_datetime(
+        500. / live_data.avg_speed, unit='s', errors='coerce')
+    live_data["ResultTime"] = pd.to_datetime(
+        live_data.ResultTime.dt.total_seconds(), unit='s', errors='coerce')
     return live_data
 
 
@@ -368,8 +371,5 @@ def set_livetracker_PGMT(live_data):
     distance_from_pace = f"distance from PGMT"
     live_data[distance_from_pace] = pace_distance - live_data.distanceTravelled
     live_data['PGMT'] = live_data.distanceTravelled / pace_distance
-    live_data['split'] = pd.to_datetime(500 / live_data.metrePerSecond, unit='s')
-    live_data['avg split'] = pd.to_datetime(500 / live_data.avg_speed, unit='s')
-    # live_data["ResultTime"] = live_data.ResultTime.dt.total_seconds()
 
     return live_data, PGMT

@@ -33,6 +33,7 @@ races = select.select_races(
 ).reset_index(drop=True)
 boat_classes = races['boatClass.DisplayName'].unique()
 
+
 with st.expander("Select GMTs"):
     st.text("Select competition best times")
     cbts = select.select_best_times(boat_classes)
@@ -47,6 +48,39 @@ with st.expander("Select GMTs"):
 races = races.set_index("race.id").join(
     gmts.dt.total_seconds().rename("GMT"), on="boatClass.DisplayName"
 )
+
+# if 1:
+#     race_ids = races.index 
+#     load_livetracker = livetracker.load_livetracker
+#     max_workers=10
+#     kwargs = {}
+#     race_livetracks, errors = utils.map_concurrent(
+#         load_livetracker, 
+#         {race_id: race_id for race_id in race_ids},
+#         singleton=True, max_workers=max_workers, **kwargs
+#     )
+#     results, errors = utils.map_concurrent(
+#         livetracker.estimate_livetracker_times, 
+#         race_livetracks, max_workers=max_workers, **kwargs
+#     )
+#     for race_id, data in race_livetracks.items():
+#         print(race_id)
+#         print(data)
+#         print(livetracker.estimate_livetracker_times(*data))
+#     # print(race_livetracks)
+#     st.stop()
+#     intermediates = pd.concat(
+#         {race_id: inters for race_id, (_, inters) in results.items()}, 
+#         axis=1
+#     )
+#     races_live_data = pd.concat(
+#         {race_id: live_data for race_id, (live_data, _) in results.items()}, 
+#         axis=0
+#     ).reset_index(drop=True)
+
+# livetracker.get_races_livetracks(
+#     races.index, max_workers=10, load_livetracker=livetracker.load_livetracker
+# )
 
 if not download:
     st.caption(f"Selected {len(races)} races")

@@ -43,6 +43,7 @@ def melt_livetracker_data(live_data, filter_distance=100):
     facet_format['PGMT'] = ':.1%'
     facet_format['split'] = "|%-M:%S.%L"
     facet_format['avg split'] = "|%-M:%S.%L"
+    facet_format['ResultTime'] = "|%-M:%S.%L"
 
     facet_data['matches'] = None
     facet_data['title_text'] = facet_data.index
@@ -55,6 +56,7 @@ def melt_livetracker_data(live_data, filter_distance=100):
 
     facet_axes['PGMT']['tickformat'] = ',.1%'
     facet_axes['split']['tickformat'] = "%-M:%S"
+    facet_axes['ResultTime']['tickformat'] = "%-M:%S"
 
     for col in ["distance from PGMT", "distanceFromLeader"]:
         facet_axes[col]['range'] =  facet_axes[col]['range'][::-1]

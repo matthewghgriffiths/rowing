@@ -550,7 +550,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
             intermediate_times.loc[d] - (
                 # backtrack time to time point if not at intermediate distance 
                 (d - distances) / speed * m0
-            )[m0.any(1)].max()
+            )[m0.any(axis=1)].max()
         ).groupby(m0.idxmax()).mean()
         int_times.update(d_times)
 
