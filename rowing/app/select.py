@@ -71,7 +71,7 @@ def load_livetracker(race_id, cached=True):
 #         race_ids, max_workers=max_workers, load_livetracker=load_livetracker
 #     )
 
-# @st.cache_data(persist=True)
+@st.cache_data(persist=True)
 def get_races_livedata(races, max_workers=10):
     logger.debug("get_races_livedata(race_ids[%d])", len(races))
     live_data, intermediates = livetracker.get_races_livetracks(
