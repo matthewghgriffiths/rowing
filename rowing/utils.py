@@ -288,6 +288,7 @@ def map_concurrent(
     singleton: bool = False, 
     total: Optional[int] = None, 
     raise_on_err: bool = False,
+    executor_kws: Optional[dict] = None, 
     **kwargs,
 ) -> Tuple[Dict[K, V], Dict[K, Exception]]:
     """
@@ -364,7 +365,7 @@ def map_concurrent(
             return args 
         
     pbar = progress_bar(total=total or len(items)) if progress_bar else nullcontext()
-    with pbar, Executor(max_workers=max_workers) as executor:
+    with pbar, Executor(max_workers=max_workers, **(executor_kws or {})) as executor:
         work = {executor.submit(func, *get(args), **kwargs): k for k, args in items}
 
         status: Dict[str, Any] = {}

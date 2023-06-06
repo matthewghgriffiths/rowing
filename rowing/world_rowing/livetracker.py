@@ -497,6 +497,131 @@ class RaceTracker:
         return ax, lines
 
 
+def shift_down(s, shift, min_val=0):
+    sp = (s - shift).clip(min_val, None)
+    nzidx = (sp > min_val).idxmax()
+    s0 = s.loc[:nzidx]
+    sp.loc[:nzidx] = min_val + sp.loc[nzidx] * (s0 - s0.min()) / s0.max()
+    return sp
+
+
+def load_livetracker(race_id, cached=True):
+    data = get_worldrowing_data("livetracker", race_id, cached=cached)
+    live_boat_data = parse_livetracker_data(data)
+    intermediates = parse_intermediates_data(data)
+    lane_info = pd.concat([
+        pd.json_normalize(
+            {k: lane[k] for k in lane.keys() - {"live", "intermediates"}}
+        )
+        for lane in data['config']['lanes']
+    ]).set_index("DisplayName")
+    lane_info['ResultTime'] = utils.read_times(lane_info.ResultTime)
+    race_distance = data['config']['plot']['totalLength']
+    return live_boat_data, intermediates, lane_info, race_distance
+
+
+def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_distance):
+    intermediate_times = intermediates.ResultTime.apply(lambda s: s.dt.total_seconds())
+    intermediate_distances = intermediates.distance.values[:, 0].astype(float)
+    intermediate_times.index = intermediate_distances
+
+    live_data = live_boat_data.loc[
+        live_boat_data.trackCount.min(1).sort_values().index
+    ].reset_index(drop=True)
+
+    countries = live_data.columns.levels[1]
+    distances = live_data.distanceTravelled
+    speed = live_data.metrePerSecond
+
+    # Estimate times
+    diffs = - distances.diff(-1).replace(0, np.nan)
+    boat_time_diff = diffs / speed.replace(0, np.nan)
+    mean_time_diff = boat_time_diff.mean(1).fillna(0)
+    times = mean_time_diff.cumsum().rename("time")
+
+    # Make sure timepoints around intermediates are correct
+    int_times = pd.Series(np.nan, live_data.index)
+    for d in intermediate_distances:
+        #timepoints before boat passes 
+        m0 = (
+            (distances <= d) & (distances.shift(-1) > d)
+        )
+        d_times = (
+            intermediate_times.loc[d] - (
+                # backtrack time to time point if not at intermediate distance 
+                (d - distances) / speed * m0
+            )[m0.any(1)].max()
+        ).groupby(m0.idxmax()).mean()
+        int_times.update(d_times)
+
+    start_err = (times - int_times).mean()
+    times = shift_down(times, start_err)
+    times -= start_err
+
+    t = (int_times - times).dropna()
+    times += np.interp(times.index, t.index, t)
+    times = shift_down(times, 0)
+
+    live_time_data = live_data.copy()
+    live_time_data.index = times
+
+    for c in countries:
+        c_data = live_time_data.xs(c, axis=1, level=1)
+        live_time_data[("avg_speed", c)] = (
+            c_data.distanceTravelled / c_data.index
+        )
+
+    live_data = live_time_data.stack(1).reset_index().join(
+        lane_info[[
+            'Rank', 'ResultTime', 
+            'country.CountryCode', 'country.DisplayName',
+            '_finished', 'InvalidMarkResult', "Remark"
+        ]], on='boat'
+    )
+    live_data['raceDistance'] = race_distance
+    return live_data, intermediate_times 
+
+
+
+def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetracker, **kwargs):
+    race_livetracks, errors = utils.map_concurrent(
+        load_livetracker, 
+        {race_id: race_id for race_id in race_ids},
+        singleton=True, max_workers=max_workers, **kwargs
+    )
+    results, errors = utils.map_concurrent(
+        estimate_livetracker_times, 
+        race_livetracks, max_workers=max_workers, **kwargs
+    )
+    intermediates = pd.concat(
+        {race_id: inters for race_id, (_, inters) in results.items()}, 
+        axis=1
+    )
+    races_live_data = pd.concat(
+        {race_id: live_data for race_id, (live_data, _) in results.items()}, 
+        axis=0
+    ).reset_index(drop=True)
+    return races_live_data, intermediates
+
+
+def calc_behind(live_time_data, gmt_speed=None, PGMT=1):
+    if gmt_speed is None:
+        distance = live_time_data.distanceTravelled.iloc[-1].max()
+        gmt_speed = np.nanmax(live_time_data.avg_speed.values[
+            live_time_data.distanceTravelled.values == distance 
+        ])
+
+    pace_speed = gmt_speed * PGMT
+    t = live_time_data.index.values 
+    pace_boat_d = pace_speed * t
+    for c, d in live_time_data.distanceTravelled.items():
+        live_time_data[("distanceFromPace", c)] = pace_boat_d - d
+        live_time_data[("timeFromPace", c)] = t - np.interp(d, pace_boat_d, t)
+        live_time_data[("PGMT", c)] = d / pace_boat_d
+
+    return live_time_data
+
+
 def get_current_data(live_data):
     current_data = live_data.iloc[[-1]].copy()
     current_data.PGMT = current_data.PGMT.applymap("{:.1%}".format)    
@@ -557,7 +682,7 @@ def parse_livetracker_results(data):
     return results, intermediates
 
 
-def parse_livetracker_raw_data(data, field, index):
+def parse_livetracker_raw_data(data, field, index=None):
     lanes = {
         lane['Lane']: lane 
         for lane in data['config']['lanes']
@@ -571,11 +696,16 @@ def parse_livetracker_raw_data(data, field, index):
         for lane, lane_data in lanes.items()
     }).sort_values()
 
+    if index is None:
+        return pd.Series(
+            {lane['DisplayName']: lane[field] for lane in lanes.values()},
+            name=field
+        )
+
     parsed = pd.concat(
         {
-            lane['DisplayName']: pd.json_normalize(
-                lane[field]
-            ).set_index(index) for lane in lanes.values()
+            lane['DisplayName']: pd.json_normalize(lane[field]).set_index(index) 
+            for lane in lanes.values()
         }, 
         axis=1, 
         names=['boat', field]
@@ -727,7 +857,7 @@ def estimate_times(live_boat_data, finish_distance=2000):
 
 def estimate_live_times(live_boat_data, gmt, race_distance=2000):
     countries = live_boat_data.columns.levels[1]
-    distance_travelled = live_boat_data.distanceTravelled.fillna(race_distance)
+    distance_travelled = live_boat_data.distanceTravelled.fillna(method='ffill')
     speed = live_boat_data.metrePerSecond.fillna(method='ffill')
 
     live_data = pd.concat({
