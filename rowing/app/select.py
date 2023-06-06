@@ -64,13 +64,6 @@ def load_livetracker(race_id, cached=True):
     logger.debug("load_livetracker(%s)", race_id)
     return livetracker.load_livetracker(race_id, cached=cached)
 
-# @st.cache_data
-# def get_races_livedata(race_ids, max_workers=10):
-#     logger.debug("get_races_livedata(race_ids[%d])", len(race_ids))
-#     return livetracker.get_races_livetracks(
-#         race_ids, max_workers=max_workers, load_livetracker=load_livetracker
-#     )
-
 @st.cache_data(persist=True)
 def get_races_livedata(races, max_workers=10):
     logger.debug("get_races_livedata(race_ids[%d])", len(races))
@@ -222,15 +215,15 @@ def filter_races(races, filters=False, select_all=True):
 
 def select_races(competition_id=None, filters=False, select_all=True):
     logger.debug("select_races(%r, filters=%s)", competition_id, filters)
-    with st.expander("Select competition"):
+    with st.expander("Select competition", state.get("expander.filter_competition", False)):
         if competition_id is None:
             competition = select_competition()
             competition_id = competition.name
 
     races = get_races(competition_id)
-    with st.expander("Filter races"):
+    with st.expander("Filter races", state.get("expander.filter_races", False)):
         races = filter_races(races, filters=filters, select_all=select_all)
-
+    
     return races 
     
 
@@ -318,7 +311,7 @@ def set_gmts(cbts, *competition_types):
         gmt_set = pd.concat(gmts, axis=1).dropna().apply(
             lambda s: s.dt.total_seconds().apply(utils.format_totalseconds)
         )
-        gmts = utils.read_times(st.experimental_data_editor(gmt_set).GMT)
+        gmts = utils.read_times(st.data_editor(gmt_set).GMT)
 
     with col2:
         inputs.download_csv(gmts.dt.total_seconds().round(2), "GMTs")

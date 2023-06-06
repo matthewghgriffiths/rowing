@@ -137,7 +137,7 @@ def filter_dataframe(
         df[select_col] = st.checkbox("Select all", value=select_all, key=f"{key}.select_all")
         df = df.loc[
             df.index[
-                st.experimental_data_editor(
+                st.data_editor(
                     df[[select_col] + list(column_options)].set_index(select_col)
                 ).index.values
             ]

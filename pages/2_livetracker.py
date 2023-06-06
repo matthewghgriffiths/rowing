@@ -17,14 +17,15 @@ st.set_page_config(
 st.title("World Rowing livetracker")
 
 with st.sidebar:
-    threads = st.number_input(
-        "number of threads to use", min_value=1, max_value=20, 
-        value=state.get("threads", 1), 
-        step=1
-    )
-    threads = int(threads)
-    state.set("threads", threads)
-    download = st.checkbox("load livetracker data", False)
+    download = st.checkbox("automatically load livetracker data", True)
+    with st.expander("Settings"):
+        threads = st.number_input(
+            "number of threads to use", min_value=1, max_value=20, 
+            value=state.get("threads", 6), 
+            step=1
+        )
+        threads = int(threads)
+        state.set("threads", threads)
 
 st.subheader("Select livetracker data")
 
@@ -33,6 +34,15 @@ races = select.select_races(
 ).reset_index(drop=True)
 boat_classes = races['boatClass.DisplayName'].unique()
 
+if races.empty:
+    if state.get("expander.filter_races", False):
+        print(state.STATE)
+        st.caption("select races to load")
+        st.stop()
+
+    state.set("expander.filter_races", True)
+    state.update_query_params()
+    st.experimental_rerun()
 
 with st.expander("Select GMTs"):
     st.text("Select competition best times")
