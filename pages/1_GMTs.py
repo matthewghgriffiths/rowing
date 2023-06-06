@@ -1,7 +1,6 @@
 
 
 import logging
-from jax import default_backend
 
 import streamlit as st
 import plotly.express as px 
@@ -11,8 +10,6 @@ from rowing.world_rowing import api, utils
 from rowing.app import state, inputs, select
 
 logger = logging.getLogger(__name__)
-# logging.basicConfig(level=logging.DEBUG)
-# logging.getLogger().setLevel(logging.DEBUG)
 
 st.set_page_config(
     page_title="PGMTs",

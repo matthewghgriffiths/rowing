@@ -9,6 +9,11 @@ from rowing.world_rowing import api, livetracker, utils
 from rowing.app import select, inputs, state, plots
 
 
+st.set_page_config(
+    page_title="World Rowing livetracker",
+    layout='wide'
+    # page_icon="👋",
+)
 st.title("World Rowing livetracker")
 
 st.subheader("Select livetracker data")
@@ -32,16 +37,19 @@ races = races.set_index("race.id").join(
 )
 
 with st.sidebar:
-    download = st.checkbox(
-        "load livetracker data", len(races) < 30
+    threads = st.number_input(
+        "number of threads to use", min_value=1, max_value=20, value=10, 
+        step=1
     )
+    threads = int(threads)
+    download = st.checkbox("load livetracker data", len(races) < 30)
 
 if not download:
     st.caption(f"Selected {len(races)} races")
     st.caption("Check load livetracker data in sidebar to view race data")
     st.stop()
 
-live_data, intermediates = select.get_races_livedata(races)
+live_data, intermediates = select.get_races_livedata(races, max_workers=threads)
 
 with st.expander("Filter livetracker data"):
     live_data = select.filter_livetracker(live_data)

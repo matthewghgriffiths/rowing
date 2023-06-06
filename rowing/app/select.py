@@ -340,7 +340,7 @@ def filter_livetracker(live_data):
         default=["Rank"],
         select=False, 
         **{
-            "Rank": [1]
+            "Rank": sorted(live_data.Rank.unique())
         }
     )
     live_data['split'] = pd.to_datetime(500 / live_data.metrePerSecond, unit='s')
