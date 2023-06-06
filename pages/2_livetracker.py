@@ -16,9 +16,21 @@ st.set_page_config(
 )
 st.title("World Rowing livetracker")
 
+with st.sidebar:
+    threads = st.number_input(
+        "number of threads to use", min_value=1, max_value=20, 
+        value=state.get("threads", 1), 
+        step=1
+    )
+    threads = int(threads)
+    state.set("threads", threads)
+    download = st.checkbox("load livetracker data", False)
+
 st.subheader("Select livetracker data")
 
-races = select.select_races(filters=True).reset_index(drop=True)
+races = select.select_races(
+    filters=True, select_all=False
+).reset_index(drop=True)
 boat_classes = races['boatClass.DisplayName'].unique()
 
 with st.expander("Select GMTs"):
@@ -36,20 +48,13 @@ races = races.set_index("race.id").join(
     gmts.dt.total_seconds().rename("GMT"), on="boatClass.DisplayName"
 )
 
-with st.sidebar:
-    threads = st.number_input(
-        "number of threads to use", min_value=1, max_value=20, value=10, 
-        step=1
-    )
-    threads = int(threads)
-    download = st.checkbox("load livetracker data", len(races) < 30)
-
 if not download:
     st.caption(f"Selected {len(races)} races")
-    st.caption("Check load livetracker data in sidebar to view race data")
+    st.caption("Checkbox 'load livetracker data' in sidebar to view race data")
     st.stop()
 
-live_data, intermediates = select.get_races_livedata(races, max_workers=threads)
+with st.spinner("Downloading livetracker data"):
+    live_data, intermediates = select.get_races_livedata(races, max_workers=threads)
 
 with st.expander("Filter livetracker data"):
     live_data = select.filter_livetracker(live_data)
@@ -57,11 +62,19 @@ with st.expander("Filter livetracker data"):
 st.subheader("Show livetracker")
 
 live_data, PGMT = select.set_livetracker_PGMT(live_data)
-
 distance_from_pace = "distance from PGMT"
 facets = ["PGMT", "distance from PGMT", "split", "strokeRate"]
-fig = plots.make_livetracker_plot(
-    facets, *plots.melt_livetracker_data(live_data, 100), 
 
-)
-st.plotly_chart(fig, use_container_width=True)
+with st.spinner("Generating livetracker plot"):
+    fig = plots.make_livetracker_plot(
+        facets, *plots.melt_livetracker_data(live_data, 100), 
+    )
+
+with st.spinner("plotting..."):
+    st.plotly_chart(fig, use_container_width=True)
+
+if st.button("reset"):
+    st.experimental_set_query_params()
+    st.experimental_rerun()
+else:
+    state.update_query_params()

@@ -74,7 +74,7 @@ def load_livetracker(race_id, cached=True):
 @st.cache_data
 def get_races_livedata(races, max_workers=10):
     logger.debug("get_races_livedata(race_ids[%d])", len(races))
-    live_data, intermediates =  livetracker.get_races_livetracks(
+    live_data, intermediates = livetracker.get_races_livetracks(
         races.index, max_workers=max_workers, load_livetracker=load_livetracker
     )
     live_data = live_data.join(
@@ -157,7 +157,7 @@ def select_competition(current=True):
         ).sort_values("StartDate")
 
         if competitions.empty:
-            st.write("No competition selected")
+            st.caption("No competition selected")
             st.stop()
 
         competition_id = state.get("CompetitionId")
@@ -192,7 +192,7 @@ RACE_COL = [
         'race.raceStatus.DisplayName', 
 ]
 
-def filter_races(races, filters=False):
+def filter_races(races, filters=False, select_all=True):
     logger.debug("filter_races(races[%d], filters=%s)", len(races), filters)
 
     boat_classes = get_boat_classes()
@@ -213,13 +213,14 @@ def filter_races(races, filters=False):
             'race.Category': ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3'], 
             'race.raceStatus.DisplayName': ["Official"]
         },
-        filters=filters
+        filters=filters,
+        select_all=select_all
     ).reset_index(drop=True)
     races['race.Date'] = pd.to_datetime(races['race.Date'])
     return races
 
 
-def select_races(competition_id=None, filters=False):
+def select_races(competition_id=None, filters=False, select_all=True):
     logger.debug("select_races(%r, filters=%s)", competition_id, filters)
     with st.expander("Select competition"):
         if competition_id is None:
@@ -228,7 +229,7 @@ def select_races(competition_id=None, filters=False):
 
     races = get_races(competition_id)
     with st.expander("Filter races"):
-        races = filter_races(races, filters=filters)
+        races = filter_races(races, filters=filters, select_all=select_all)
 
     return races 
     
@@ -274,7 +275,7 @@ def select_best_times(boat_classes=None, *competition_types):
     
 
     pick = inputs.modal_button(
-        "Select competition best times", "Use world best times", "pickCBT"
+        "Select competition best times", "Use world best times", "pickCBT", mode=True
     )
     if not pick:
         filtered_cbts = inputs.filter_dataframe(
@@ -352,7 +353,7 @@ def filter_livetracker(live_data):
 def set_livetracker_PGMT(live_data):
     col1, col2 = st.columns(2)
     with col1:
-        st.write("input %GMT for pace boat")
+        st.caption("input %GMT for pace boat")
     with col2:
         PGMT = st.number_input(
             "input %GMT for pace boat", 

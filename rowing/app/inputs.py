@@ -42,7 +42,7 @@ def modal_button(label1, label2, key=None, mode=False):
 
 def filter_dataframe(
         df: pd.DataFrame, options=None, default=None, key=None, categories=(), filters=True,
-        select=True, select_col='select', **kwargs
+        select=True, select_col='select', select_all=True, **kwargs
 ) -> pd.DataFrame:
     """
     Adds a UI on top of a dataframe to let viewers filter columns
@@ -134,7 +134,7 @@ def filter_dataframe(
                     df = df[df[column].astype(str).str.contains(user_text_input)]
 
     if select:
-        df[select_col] = st.checkbox("Select all", value=True, key=f"{key}.select_all")
+        df[select_col] = st.checkbox("Select all", value=select_all, key=f"{key}.select_all")
         df = df.loc[
             df.index[
                 st.experimental_data_editor(

@@ -117,7 +117,7 @@ fig = px.scatter(
 fig.update_xaxes(**facets_axes.get(x, {}))
 fig.update_yaxes(**facets_axes.get(y, {}))
 
-st.plotly_chart(fig)
+st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("View Intermediates")
 
