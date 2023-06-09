@@ -5,9 +5,8 @@ import pandas as pd
 
 import plotly.express as px
 
-from rowing.world_rowing import api, livetracker, utils
+# from rowing.world_rowing import api, live, utils
 from rowing.app import select, inputs, state, plots
-
 
 st.set_page_config(
     page_title="World Rowing livetracker",
@@ -59,39 +58,6 @@ races = races.set_index("race.id").join(
     gmts.dt.total_seconds().rename("GMT"), on="boatClass.DisplayName"
 )
 
-# if 1:
-#     race_ids = races.index 
-#     load_livetracker = livetracker.load_livetracker
-#     max_workers=10
-#     kwargs = {}
-#     race_livetracks, errors = utils.map_concurrent(
-#         load_livetracker, 
-#         {race_id: race_id for race_id in race_ids},
-#         singleton=True, max_workers=max_workers, **kwargs
-#     )
-#     results, errors = utils.map_concurrent(
-#         livetracker.estimate_livetracker_times, 
-#         race_livetracks, max_workers=max_workers, **kwargs
-#     )
-#     for race_id, data in race_livetracks.items():
-#         print(race_id)
-#         print(data)
-#         print(livetracker.estimate_livetracker_times(*data))
-#     # print(race_livetracks)
-#     st.stop()
-#     intermediates = pd.concat(
-#         {race_id: inters for race_id, (_, inters) in results.items()}, 
-#         axis=1
-#     )
-#     races_live_data = pd.concat(
-#         {race_id: live_data for race_id, (live_data, _) in results.items()}, 
-#         axis=0
-#     ).reset_index(drop=True)
-
-# livetracker.get_races_livetracks(
-#     races.index, max_workers=10, load_livetracker=livetracker.load_livetracker
-# )
-
 if not download:
     st.caption(f"Selected {len(races)} races")
     st.caption("Checkbox 'load livetracker data' in sidebar to view race data")
@@ -113,8 +79,6 @@ with st.spinner("Generating livetracker plot"):
     fig = plots.make_livetracker_plot(
         facets, *plots.melt_livetracker_data(live_data, 100), 
     )
-
-with st.spinner("plotting..."):
     st.plotly_chart(fig, use_container_width=True)
 
 if st.button("reset"):

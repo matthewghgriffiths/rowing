@@ -6,7 +6,7 @@ from os import get_blocking
 import streamlit as st
 import pandas as pd
 
-from rowing.world_rowing import api, utils, livetracker
+from rowing.world_rowing import api, utils, live
 from rowing.app import state, inputs, threads
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,6 @@ def get_competition_boat_classes(competition_id):
     ]["boatClass.DisplayName"].sort_values()
     return event_boat_classes
 
-
 @st.cache_data(persist=True)
 def get_cbts(boat_classes=None):
     cbts = api.get_competition_best_times()
@@ -56,18 +55,18 @@ def get_cbts(boat_classes=None):
 def get_livedata(race_id, gmt=None):
     logger.debug("get_livedata(%s)", race_id)
     live_data, live_boat_data, intermediates, race_distance = \
-        livetracker.get_race_livetracker(race_id, gmt=gmt, live=False)
+        live.get_race_livetracker(race_id, gmt=gmt, live=False)
     return live_data, live_boat_data, intermediates, race_distance
 
 @st.cache_data(persist=True)
 def load_livetracker(race_id, cached=True):
     logger.debug("load_livetracker(%s)", race_id)
-    return livetracker.load_livetracker(race_id, cached=cached)
+    return live.load_livetracker(race_id, cached=cached)
 
 @st.cache_data(persist=True)
 def get_races_livedata(races, max_workers=10):
     logger.debug("get_races_livedata(race_ids[%d])", len(races))
-    live_data, intermediates = livetracker.get_races_livetracks(
+    live_data, intermediates = live.get_races_livetracks(
         races.index, max_workers=max_workers, load_livetracker=load_livetracker
     )
     live_data = live_data.join(
@@ -79,7 +78,6 @@ def get_races_livedata(races, max_workers=10):
     )
     live_data['race.Date'] = pd.to_datetime(live_data['race.Date'])
     return live_data, intermediates
-
 
 
 COMPETITION_COL = [
@@ -180,6 +178,7 @@ RACE_COL = [
         'race.Phase',
         'race.Gender', 
         'race.Category', 
+        'race.Day', 
         'race.Date', 
         'race.event.competition.DisplayName',
         'race.raceStatus.DisplayName', 
@@ -243,9 +242,9 @@ def select_race(races):
 
 
 RESULT_COLS = [
-    'PGMT', 'ResultTime', 'GMT', 'boatClass', 'Country', "race.Date", 
+    'PGMT', 'ResultTime', 'GMT', 'boatClass', 'Country', "race.Day", 
     "event", 'competition', 'race', 'racePhase',  
-    'Rank', 'Lane', 'distance', 
+    'Rank', 'Lane', 'distance', "race.Date", 
 ]
 
 def select_results(race_results, **kwargs):

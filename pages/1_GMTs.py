@@ -31,6 +31,8 @@ events = select.get_events(competition_id)
 results = select.get_results(competition_id)
 boat_classes = select.get_boat_classes()
 
+print(races.columns)
+
 with st.expander("Set GMTs"):
     comp_boat_classes = select.get_competition_boat_classes(competition_id)
     cbts = select.select_best_times(comp_boat_classes, competition_type)
@@ -44,6 +46,8 @@ with st.expander("Set GMTs"):
 merged_results = api.merge_competition_results(
     results, races, events, boat_classes, gmts)
 
+print(merged_results.columns, races.columns)
+
 with st.expander("Filter Races"):
     results = select.select_results(
         merged_results,
@@ -52,9 +56,9 @@ with st.expander("Filter Races"):
         distance=[2000], 
         Rank=[1],
         key='results', 
-    ).set_index("event")
-
-results['crew'] = results['Country'] + " " + results['boatClass']
+    )
+    results['crew'] = results['Country'] + " " + results['boatClass']
+    results = results.set_index('crew')
 
 st.subheader("View PGMTs")
 st.dataframe(results.style.format({"PGMT": "{:,.2%}"}))

@@ -279,7 +279,6 @@ if use_requests:
 
 
 else:
-
     def load_json_url(url, params=None, **kwargs):
         if params:
             query = parse.urlencode(params)
@@ -302,12 +301,14 @@ def prepare_request(*endpoints, **kwargs):
     logger.debug("preparing: %s\nparams: %s", url, params)
     return url, params
 
+def request_worldrowing(*endpoints, request_kws=None, **kwargs):
+    return requests.get(*prepare_request(*endpoints, **kwargs), **dict(request_kws or {}))
 
-def request_worldrowing_data(*endpoints, request_kws=None, **kwargs):
+def request_worldrowing_json(*endpoints, request_kws=None, **kwargs):
     return load_json_url(*prepare_request(*endpoints, **kwargs), **dict(request_kws or {}))
 
 
-cached_request_worldrowing_data = cache(request_worldrowing_data)
+cached_request_worldrowing_json = cache(request_worldrowing_json)
 
 
 @cache
@@ -326,9 +327,9 @@ def get_worldrowing_data(*endpoints, cached=True, request_kws=None, **kwargs):
             else tuple(dict(vals).items())
             for k, vals in kwargs.items()
         }
-        data = cached_request_worldrowing_data(*endpoints, **hashable_kws)
+        data = cached_request_worldrowing_json(*endpoints, **hashable_kws)
     else:
-        data = request_worldrowing_data(*endpoints, **kwargs, request_kws=request_kws)
+        data = request_worldrowing_json(*endpoints, **kwargs, request_kws=request_kws)
 
     return data.get("data", [])
 
@@ -375,6 +376,7 @@ def parse_races(races):
     boat_classes = races[
         'event.boatClassId'
     ].replace(BOATCLASSES).rename("boatClass.DisplayName")
+    races['Day'] = races.Date.dt.date
     return pd.concat([races, race_codes, boat_classes], axis=1) 
 
 
@@ -391,7 +393,7 @@ def get_competition_races(competition_id=None, cached=True):
                 "event"
             )
         )
-    return parse_races(races)
+    return parse_races(races) 
 
 def get_race(race_id, **kwargs):
     kwargs.setdefault(

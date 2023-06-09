@@ -3,6 +3,27 @@ import streamlit as st
 import pandas as pd 
 import plotly.express as px
 
+FORMATS = {
+    "default": {
+        "format": ':.1%'
+    },
+    "percentage": {
+        "format": ':.1%',
+        "tickformat": ',.1%',
+    }, 
+    "time": {
+        "format": "|%-M:%S.%L",
+        "tickformat": "%-M:%S",
+    }
+}
+
+def to_plot_data(
+        live_data, 
+        facets, 
+        filter_distance=100, 
+        dropna=(), 
+):
+    pass
 
 def melt_livetracker_data(live_data, filter_distance=100):
     plot_data = live_data.dropna(

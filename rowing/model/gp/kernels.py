@@ -8,6 +8,8 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 import haiku as hk
 
+from scipy import integrate
+
 from .utils import to_2d
 
 SQPI2 = jnp.sqrt(jnp.pi/2)

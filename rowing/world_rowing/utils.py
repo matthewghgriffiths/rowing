@@ -10,8 +10,9 @@ import pandas as pd
 from scipy.special import erf
 
 from ..utils import (
-    cached_property, map_concurrent, format_totalseconds,
+    cached_property, format_totalseconds,
     format_timedelta, format_timedelta_hours, 
+    map_concurrent, WorkQueue, ThreadPoolExecutor,
     format_yaxis_splits, format_xaxis_splits, format_axis_splits
 )
 

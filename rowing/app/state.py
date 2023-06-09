@@ -2,10 +2,12 @@
 import json 
 import atexit
 import logging
+import datetime 
 
 import streamlit as st 
 
 import numpy as np
+from pandas.api.types import is_datetime64_any_dtype
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,11 @@ class NumpyEncoder(json.JSONEncoder):
             return bool(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
+        if is_datetime64_any_dtype(obj):
+            return str(obj)
+        if isinstance(obj, (datetime.date, datetime.datetime)):
+            return str(obj)
+
         return super(NumpyEncoder, self).default(obj)
 
 
@@ -28,14 +35,18 @@ STATE = {
 }
 
 get = STATE.get 
-set = STATE.__setitem__
 items = STATE.items 
 keys = STATE.keys 
 values = STATE.values 
-update = STATE.update 
 
-def __setitem__(key, val):
+def set(key, val):
     STATE[key] = val
+    update_query_params()
+
+def update(*args, **kwarg):
+    STATE.update(*args, **kwargs)
+    update_query_params()
+
 
 def update_query_params():
     STATE.update(st.session_state)

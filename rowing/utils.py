@@ -8,8 +8,12 @@ import re
 import json 
 from functools import lru_cache
 from pathlib import Path
+import threading
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import (
+    ThreadPoolExecutor, as_completed, 
+    wait, FIRST_COMPLETED, ALL_COMPLETED
+)
 try:
     from concurrent.futures import ProcessPoolExecutor
 except ModuleNotFoundError:
@@ -389,6 +393,139 @@ def map_concurrent(
         output = [output.get(i, None) for i in range(len(inputs))]
 
     return output, errors
+
+
+class WorkQueue:
+    """
+    A Work Queue to allow straightforward multithreading. calling 
+    
+    `WorkQueue(executor, queue_size=5).run(func, work)`
+
+    is broadly equivalent to generating an iterator, 
+
+    `((func(*args), *args) for args in work)`
+    
+    except the iterator of the WorkQueue returns the work out of order. 
+    multiple work queues can be created which pass their results together. 
+
+    passing queue_size > 0 caps the maximum number of jobs the work queue
+    will allow to be simultaneously running
+    
+    Examples
+    --------
+    def func1(*args):
+        time.sleep(1)
+        return args[0] * 2
+
+    def func2(*args):
+        time.sleep(1)
+        return args[0] * 3
+
+    def func3(*args):
+        time.sleep(1)
+        return args[0] * 4
+        
+
+    max_workers = 20
+    queue_size = 10
+    work = [(i,) for i in range(5)]
+    start = time.time()
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:    
+        queue1 = WorkQueue(executor, queue_size=queue_size).run(func1, work)
+        queue2 = WorkQueue(executor, queue_size=queue_size).run(func2, queue1)
+        queue3 = WorkQueue(executor, queue_size=queue_size).run(func3, queue2)
+        for out in queue3:
+            print(out[0], out[3])
+            
+    print(time.time() - start)
+    
+    0 0
+    216 9
+    168 7
+    96 4
+    24 1
+    144 6
+    120 5
+    72 3
+    192 8
+    48 2
+    4.009526968002319
+    """
+    def __init__(self, executor, queue_size=None):
+        self.executor = executor
+        self.queue = {}
+        self.mutex = threading.Lock()
+        self.queue_size = queue_size
+        self.not_full = threading.Condition(self.mutex)
+        self.not_empty = threading.Condition(self.mutex)
+        self.running = None
+        self._shutdown = False
+        
+    def qsize(self):
+        with self.mutex:
+            return len(self.queue)
+        
+    def _submit(self, func, *args, **kwargs):
+        with self.not_full:
+            future = self.executor.submit(func, *args, **kwargs)
+            if self.queue_size:
+                while len(self.queue) >= self.queue_size:
+                    self.not_full.wait()
+
+            self.queue[future] = args
+            self.not_empty.notify()
+
+    def is_alive(self):
+        return not (self.executor._shutdown or self._shutdown)
+            
+    def _consume(self, func, work, **kwargs):
+        for args in work:
+            if self.is_alive():
+                logger.debug("submitting %s", func)
+                self._submit(func, *args, **kwargs)
+            else:
+                break
+            
+        self.running = False
+                    
+    def run(self, func, work, **kwargs):
+        """
+        equivalent to creating a generator, 
+
+        `((func(*args, **kwargs), *args) for args in work)`
+
+        Except that the generator returns values as they are calculated
+        """
+        self.running = True     
+        self.work_thread = threading.Thread(target=self._consume, args=(func, work), kwargs=kwargs)
+        self.work_thread.start()
+        return self
+    
+    def join(self, timeout=None):
+        """
+        Calling WorkQueue(executor).run(func, work).join() will block until
+        all the jobs sent to executor to complete 
+        """
+        self.work_thread.join(timeout)
+        wait(self.queue, return_when=ALL_COMPLETED)
+
+        return self
+                    
+    def __iter__(self):
+        if self.running is None:
+            raise RuntimeError("")
+            
+        while self.running or self.queue:
+            with self.not_empty:
+                while not self.queue:
+                    self.not_empty.wait()
+                    
+                done_and_not = wait(self.queue, return_when=FIRST_COMPLETED)
+                for future in done_and_not.done:
+                    args = self.queue.pop(future)
+                    self.not_full.notify()
+                    yield (future.result(), *args)
+
 
 
 def _map_singlethreaded(
