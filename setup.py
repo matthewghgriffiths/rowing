@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='rowing',
-    version='0.2.5',
+    version='0.3.0',
     description='Library for loading and presenting data from the worldrowing.com',
     author='Matthew Griffiths',
     author_email='matthewghgriffiths@gmail.com',
@@ -15,8 +15,7 @@ setup(
     packages=['rowing'],
     entry_points={
         'console_scripts': [
-            'world_rowing = rowing.world_rowing.cli:run [CLI]', 
-            'rowing_live_tracker = rowing.world_rowing.dashboard:main [CLI]', 
+            'worldrowing = rowing.worldrowing.app:main [WORLDROWING]'
             'garmin = rowing.analysis.garmin:main [GARMIN]',
             'gpx = rowing.analysis.files:main [GPX]',
         ]
@@ -32,7 +31,7 @@ setup(
         'tqdm>=4.0.0',
     ],
     extras_require={
-        'CLI': ['cmd2>=2.0.0', 'pyqt5>=5.0.0'],
+        'WORLDROWING': ['streamlit>=1.22.0', 'plotly>=5.14.1'],
         'REQ': ['requests>=2.0.0'], # Requests is not required if using pyodide
         'GARMIN': [
             'garminconnect>=0.1.45', 
