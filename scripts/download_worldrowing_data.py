@@ -45,7 +45,7 @@ def load_races(
         )
     )
     competition_races, errors = utils.map_concurrent(
-        api.get_competition_races,
+        api.get_races,
         dict(
             zip(
                 competitions.index, 
@@ -59,7 +59,7 @@ def load_races(
     ).reset_index(0)
 
     competition_events, errors = utils.map_concurrent(
-        api.get_competition_events,
+        api.get_events,
         dict(
             zip(
                 competitions.index, 
@@ -86,7 +86,7 @@ def merge_race_event_competitions(races, events, competitions):
     return utils.merge(
         (
             races.reset_index(), events, 
-            competitions, api.get_boat_types()
+            competitions, api.get_boat_classes()
         ),
         how='left',
         left_on=('eventId', 'competitionId', 'boatClassId'),

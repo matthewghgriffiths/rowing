@@ -18,12 +18,12 @@ def get_competitions(**kwargs):
 @st.cache_data(persist=True)
 def get_races(competition_id):
     logger.debug("get_races(%s)", competition_id)
-    return api.get_competition_races(competition_id=competition_id).reset_index().add_prefix("race.")
+    return api.get_races(competition_id=competition_id)
 
 @st.cache_data(persist=True)
 def get_events(competition_id):
     logger.debug("get_events(%s)", competition_id)
-    return api.get_competition_events(competition_id=competition_id).add_prefix("event.")
+    return api.get_events(competition_id=competition_id)
 
 @st.cache_data(persist=True)
 def get_results(competition_id):
@@ -32,7 +32,7 @@ def get_results(competition_id):
 
 @st.cache_data(persist=True)
 def get_boat_classes():
-    return api.get_boat_types().reset_index().add_prefix("boatClass.")
+    return api.get_boat_classes()
 
 @st.cache_data(persist=True)
 def get_competition_boat_classes(competition_id):
@@ -40,8 +40,8 @@ def get_competition_boat_classes(competition_id):
     events = get_events(competition_id)
     boat_classes = get_boat_classes()
     event_boat_classes = boat_classes[
-        boat_classes['boatClass.id'].isin(events['event.boatClassId'])
-    ]["boatClass.DisplayName"].sort_values()
+        boat_classes['boatClass_id'].isin(events['event_boatClassId'])
+    ]["boatClass"].sort_values()
     return event_boat_classes
 
 @st.cache_data(persist=True)
@@ -69,21 +69,22 @@ def get_races_livedata(races, max_workers=10):
     live_data, intermediates = live.get_races_livetracks(
         races.index, max_workers=max_workers, load_livetracker=load_livetracker
     )
+    print(races.columns)
     live_data = live_data.join(
         races[[
-            "race.Date", "race.DisplayName", "race.Gender", 
-            "race.Category", "race.Phase", "boatClass.DisplayName", "GMT"
+            "race_Date", "race", "Gender", 
+            "Category", "Phase", "boatClass", "GMT"
         ]], 
         on='raceId'
     )
-    live_data['race.Date'] = pd.to_datetime(live_data['race.Date'])
+    live_data['race_Date'] = pd.to_datetime(live_data['race_Date'])
     return live_data, intermediates
 
 
 COMPETITION_COL = [
-    "DisplayName", "started", "venue.DisplayName", 
-    "StartDate", "Year", "competitionType.DisplayName", 
-    "finished", 
+    "competition", "started", "competition_venue", 
+    "competition_StartDate", "competition_Year", "competition_competitionType", 
+    "finished", "competition_id", 
 ]
 
 def select_competition(current=True):
@@ -99,11 +100,11 @@ def select_competition(current=True):
         competition_id = st.text_input(
             "Competition id:", api.get_most_recent_competition().name
         )
-        competition = pd.json_normalize(api.get_worldrowing_data(
+        competition = api.get_worldrowing_record(
             "competition", competition_id, include="competitionType,venue"
-        )).set_index("id").iloc[0]
-        competition.loc["started"] = pd.to_datetime(competition.StartDate) < datetime.datetime.now()
-        competition.loc["finished"] = pd.to_datetime(competition.StartDate) < datetime.datetime.now()
+        )
+        competition.loc["started"] = pd.to_datetime(competition.competition_StartDate) < datetime.datetime.now()
+        competition.loc["finished"] = pd.to_datetime(competition.competition_StartDate) < datetime.datetime.now()
     else:
         today = datetime.date.today()
         start_date = pd.to_datetime(state.get("competition.start_date", today))
@@ -137,15 +138,15 @@ def select_competition(current=True):
             st.stop()
 
         
-        competitions['started'] = pd.to_datetime(competitions.StartDate) < datetime.datetime.now()
-        competitions['finished'] = pd.to_datetime(competitions.EndDate) < datetime.datetime.now()
+        competitions['started'] = pd.to_datetime(competitions.competition_StartDate) < datetime.datetime.now()
+        competitions['finished'] = pd.to_datetime(competitions.competition_EndDate) < datetime.datetime.now()
         competitions = inputs.filter_dataframe(
             competitions[COMPETITION_COL], 
             default=["started"],
             started=[True], 
             key='competition',
             filters=False
-        ).sort_values("StartDate")
+        ).sort_values("competition_StartDate")
 
         if competitions.empty:
             st.caption("No competition selected")
@@ -163,25 +164,25 @@ def select_competition(current=True):
             competitions, 
             index=index
         )
-        competition = competitions[competitions.DisplayName == sel_competition].iloc[0]
+        competition = competitions[competitions.competition == sel_competition].iloc[0]
 
     competition.loc['WBTCompetitionType'] = api.COMPETITION_TYPES[
-        competition['competitionType.DisplayName']
+        competition['competition_competitionType']
     ]
-    competition.index.name = 'CompetitionId'
+    # competition.index.name = 'CompetitionId'
     st.write(competition.loc[COMPETITION_COL + ["WBTCompetitionType"]])
     return competition
 
 RACE_COL = [
-        'boatClass.DisplayName',
-        'race.DisplayName', 
-        'race.Phase',
-        'race.Gender', 
-        'race.Category', 
-        'race.Day', 
-        'race.Date', 
-        'race.event.competition.DisplayName',
-        'race.raceStatus.DisplayName', 
+        'boatClass',
+        'race', 
+        'Phase',
+        'Gender', 
+        'Category', 
+        'Day', 
+        'race_Date', 
+        'race_event_competition',
+        'race_raceStatus', 
 ]
 
 def filter_races(races, filters=False, select_all=True):
@@ -190,25 +191,26 @@ def filter_races(races, filters=False, select_all=True):
     boat_classes = get_boat_classes()
     races = pd.merge(
         races, boat_classes, 
-        left_on='race.event.boatClassId', right_on="boatClass.id"
+        left_on='race_event_boatClassId', right_on="boatClass_id"
     )
     st.subheader("Filter races to look at")
     races = inputs.filter_dataframe(
         races, 
         options=RACE_COL, 
         default=[
-            'race.Phase', 'race.Gender', 'race.Category', 'race.raceStatus.DisplayName'
+            'Phase', 'Gender', 'Category', 
+            'race_raceStatus'
         ],
         **{
-            'race.Phase': ['Final A'], 
-            'race.Gender': ['Men', 'Women', 'Mixed'], 
-            'race.Category': ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3'], 
-            'race.raceStatus.DisplayName': ["Official"]
+            'Phase': ['Final A'], 
+            'Gender': ['Men', 'Women', 'Mixed'], 
+            'Category': ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3'], 
+            'race_raceStatus': ["Official"]
         },
         filters=filters,
         select_all=select_all
     ).reset_index(drop=True)
-    races['race.Date'] = pd.to_datetime(races['race.Date'])
+    races['race_Date'] = pd.to_datetime(races['race_Date'])
     return races
 
 
@@ -217,7 +219,7 @@ def select_races(competition_id=None, filters=False, select_all=True):
     with st.expander("Select competition", state.get("expander.filter_competition", False)):
         if competition_id is None:
             competition = select_competition()
-            competition_id = competition.name
+            competition_id = competition.competition_id
 
     races = get_races(competition_id)
     with st.expander("Filter races", state.get("expander.filter_races", False)):
@@ -242,9 +244,9 @@ def select_race(races):
 
 
 RESULT_COLS = [
-    'PGMT', 'ResultTime', 'GMT', 'boatClass', 'Country', "race.Day", 
-    "event", 'competition', 'race', 'racePhase',  
-    'Rank', 'Lane', 'distance', "race.Date", 
+    'PGMT', 'raceBoatIntermediates_ResultTime', 'GMT', 'boatClass', 'raceBoats', "Day", 
+    "event", 'race_event_competition', 'race', 'Phase',  
+    'raceBoatIntermediates_Rank', 'raceBoats_Lane', 'distance', "race_Date", 
 ]
 
 def select_results(race_results, **kwargs):

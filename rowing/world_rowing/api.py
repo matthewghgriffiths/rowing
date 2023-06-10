@@ -1,6 +1,7 @@
 import datetime
 from collections.abc import Mapping
 import logging
+from functools import partial
 
 import pandas as pd
 
@@ -237,11 +238,14 @@ def parse_race_codes(race_codes):
 
 
 def rename_column(s, prefix=''):
-    c = f"{prefix}.{s}"
+    c = f"{prefix}_{s}".replace(".", "_")
     if c.endswith("DisplayName"):
         c = c[:-12]
 
     return c
+
+def renamer(prefix): 
+    return partial(rename_column, prefix=prefix)
 
 
 def stringify_value(value):
@@ -336,19 +340,21 @@ def get_worldrowing_data(*endpoints, cached=True, request_kws=None, **kwargs):
 
 def get_worldrowing_record(*endpoints, **kwargs):
     data = get_worldrowing_data(*endpoints, **kwargs)
-    return pd.json_normalize(data).loc[0].rename(data.get("id", data.get("DisplayName", "")))
+    records = parse_records(endpoints[:-1], [data])
+    return records.loc[0]
 
 
 def get_worldrowing_records(*endpoints, request_kws=None, **kwargs):
     records = get_worldrowing_data(*endpoints, **kwargs, request_kws=request_kws)
+    return parse_records(endpoints, records)
+
+def parse_records(endpoints, records):
     if not records:
         return pd.DataFrame([])
     
     records = pd.concat(
         [pd.json_normalize(r) for r in records]
-    )
-    if "id" in records.columns:
-        records.set_index("id", inplace=True)
+    ).reset_index(drop=True)
 
     for col in records.columns:
         if "Date" in col:
@@ -356,10 +362,12 @@ def get_worldrowing_records(*endpoints, request_kws=None, **kwargs):
             if dates.notna().all():
                 records[col] = dates
 
-    return records
+    prefix = ".".join(endpoints)
+    return records.rename(columns=renamer(prefix))
 
 
-def get_competition_events(competition_id=None, cached=True):
+
+def get_events(competition_id=None, cached=True):
     competition_id = competition_id or get_most_recent_competition().name
     return get_worldrowing_records(
         "event",
@@ -372,42 +380,72 @@ def parse_race(race):
     return parse_races(race.to_frame().T).iloc[0]
 
 def parse_races(races):
-    race_codes = parse_race_codes(races['RscCode'])
+    race_codes = parse_race_codes(races.race_RscCode)
     boat_classes = races[
-        'event.boatClassId'
-    ].replace(BOATCLASSES).rename("boatClass.DisplayName")
-    races['Day'] = races.Date.dt.date
-    return pd.concat([races, race_codes, boat_classes], axis=1) 
+        'race_event_boatClassId'
+    ].replace(BOATCLASSES).rename("race_boatClass")
+    races['Day'] = races.race_Date.dt.date
+    races = pd.concat([races, race_codes, boat_classes], axis=1)
+    return races
 
+INCLUDE_RACE = (
+    "event.competition,raceStatus,racePhase,"
+    "raceBoats.raceBoatIntermediates.distance,event"
+)
 
-def get_competition_races(competition_id=None, cached=True):
-    competition_id = competition_id or get_most_recent_competition().name
+def get_races(competition_id=None, cached=True):
+    competition_id = competition_id or get_most_recent_competition().competition_id
     races = get_worldrowing_records(
-            "race",
-            cached=cached,
-            filter=(("event.competitionId", competition_id),),
-            sort=(("eventId", "asc"), ("Date", "asc")),
-            include=(
-                "event.competition,raceStatus,racePhase,"
-                "raceBoats.raceBoatIntermediates.distance,"
-                "event"
-            )
-        )
-    return parse_races(races) 
+        "race",
+        cached=cached,
+        filter=(("event.competitionId", competition_id),),
+        sort=(("eventId", "asc"), ("Date", "asc")),
+        include=INCLUDE_RACE,
+    )
+    return parse_races(races)
 
 def get_race(race_id, **kwargs):
     kwargs.setdefault(
         "sort", (("eventId", "asc"), ("Date", "asc"))
     )
     kwargs.setdefault(
-        "include", 
-        "event.competition,raceStatus,racePhase,"
-        "raceBoats.raceBoatIntermediates.distance,event"
+        "include", INCLUDE_RACE
     )
-    race = get_worldrowing_record(
+    data = get_worldrowing_data(
         "race", race_id, **kwargs
     )
-    return parse_races(race.to_frame().T).iloc[0]
+    races = parse_records(("race",), [data])
+    return parse_races(races).loc[0]
+
+def extract_results(races):
+    race_results = pd.concat(
+        races.race_raceBoats.map(pd.json_normalize).values
+    ).reset_index(drop=True).rename(columns=partial(rename_column, prefix='raceBoats'))
+    race_intermediates = pd.concat(
+        race_results.raceBoats_raceBoatIntermediates.map(pd.json_normalize).values, 
+    ).reset_index(drop=True).rename(
+        columns=partial(rename_column, prefix='raceBoatIntermediates')
+    ).join(
+        race_results.set_index("raceBoats_id"), 
+        on='raceBoatIntermediates_raceBoatId'
+    )
+    race_intermediates.raceBoats_ResultTime = \
+        read_times(race_intermediates.raceBoats_ResultTime)
+    race_intermediates.raceBoatIntermediates_ResultTime = \
+        read_times(race_intermediates.raceBoatIntermediates_ResultTime)
+    
+    inter_distances = race_intermediates.raceBoatIntermediates_distance
+    race_intermediates['distance'] = \
+        inter_distances.str.extract("([0-9]+)")[0].astype(int)
+    
+    race_distances = race_intermediates[(
+        race_intermediates.raceBoats_ResultTime 
+        == race_intermediates.raceBoatIntermediates_ResultTime
+    )].groupby("raceBoats_raceId").distance.max()
+    race_intermediates['race_distance'] = \
+        race_distances.loc[race_intermediates.raceBoats_raceId].values
+
+    return race_intermediates
 
 def get_competitions(year=None, fisa=True, has_results=True, cached=True, **kwargs):
     
@@ -425,7 +463,7 @@ def get_competitions(year=None, fisa=True, has_results=True, cached=True, **kwar
         + "competitionType,venue".split(",")
     ))
     competitions = get_worldrowing_records("competition", cached=cached, **kwargs)
-    competitions['CompetitionType'] = competitions['competitionType.DisplayName'].replace(
+    competitions['competition_CompetitionType'] = competitions['competition_competitionType'].replace(
         COMPETITION_TYPES
     )
 
@@ -443,14 +481,14 @@ def get_last_years_competitions(fisa=True, has_results=True):
 
 
 def get_most_recent_competition(fisa=True):
-    competitions = get_this_years_competitions(fisa=fisa)
-    started = competitions.StartDate < datetime.datetime.now()
+    comps = get_this_years_competitions(fisa=fisa)
+    started = comps['competition_StartDate'] < datetime.datetime.now()
     if not started.any():
-        competitions = get_last_years_competitions(fisa=fisa)
-        started = competitions.StartDate < datetime.datetime.now()
+        comp = get_last_years_competitions(fisa=fisa)
+        started = comps['competition_StartDate'] < datetime.datetime.now()
 
-    competition = competitions.loc[started].iloc[-1]
-    logger.info(f"loaded most recent competition: {competition.DisplayName}")
+    competition = comps.loc[started].iloc[-1]
+    logger.info(f"loaded most recent competition: {competition.competition}")
     return competition
 
 
@@ -462,7 +500,7 @@ def get_live_races(fisa=True, competition=None):
         "race",
         cached=False,
         filter=(
-            ("event.competitionId", competition.name),
+            ("event.competitionId", competition.competition_id),
             ('raceStatus.displayName', 'LIVE'),
         ),
         include='event.competition,raceStatus',
@@ -502,7 +540,7 @@ def get_last_race_started(fisa=True, competition=None):
     races = get_last_races(n=1, fisa=fisa, competition=competition)
     if races is not None:    
         race = races.iloc[0]
-        logger.info(f"loaded last race started: {race.DisplayName}")
+        logger.info(f"loaded last race started: {race.race}")
         return race
 
 get_most_recent_race = get_last_race_started
@@ -510,16 +548,16 @@ get_most_recent_race = get_last_race_started
 def get_last_races(n=1, fisa=True, competition=None):
     if competition is None:
         competition = get_most_recent_competition(fisa)
-    races = get_competition_races(competition.name)
+    races = get_races(competition.name)
     if not races.empty:
-        started = races.DateString < datetime.datetime.now().astimezone()
-        return races.loc[started].sort_values("DateString").iloc[-n:]
+        started = races.race_DateString < datetime.datetime.now().astimezone()
+        return races.loc[started].sort_values("race_DateString").iloc[-n:]
 
 
 def get_next_races(n=1, fisa=True, competition=None):
     if competition is None:
         competition = get_most_recent_competition(fisa)
-    races = get_competition_races(competition.name)
+    races = get_races(competition.name)
     to_race = races.DateString > datetime.datetime.now().astimezone()
     return races.loc[to_race].sort_values("DateString").iloc[:n]
 
@@ -537,20 +575,28 @@ def show_next_races(n=10, fisa=True, competition=None):
     return next_races
 
 
-def get_boat_types():
-    return get_worldrowing_records("boatClass", cached=True)
+def get_boat_classes():
+    return get_worldrowing_records(
+        "boatClass", cached=True
+    )
 
 
 def get_competition_types():
-    return get_worldrowing_records("competitionType", cached=True)
+    return get_worldrowing_records(
+        "competitionType", cached=True
+    )
 
 
 def get_statistics():
-    return get_worldrowing_records("statistic", cached=True)
+    return get_worldrowing_records(
+        "statistic", cached=True
+    )
 
 
 def get_venues():
-    return get_worldrowing_records("venue", cached=True)
+    return get_worldrowing_records(
+        "venue", cached=True
+    )
 
 
 RACEBOAT_FIELDS = {
@@ -673,7 +719,7 @@ def get_competition_best_times(timeout=2., load_event_info=False):
     )
     wbts, _ = map_concurrent(
         load_competition_best_times,
-        dict(zip(wbt_stats.description, zip(wbt_stats.url))),
+        dict(zip(wbt_stats.statistic_description, zip(wbt_stats.statistic_url))),
         progress_bar=None,
         timeout=timeout, 
     )
@@ -706,7 +752,7 @@ def get_world_best_times():
         get_competition_best_times()
         .sort_values("ResultTime")
         .groupby("BoatClass")
-        .first()
+        .min()
     )
 
 
@@ -734,15 +780,15 @@ def find_world_best_time(
 
 def get_raw_competition_results(competition_id=None, with_intermediates=True):
     competition_id = competition_id or get_most_recent_competition().name
-    competition_races = get_competition_races(competition_id).reset_index().add_prefix("race.")
-    competition_events = get_competition_events(competition_id).add_prefix("event.")
+    competition_races = get_races(competition_id)
+    competition_events = get_events(competition_id)
 
     if with_intermediates:
         race_results = get_intermediate_results(competition_id=competition_id)
     else:
         race_results = get_race_results(competition_id=competition_id)
 
-    boat_classes = get_boat_types().reset_index().add_prefix("boatClass.")
+    boat_classes = get_boat_classes()
     wbts = get_world_best_times().ResultTime
     wbts.index.name, wbts.name = "id", "worldBestTime"
 
@@ -763,40 +809,41 @@ def merge_competition_results(
 ):
     GMT_col = wbts.name
     boat_wbts = pd.merge(
-        boat_classes.reset_index(), wbts, 
-        left_on='boatClass.DisplayName', right_on=wbts.index.name
+        boat_classes, wbts, 
+        left_on='boatClass', right_on=wbts.index.name
     )
     event_wbts = pd.merge(
-        competition_events.reset_index(), boat_wbts, 
-        left_on='event.boatClassId', right_on='boatClass.id', 
+        competition_events, boat_wbts, 
+        left_on='event_boatClassId', right_on='boatClass_id', 
         # suffixes = ('_event', '_boat'),
     )
     race_wbts = pd.merge(
         competition_races, event_wbts,
-        left_on='race.eventId', right_on='id', 
+        left_on='race_eventId', right_on='event_id', 
         # suffixes = ('_race', '_event')
     )
     race_data = pd.merge(
         race_results.loc[
-            race_results.Rank.notna()
-            & (race_results.ResultTime > pd.Timedelta(0))
+            race_results.raceBoatIntermediates_Rank.notna()
+            & (race_results.raceBoatIntermediates_ResultTime > pd.Timedelta(0))
         ], 
         race_wbts,
-        left_on='raceId',  right_on='race.id' 
+        left_on='raceBoats_raceId',  right_on='race_id' 
     )
-    race_data.Rank = race_data.Rank.astype(int)
-    if "distance" in race_data.columns:
-        race_data.distance = race_data.distance.str.extract("([0-9]+)")[0].astype(float)
+    race_data.raceBoatIntermediates_Rank = race_data.raceBoatIntermediates_Rank.astype(int)
+    if "raceBoatIntermediates_distance" in race_data.columns:
         race_data['PGMT'] = (
-            race_data[GMT_col].dt.total_seconds() * race_data.distance 
-            / race_data.ResultTime.dt.total_seconds() / 2000
+            race_data[GMT_col].dt.total_seconds() 
+            / race_data.raceBoatIntermediates_ResultTime.dt.total_seconds() 
+            * race_data.distance / race_data.race_distance
         )
     else:
         race_data['PGMT'] = race_data[GMT_col].dt.total_seconds() / race_data.ResultTime.dt.total_seconds()
     
     race_data[GMT_col] = race_data[GMT_col].dt.total_seconds().apply(format_totalseconds)
-    race_data['time'] = race_data.ResultTime
-    race_data.ResultTime = race_data.ResultTime.dt.total_seconds().apply(format_totalseconds)
+    race_data['time'] = race_data.raceBoatIntermediates_ResultTime
+    race_data.raceBoatIntermediates_ResultTime = \
+        race_data.raceBoatIntermediates_ResultTime.dt.total_seconds().apply(format_totalseconds)
     
     for col in race_data.columns[race_data.columns.str.contains("DisplayName")]:
         n = col.rsplit(".")[-2]
@@ -830,10 +877,10 @@ def get_competition_results(competition_id=None, with_intermediates=True):
 
 def get_competition_pgmts(competition_id=None, finals_only=False):
     competition_id = competition_id or get_most_recent_competition().name
-    competition_races = get_competition_races(competition_id)
-    competition_events = get_competition_events(competition_id)
+    competition_races = get_races(competition_id)
+    competition_events = get_events(competition_id)
     competition_results = get_race_results(competition_id=competition_id)
-    boat_classes = get_boat_types()
+    boat_classes = get_boat_classes()
     wbts = get_world_best_times().ResultTime
     wbts.index.name, wbts.name = "id", "worldBestTime"
 

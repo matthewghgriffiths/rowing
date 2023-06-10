@@ -13,7 +13,7 @@ from . import api, utils
 from .api import (
     get_worldrowing_data, get_race_results, get_worldrowing_record,
     find_world_best_time, INTERMEDIATE_FIELDS, get_most_recent_competition,
-    get_competition_races, get_competition_events, get_world_best_times, 
+    get_races, get_events, get_world_best_times, 
     get_live_race
 )
 from .utils import (
@@ -1161,11 +1161,11 @@ def load_competition_data(
             "downloading up-to-date race for %s from World Rowing",
             competition.DisplayName
         )
-        races = api.get_competition_races(competition.name, cached=False)
-        events = api.get_competition_events(competition.name)
+        races = api.get_races(competition.name, cached=False)
+        events = api.get_events(competition.name)
         wbts = api.get_world_best_times()
 
-        events['BoatClass'] = api.get_boat_types().DisplayName[
+        events['BoatClass'] = api.get_boat_classes().DisplayName[
             events.boatClassId
         ].values
         events['worldBestTime'] = wbts.reindex(events.BoatClass).ResultTime.values 

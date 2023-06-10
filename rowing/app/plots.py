@@ -29,9 +29,9 @@ def melt_livetracker_data(live_data, filter_distance=100):
     plot_data = live_data.dropna(
         subset=['distanceTravelled', "split", "avg split"]
     ).melt([
-        "time", "distanceTravelled", "boat", "boatClass.DisplayName", "raceId"
+        "time", "distanceTravelled", "boat", "boatClass", "raceId"
     ])
-    plot_data['crew'] = plot_data.boat + " " + plot_data['boatClass.DisplayName']
+    plot_data['crew'] = plot_data.boat + " " + plot_data['boatClass']
     
     facet_groups = live_data[
         (live_data.distanceTravelled > filter_distance)

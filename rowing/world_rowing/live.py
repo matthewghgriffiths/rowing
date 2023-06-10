@@ -16,7 +16,7 @@ from . import api, utils
 from .api import (
     get_worldrowing_data, get_race_results, get_worldrowing_record,
     find_world_best_time, INTERMEDIATE_FIELDS, get_most_recent_competition,
-    get_competition_races, get_competition_events, get_world_best_times, 
+    get_races, get_events, get_world_best_times, 
     get_live_race
 )
 from .utils import (

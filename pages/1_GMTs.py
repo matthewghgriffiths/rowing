@@ -20,15 +20,15 @@ st.title("PGMTs")
 
 with st.expander("Select competition"):
     competition = select.select_competition()
-    competition_id = competition.name
+    competition_id = competition.competition_id
     competition_type = competition.WBTCompetitionType
     state.set("CompetitionId", competition_id)
 
-    f"loading Results for {competition.DisplayName}, type: {competition_type}"
+    f"loading Results for {competition.competition}, type: {competition_type}"
 
 races = select.get_races(competition_id)
 events = select.get_events(competition_id)
-results = select.get_results(competition_id)
+results = api.extract_results(races)
 boat_classes = select.get_boat_classes()
 
 print(races.columns)
@@ -43,27 +43,28 @@ with st.expander("Set GMTs"):
 
     gmts = select.set_gmts(cbts, competition_type)
 
+
 merged_results = api.merge_competition_results(
     results, races, events, boat_classes, gmts)
 
-print(merged_results.columns, races.columns)
+print(merged_results.columns)
 
 with st.expander("Filter Races"):
     results = select.select_results(
         merged_results,
-        default=["racePhase", "distance", "Rank"],
+        default=["Phase", "distance", "raceBoatIntermediates_Rank"],
         racePhase=['Final'], 
         distance=[2000], 
         Rank=[1],
         key='results', 
     )
-    results['crew'] = results['Country'] + " " + results['boatClass']
+    results['crew'] = results['raceBoats'] + " " + results['boatClass']
     results = results.set_index('crew')
 
 st.subheader("View PGMTs")
 st.dataframe(results.style.format({"PGMT": "{:,.2%}"}))
 
-name = f"{competition.DisplayName} results"
+name = f"{competition.competition} results"
 st.download_button(
     label=f"Download {name}.csv",
     data=inputs.df_to_csv(results),
@@ -71,7 +72,7 @@ st.download_button(
     mime='text/csv',
 )
 
-results['ResultTime'] = utils.read_times(results.ResultTime) + pd.Timestamp(0)
+results['raceBoatIntermediates_ResultTime'] = utils.read_times(results.raceBoatIntermediates_ResultTime) + pd.Timestamp(0)
 
 col1, col2, col3 = st.columns(3)
 facets_axes = {}
@@ -82,35 +83,34 @@ facets_axes['PGMT'] = {
     "tickformat": ",.0%"
 } 
 hover_data = {
-    'race.Date': True,
-    'ResultTime': "|%-M:%S.%L",
+    'race_Date': True,
+    'raceBoatIntermediates_ResultTime': "|%-M:%S.%L",
     'PGMT': ":.1%",
     'event': True,
-    'Country': True,
-    'Rank': True,
-    'Lane': True
+    'raceBoats': True,
+    'raceBoatIntermediates_Rank': True,
+    'raceBoats_Lane': True
 }
 with col1:
     x = st.selectbox(
         "Plot x", 
-        options=["race.Date", "PGMT", "ResultTime"], 
+        options=["race_Date", "PGMT", "raceBoatIntermediates_ResultTime"], 
         index=0
     )
 with col2:
     y = st.selectbox(
         "Plot y", 
-        options=["race.Date", "PGMT", "ResultTime"], 
+        options=["race_Date", "PGMT", "raceBoatIntermediates_ResultTime"], 
         index=1
     )
 with col3:
     group = st.selectbox(
         "Label", 
         options=[
-            "crew", "event", "Country", "ResultTime", "Rank", "Lane", "racePhase"
+            "crew", "event", "raceBoats", "raceBoatIntermediates_ResultTime", "raceBoatIntermediates_Rank", "Lane", "Phase"
         ], 
         index=0
     )
-
 fig = px.scatter(
     results.reset_index(), 
     x=x, 
@@ -133,13 +133,13 @@ with st.expander("Filter Intermediates"):
         key='intermediate_results', 
         filters=False, 
     ).groupby([
-        "race", "Country", "distance"
+        "race", "raceBoats", "distance"
     ]).first().unstack(-1)
 
 st.dataframe(intermediate_results['PGMT'].style.format("{:,.2%}"))
 
 
-name = f"{competition.DisplayName} PGMT"
+name = f"{competition.competition} PGMT"
 st.download_button(
     label=f"Download {name}.csv",
     data=inputs.df_to_csv(intermediate_results.PGMT),
@@ -147,12 +147,12 @@ st.download_button(
     mime='text/csv',
 )
 
-st.dataframe(intermediate_results['ResultTime'])
+st.dataframe(intermediate_results['raceBoatIntermediates_ResultTime'])
 
-name = f"{competition.DisplayName} intermediates"
+name = f"{competition.competition} intermediates"
 st.download_button(
     label=f"Download {name}.csv",
-    data=inputs.df_to_csv(intermediate_results.ResultTime),
+    data=inputs.df_to_csv(intermediate_results.raceBoatIntermediates_ResultTime),
     file_name=f'{name}.csv',
     mime='text/csv',
 )

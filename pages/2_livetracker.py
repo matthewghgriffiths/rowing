@@ -31,7 +31,7 @@ st.subheader("Select livetracker data")
 races = select.select_races(
     filters=True, select_all=False
 ).reset_index(drop=True)
-boat_classes = races['boatClass.DisplayName'].unique()
+boat_classes = races['boatClass'].unique()
 
 if races.empty:
     if state.get("expander.filter_races", False):
@@ -54,8 +54,8 @@ with st.expander("Select GMTs"):
     st.text("Set GMT")
     gmts = select.set_gmts(cbts)
 
-races = races.set_index("race.id").join(
-    gmts.dt.total_seconds().rename("GMT"), on="boatClass.DisplayName"
+races = races.set_index("race_id").join(
+    gmts.dt.total_seconds().rename("GMT"), on="boatClass"
 )
 
 if not download:
