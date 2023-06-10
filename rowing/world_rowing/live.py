@@ -84,12 +84,15 @@ def parse_livetracker_data(data):
     live_data = parse_livetracker_raw_data(data, 'live', 'id')
     if live_data.empty:
         return live_data 
+    
 
-    return live_data.rename(
+    live_data = live_data.rename(
         {c: c.split(".")[-1] for c in live_data.columns.levels[0]},
         axis=1, 
         level=0,
     )
+    
+    return live_data
 
 
 def parse_intermediates_data(data):
@@ -184,6 +187,10 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
         live_time_data[("avg_speed", c)] = (
             c_data.distanceTravelled / c_data.index
         )
+        live_time_data[("split", c)] = pd.to_datetime(
+            500 / live_time_data.metrePerSecond[c], unit='s', errors='coerce') 
+        live_time_data[('avg split', c)] = pd.to_datetime(
+            500. / live_time_data.avg_speed[c], unit='s', errors='coerce')
 
     live_data = live_time_data.stack(1).reset_index().join(
         lane_info[[
@@ -220,7 +227,7 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
 
 
 class RealTimeLivetracker:
-    def __init__(self, race_id, realtime_sleep=3, dummy=False):
+    def __init__(self, race_id, realtime_sleep=3, dummy=False, dummy_index=0):
         self.race_id = race_id
         
         self.realtime_sleep = realtime_sleep 
@@ -230,6 +237,7 @@ class RealTimeLivetracker:
         self.livetracker_history = {}
         self.dummy = dummy
         self.dummy_data = None
+        self.dummy_index = dummy_index
         self._shutdown = False
     
     @classmethod
@@ -249,10 +257,11 @@ class RealTimeLivetracker:
         self.realtime_history[curr_time] = data
         return data
     
-    def get_dummy_realtime(self, i):
+    def get_dummy_realtime(self):
         if self.dummy_data is None:
             self.dummy_data = api.get_worldrowing_data("livetracker", self.race_id)
-
+        
+        i = self.dummy_index
         live_data = copy.deepcopy(self.dummy_data)
         for lane, lane_data in enumerate(live_data['config']['lanes']):
             lane_count = len(lane_data['live'])
@@ -267,6 +276,7 @@ class RealTimeLivetracker:
             lane_data['live'] = lane_data['live'][s]
             live_data['config']['lanes'][lane] = lane_data
 
+        self.dummy_index += 1
         return live_data
     
     def get_livetracker(self):
@@ -306,7 +316,7 @@ class RealTimeLivetracker:
             i += 1
             curr_time = time.time()
             if self.dummy:
-                data = self.get_dummy_realtime(i)
+                data = self.get_dummy_realtime()
             elif curr_time > self.livetracker_max_age:
                 data = self.get_livetracker()
             else:
