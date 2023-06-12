@@ -1,8 +1,10 @@
 
 import logging
+from matplotlib import category
 import streamlit as st
 from io import StringIO
 
+import numpy as np 
 import pandas as pd
 from pandas.api.types import (
     is_categorical_dtype,
@@ -10,6 +12,8 @@ from pandas.api.types import (
     is_numeric_dtype,
     is_object_dtype,
 )
+
+from ..world_rowing import fields
 
 from . import state
 
@@ -42,7 +46,8 @@ def modal_button(label1, label2, key=None, mode=False):
 
 def filter_dataframe(
         df: pd.DataFrame, options=None, default=None, key=None, categories=(), filters=True,
-        select=True, select_col='select', select_all=True, **kwargs
+        select=True, select_col='select', select_all=True, select_first=False, 
+        **kwargs
 ) -> pd.DataFrame:
     """
     Adds a UI on top of a dataframe to let viewers filter columns
@@ -133,19 +138,25 @@ def filter_dataframe(
                 if user_text_input:
                     df = df[df[column].astype(str).str.contains(user_text_input)]
 
-    if select:
+    if select and not df.empty:
         df[select_col] = st.checkbox("Select all", value=select_all, key=f"{key}.select_all")
-        df = df.loc[
-            df.index[
-                st.data_editor(
-                    df[[select_col] + list(column_options)].set_index(select_col)
-                ).index.values
-            ]
-        ]
+        if select_first: 
+            df[select_col] = np.r_[True, df[select_col].iloc[1:]]
+
+        sel_df = st.data_editor(
+            df[[select_col] + list(column_options)].set_index(select_col)
+        )
+        sel_index = df.index[sel_df.index.values]
+        df = df.loc[sel_index]
 
     return df
 
 
+def select_dataframe(df, column, label=None):
+    label = None or f"select {column} to load"
+    sel_val = st.selectbox(label, df[column])
+    sel = df.loc[df[column] == sel_val].iloc[0]
+    return sel
 
 @st.cache_data
 def df_to_csv(df, **kwargs):
@@ -158,7 +169,7 @@ def download_csv(df, name='data', button="Create download", key=None, **kwargs):
         if st.button(button, key=key):
             data = df_to_csv(df, **kwargs)
             st.download_button(
-                label=f"Download {name}.csv",
+                label=f":inbox_tray: Download {name}.csv",
                 data=data,
                 file_name=f'{name}.csv',
                 mime='text/csv',
@@ -170,3 +181,62 @@ def upload_csv(name="Upload csv", encoding="utf-8", key=None, **kwargs):
         raw = StringIO(uploaded.getvalue().decode(encoding))
         df = pd.read_csv(raw, **kwargs)
         return df
+    
+
+def set_plotly_inputs(
+    data, 
+    x_cols=None, 
+    y_cols=None, 
+    color_cols=None, 
+    facet_cols=None, 
+    facet_rows=None, 
+    category_orders=None, 
+    col_labels=None,
+    max_unique=8, 
+    **kwargs
+):
+    cols = st.columns(5)
+    numeric_columns = fields.filter_numerical_columns(data)
+    cat_columns = fields.filter_categorical_columns(data, max_unique=max_unique)
+
+    col_options = {
+        "x": numeric_columns if x_cols is None else x_cols,
+        "y": numeric_columns if y_cols is None else y_cols,
+        "color": cat_columns if color_cols is None else color_cols,
+        "facet_col": np.r_[None, cat_columns] if facet_cols is None else facet_cols,
+        "facet_row": np.r_[None, cat_columns] if facet_rows is None else facet_rows,
+    }
+    choose_cols = {k: len(opts) > 1 for k, opts in col_options.items()}
+    col_labels = {
+        "x": "Choose x", 
+        "y": "Choose y", 
+        "color": "Label", 
+        "facet_col": "Choose columns", 
+        "facet_row": "Choose rows"
+    }
+    col_labels.update(col_labels or {})
+    n_cols = sum(choose_cols.values())
+    cols = st.columns(n_cols)
+    cat_orders = dict(
+        data.apply(lambda s: sorted(s.unique())).items()
+    )
+    cat_orders.update(category_orders or {})
+    plotly_inputs = {
+        "data_frame": data,
+        "category_orders": cat_orders,
+    }
+
+    i = 0 
+    for col, options in col_options.items():
+        val = kwargs.get(col, options[0])
+        if choose_cols[col]:
+            with cols[i]:
+                val = st.selectbox(
+                    col_labels[col],  
+                    options=options, 
+                    index=list(options).index(val)
+                )
+            i += 1
+        plotly_inputs[col] = val
+
+    return plotly_inputs

@@ -119,6 +119,8 @@ def parse_livetracker_info(data):
 
 def parse_livetracker(data):
     live_boat_data = parse_livetracker_data(data)
+    if live_boat_data.empty:
+        live_boat_data = None 
     intermediates = parse_intermediates_data(data)
     lane_info, race_distance = parse_livetracker_info(data)
     return live_boat_data, intermediates, lane_info, race_distance
@@ -379,13 +381,17 @@ class LiveRaceData:
             if self.lane_info is not None:
                 lane_update = update_dataframe(self.lane_info, lane_update)
 
-            track_count = livetracker_update['trackCount'].mean(axis=1).sort_values()
-            self.livetracker = livetracker_update.loc[track_count.index]
-            self.new_points = livetracker_update.index.difference(current_points)
+            if livetracker_update is not None:
+                track_count = livetracker_update['trackCount'].mean(axis=1).sort_values()
+                self.livetracker = livetracker_update.loc[track_count.index]
+                self.new_points = livetracker_update.index.difference(current_points)
         
         return self
     
     def plot_data(self, facets=None):
+        if self.livetracker is None:
+            return None 
+        
         index_names = ['id', "boat", "distanceTravelled"]
         stacked = self.livetracker.stack(
             1

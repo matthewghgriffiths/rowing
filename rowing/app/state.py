@@ -28,6 +28,13 @@ class NumpyEncoder(json.JSONEncoder):
 
         return super(NumpyEncoder, self).default(obj)
 
+def as_json(val):
+    try:
+        return json.dumps(val, cls=NumpyEncoder)
+    except TypeError:
+        return None
+    
+
 
 STATE = {
     k: json.loads(v[0]) 
@@ -38,28 +45,32 @@ get = STATE.get
 items = STATE.items 
 keys = STATE.keys 
 values = STATE.values 
+clear = STATE.clear 
 
 def set(key, val):
     STATE[key] = val
     update_query_params()
 
-def update(*args, **kwarg):
+def update(*args, **kwargs):
     STATE.update(*args, **kwargs)
     update_query_params()
 
 
 def update_query_params():
     STATE.update(st.session_state)
+    items = ((k, as_json(v)) for k, v in STATE.items())
     update_params = {
-        k: json.dumps(v, cls=NumpyEncoder) for k, v in STATE.items()
+        k: v for k, v in items if v is not None
     }
     st.experimental_set_query_params(**update_params)
 
 
-def reset():
-    if st.button("reset"):
-        st.experimental_set_query_params()
+def reset_button(label='reset'):
+    if st.button(label):
+        st.session_state.clear()
         st.cache_resource.clear()
+        clear()
+        st.experimental_set_query_params()
         st.experimental_rerun()
 
 

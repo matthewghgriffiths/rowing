@@ -29,7 +29,10 @@ with st.sidebar:
 st.subheader("Select livetracker data")
 
 races = select.select_races(
-    filters=True, select_all=False
+    filters=True, select_all=False, select_first=True, 
+    default=['Phase', "Gender", 'race_raceStatus'],
+    Phase=['Final A'],
+    race_raceStatus=["Official"],
 ).reset_index(drop=True)
 boat_classes = races['boatClass'].unique()
 
@@ -63,7 +66,7 @@ if not download:
     st.caption("Checkbox 'load livetracker data' in sidebar to view race data")
     st.stop()
 
-with st.spinner("Downloading livetracker data"):
+with st.spinner("Downloading livetracker data"), st.empty():
     live_data, intermediates = select.get_races_livedata(races, max_workers=threads)
 
 with st.expander("Filter livetracker data"):
@@ -81,8 +84,6 @@ with st.spinner("Generating livetracker plot"):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-if st.button("reset"):
-    st.experimental_set_query_params()
-    st.experimental_rerun()
-else:
-    state.update_query_params()
+
+state.reset_button()
+state.update_query_params()
