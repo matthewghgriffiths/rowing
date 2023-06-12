@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 st.set_page_config(
     page_title="PGMTs",
     layout='wide'
-    # page_icon="👋",
 )
 st.title("PGMTs")
 
@@ -26,17 +25,8 @@ with st.expander("Select competition"):
 
     f"loading Results for {competition.competition}, type: {competition_type}"
 
-# races = select.get_races(competition_id)
-# events = select.get_events(competition_id)
-# results = api.extract_results(races)
-# boat_classes = select.get_boat_classes()
-
 with st.expander("Set GMTs"):
     gmts = select.set_competition_gmts(competition_id, competition_type)
-
-
-# merged_results = api.merge_competition_results(
-#     results, races, events, boat_classes, gmts)
 
 with st.expander("Filter Results"):
     results = select.select_competition_results(
@@ -56,18 +46,7 @@ with st.expander("Filter Results"):
 
 st.subheader("View PGMTs")
 
-
-st.components.v1.html(
-    results.style.format(fields.field_formats(results)).to_html()
-)
-
-print(
-    fields.field_formats(results)
-)
-print(results.dtypes)
-st.dataframe(
-    results.style.format(fields.field_formats(results))
-)
+st.dataframe(fields.format_dataframe(results))
 
 name = f"{competition.competition} results"
 st.download_button(
@@ -87,18 +66,10 @@ plot_inputs = inputs.set_plotly_inputs(
     group=fields.crew, 
     facet_col=fields.Day, 
 )
-print(plot_inputs)
-
 facets_axes = {
-    fields.race_Date: {
-        "matches": None
-    },
-    fields.ResultTime: {
-        "tickformat": "%-M:%S"
-    },
-    fields.PGMT: {
-        "tickformat": ",.0%"
-    } 
+    fields.race_Date: {"matches": None},
+    fields.ResultTime: {"tickformat": "%-M:%S"},
+    fields.PGMT: {"tickformat": ",.0%"} 
 }
 # hover_data = {
 #     'race_Date': True,
@@ -155,9 +126,7 @@ cols = st.multiselect(
 )
 
 for col in cols:
-    st.dataframe(intermediate_results[col].style.format(
-        col_formats[col]
-    ))
+    st.dataframe(fields.format_dataframe(intermediate_results[col]))
 
     name = f"{competition.competition} {col}"
     st.download_button(

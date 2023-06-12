@@ -454,7 +454,7 @@ def get_competitions(year=None, fisa=True, has_results=True, cached=True, **kwar
         + "competitionType,venue".split(",")
     ))
     competitions = get_worldrowing_records("competition", cached=cached, **kwargs)
-    competitions[fields.competition_competitionType] = \
+    competitions[fields.WBTCompetitionType] = \
         competitions[fields.competition_competitionType].replace(
         COMPETITION_TYPES
     )

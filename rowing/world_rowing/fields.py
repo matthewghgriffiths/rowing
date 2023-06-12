@@ -1,6 +1,7 @@
 
 from functools import partial
 
+import pandas as pd
 from pandas.api.types import (
     is_categorical_dtype,
     is_datetime64_any_dtype,
@@ -44,6 +45,7 @@ field_names = {
     'ResultTime': 'Time',
     'split': 'Split', 
     'avg_split': 'Average Split', 
+    'avg_speed': 'Average Speed', 
     'Date': 'Date',
     'raceBoats_raceBoatIntermediates': 'raceBoats_raceBoatIntermediates', 
     'raceBoatIntermediates_Rank': 'Intermediate Position',
@@ -57,11 +59,16 @@ field_names = {
     'Distance': 'Distance',
     'race_Date': 'Race Start',
     'race_id': 'race_id',
+    'raceId': 'raceId', 
     'race_raceBoats': 'Race.Boat',
     'race_event': 'Race.Event',
     'race_eventId': 'race_eventId', 
+    'race_event_boatClassId': 'race_event_boatClassId', 
+    'race_competitionId': 'race_competitionId',
+    'race_event_competitionId': 'race_event_competitionId', 
     'race_event_RscCode': 'Rsc Code',
     'race_distance': 'Race Distance',
+    'race_raceStatus': 'Results Status',
     'boatClass_id': 'boatClass_id',
     'event_boatClassId': 'event_boatClassId',
     'Gender': 'Gender',
@@ -111,6 +118,14 @@ def field_formats(data):
     cols = data.columns[data.columns.isin(field_types)]
     formats.update(zip(cols, cols.map(field_formatters.get)))
     return formats
+
+def format_dataframe(data):
+    formatters = field_formats(data)
+    return pd.concat({
+        col: values.apply(formatters.get(col, lambda x: x))
+        for col, values in data.items()
+    }, axis=1)
+
 
 def rename_column(s, prefix=''):
     c = f"{prefix}_{s}".replace(".", "_")

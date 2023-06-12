@@ -186,12 +186,12 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
 
     for c in countries:
         c_data = live_time_data.xs(c, axis=1, level=1)
-        live_time_data[("avg_speed", c)] = (
+        live_time_data[(fields.avg_speed, c)] = (
             c_data.distanceTravelled / c_data.index
         )
-        live_time_data[("split", c)] = pd.to_datetime(
+        live_time_data[(fields.split, c)] = pd.to_timedelta(
             500 / live_time_data.metrePerSecond[c], unit='s', errors='coerce') 
-        live_time_data[('avg split', c)] = pd.to_datetime(
+        live_time_data[(fields.avg_split, c)] = pd.to_timedelta(
             500. / live_time_data.avg_speed[c], unit='s', errors='coerce')
 
     live_data = live_time_data.stack(1).reset_index().join(

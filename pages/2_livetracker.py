@@ -5,7 +5,7 @@ import pandas as pd
 
 import plotly.express as px
 
-# from rowing.world_rowing import api, live, utils
+from rowing.world_rowing import fields
 from rowing.app import select, inputs, state, plots
 
 st.set_page_config(
@@ -30,11 +30,17 @@ st.subheader("Select livetracker data")
 
 races = select.select_races(
     filters=True, select_all=False, select_first=True, 
-    default=['Phase', "Gender", 'race_raceStatus'],
-    Phase=['Final A'],
-    race_raceStatus=["Official"],
+    default=[
+        fields.Phase, 
+        fields.Gender, 
+        fields.race_raceStatus
+    ],
+    **{
+        fields.Phase: ['Final A'],
+        fields.race_raceStatus: ["Official"],
+    }
 ).reset_index(drop=True)
-boat_classes = races['boatClass'].unique()
+boat_classes = races[fields.boatClass].unique()
 
 if races.empty:
     if state.get("expander.filter_races", False):
@@ -46,19 +52,14 @@ if races.empty:
     state.update_query_params()
     st.experimental_rerun()
 
+competition_id = races[fields.race_competitionId].iloc[0]
 with st.expander("Select GMTs"):
-    st.text("Select competition best times")
-    cbts = select.select_best_times(boat_classes)
+    gmts = select.set_competition_gmts(competition_id)
 
-    if cbts.empty:
-        st.write("No GMTS selected")
-        st.stop()
-
-    st.text("Set GMT")
-    gmts = select.set_gmts(cbts)
 
 races = races.set_index("race_id").join(
-    gmts.dt.total_seconds().rename("GMT"), on="boatClass"
+    gmts.dt.total_seconds().rename(fields.GMT), 
+    on=fields.boatClass
 )
 
 if not download:

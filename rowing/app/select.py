@@ -72,12 +72,13 @@ def get_races_livedata(races, max_workers=10):
     )
     live_data = live_data.join(
         races[[
-            "race_Date", "race", "Gender", 
-            "Category", "Phase", "boatClass", "GMT"
+            fields.race_Date, fields.race, fields.Gender, 
+            fields.Category, fields.Phase, fields.boatClass, 
+            fields.GMT
         ]], 
-        on='raceId'
+        on=fields.raceId
     )
-    live_data['race_Date'] = pd.to_datetime(live_data['race_Date'])
+    live_data[fields.race_Date] = pd.to_datetime(live_data[fields.race_Date])
     return live_data, intermediates
 
 
@@ -155,7 +156,7 @@ def select_competition(current=True):
             started=[True], 
             key='competition',
             filters=False
-        ).sort_values(fields.competition_StartDate)
+        ).sort_values(fields.competition_StartDate, ascending=False)
 
         if competitions.empty:
             st.caption("No competition selected")
@@ -184,15 +185,15 @@ def select_competition(current=True):
     return competition
 
 RACE_COL = [
-        'boatClass',
-        'race', 
-        'Phase',
-        'Gender', 
-        'Category', 
-        'Day', 
-        'race_Date', 
-        'race_event_competition',
-        'race_raceStatus', 
+    fields.boatClass,
+    fields.race, 
+    fields.Phase,
+    fields.Gender, 
+    fields.Category, 
+    fields.Day, 
+    fields.race_Date,
+    fields.race_event_competition,
+    fields.race_raceStatus, 
 ]
 
 def filter_races(
@@ -205,31 +206,32 @@ def filter_races(
     boat_classes = get_boat_classes()
     races = pd.merge(
         races, boat_classes, 
-        left_on='race_event_boatClassId', right_on="boatClass_id",
+        left_on=fields.race_event_boatClassId, 
+        right_on=fields.boatClass_id,
         how='left', 
     )
     st.subheader("Filter races to look at")
-    print(kwargs)
     kwargs.setdefault(
-        'Phase', ['Final A'])
+        fields.Phase, ['Final A'])
     kwargs.setdefault(
-        'Gender', ['Men', 'Women', 'Mixed'])
+        fields.Gender, ['Men', 'Women', 'Mixed'])
     kwargs.setdefault(
-        'Category', ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3']) 
+        fields.Category, ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3']) 
     kwargs.setdefault(
-        'race_raceStatus', ["Official"])
+        fields.race_raceStatus, ["Official"])
     kwargs.setdefault(
-        "default", ['Gender', 'Category', 'race_raceStatus'])
+        "default", [fields.Gender, fields.Category, fields.race_raceStatus])
+
     races = inputs.filter_dataframe(
         races, 
         options=RACE_COL, 
-        categories=['Phase'],
+        categories=[fields.Phase],
         filters=filters,
         select_all=select_all,
         select_first=select_first,
         **kwargs,
     ).reset_index(drop=True)
-    races['race_Date'] = pd.to_datetime(races['race_Date'])
+    races[fields.race_Date] = pd.to_datetime(races[fields.race_Date])
     return races
 
 
@@ -243,6 +245,7 @@ def select_races(
             competition_id = competition.competition_id
 
     races = get_races(competition_id)
+    
     with st.expander("Filter races", state.get("expander.filter_races", False)):
         races = filter_races(races, **kwargs)
     
@@ -251,9 +254,9 @@ def select_races(
 
 def select_race(races):
     sel_race = st.selectbox(
-        "select race to load", races['race'], 
+        "select race to load", races[fields.race], 
     )
-    race = races.loc[races['race'] == sel_race]
+    race = races.loc[races[fields.race] == sel_race]
     return race.iloc[0]
 
 
