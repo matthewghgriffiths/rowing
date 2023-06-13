@@ -12,7 +12,7 @@ from scipy import stats
 
 from tqdm.auto import tqdm 
 
-from . import api, utils 
+from . import api, utils, fields
 from .api import (
     get_worldrowing_data, get_race_results, get_worldrowing_record,
     find_world_best_time, INTERMEDIATE_FIELDS, get_most_recent_competition,
@@ -42,8 +42,7 @@ RESULTS_FIELDS = {
     'ResultTime': ('ResultTime',),
     # 'raceBoatIntermediates': ('raceBoatIntermediates',),
 }
-
-def parse_livetracker_raw_data(data, field, index=None):
+def parse_livetracker_lane_data(data, field, index):
     lanes = {
         lane['Lane']: lane 
         for lane in data['config']['lanes']
@@ -56,52 +55,35 @@ def parse_livetracker_raw_data(data, field, index=None):
         lane_data['DisplayName']: lane
         for lane, lane_data in lanes.items()
     }).sort_values()
-
-    if index is None:
-        return pd.Series(
-            {lane['DisplayName']: lane[field] for lane in lanes.values()},
-            name=field
-        )
-
     parsed = pd.concat(
         {
             lane['DisplayName']: pd.json_normalize(lane[field]).set_index(index) 
             for lane in lanes.values()
         }, 
         axis=1, 
-        names=['boat', field]
-    ).swaplevel(0, 1, 1)
-    
-    return parsed[
-        pd.MultiIndex.from_product([
-            parsed.columns.levels[0], 
-            lane_boat.index
-        ])
-    ].copy()
+        names=[fields.raceBoats, field]
+    ).swaplevel(0, 1, 1).rename(
+        columns=fields.renamer(field), level=0
+    )
+    return parsed.sort_index(axis=1)
 
 
 def parse_livetracker_data(data):
-    live_data = parse_livetracker_raw_data(data, 'live', 'id')
+    live_data = parse_livetracker_lane_data(data, 'live', 'id')
     if live_data.empty:
         return live_data 
-    
-
-    live_data = live_data.rename(
-        {c: c.split(".")[-1] for c in live_data.columns.levels[0]},
-        axis=1, 
-        level=0,
-    )
     
     return live_data
 
 
 def parse_intermediates_data(data):
-    intermediates = parse_livetracker_raw_data(
+    intermediates = parse_livetracker_lane_data(
         data, 'intermediates', 'distance.DisplayName'
-    ).rename(columns={"raceConfig.value": "distance"})
-    if 'ResultTime' in intermediates:
-        for c, times in intermediates.ResultTime.items():
-            intermediates[("ResultTime", c)] = pd.to_timedelta(times)
+    )
+    intermediates.index = intermediates.index.str.extract("([0-9]+)")[0].astype(int)
+    if fields.intermediates_ResultTime in intermediates:
+        for c, times in intermediates[fields.intermediates_ResultTime].items():
+            intermediates[(fields.intermediates_ResultTime, c)] = pd.to_timedelta(times)
 
     return intermediates
 
@@ -111,8 +93,8 @@ def parse_livetracker_info(data):
             {k: lane[k] for k in lane.keys() - {"live", "intermediates"}}
         )
         for lane in data['config']['lanes']
-    ]).set_index("DisplayName")
-    lane_info['ResultTime'] = utils.read_times(lane_info.ResultTime)
+    ]).set_index("DisplayName").rename(columns=fields.renamer("lane"))
+    lane_info[fields.lane_ResultTime] = utils.read_times(lane_info[fields.lane_ResultTime])
     race_distance = data['config']['plot']['totalLength']
     return lane_info, race_distance
 
@@ -140,17 +122,16 @@ def shift_down(s, shift, min_val=0):
 
 
 def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_distance):
-    intermediate_times = intermediates.ResultTime.apply(lambda s: s.dt.total_seconds())
-    intermediate_distances = intermediates.distance.values[:, 0].astype(float)
-    intermediate_times.index = intermediate_distances
+    intermediate_times = intermediates[
+        fields.intermediates_ResultTime].apply(lambda s: s.dt.total_seconds())
+    intermediate_distances = intermediate_times.index.values
 
     live_data = live_boat_data.loc[
-        live_boat_data.trackCount.min(1).sort_values().index
+        live_boat_data[fields.live_trackCount].min(1).sort_values().index
     ].reset_index(drop=True)
-
     countries = live_data.columns.levels[1]
-    distances = live_data.distanceTravelled
-    speed = live_data.metrePerSecond
+    distances = live_data[fields.live_raceBoatTracker_distanceTravelled]
+    speed = live_data[fields.live_raceBoatTracker_metrePerSecond]
 
     # Estimate times
     diffs = - distances.diff(-1).replace(0, np.nan)
@@ -187,19 +168,23 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     for c in countries:
         c_data = live_time_data.xs(c, axis=1, level=1)
         live_time_data[(fields.avg_speed, c)] = (
-            c_data.distanceTravelled / c_data.index
+            c_data[fields.live_raceBoatTracker_distanceTravelled] / c_data.index
         )
         live_time_data[(fields.split, c)] = pd.to_timedelta(
-            500 / live_time_data.metrePerSecond[c], unit='s', errors='coerce') 
+            500 / live_time_data[fields.live_raceBoatTracker_metrePerSecond][c], unit='s', errors='coerce') 
         live_time_data[(fields.avg_split, c)] = pd.to_timedelta(
-            500. / live_time_data.avg_speed[c], unit='s', errors='coerce')
+            500. / live_time_data[fields.avg_speed, c], unit='s', errors='coerce')
 
     live_data = live_time_data.stack(1).reset_index().join(
         lane_info[[
-            'Rank', 'ResultTime', 
-            'country.CountryCode', 'country.DisplayName',
-            '_finished', 'InvalidMarkResult', "Remark"
-        ]], on='boat'
+            fields.lane_Rank, 
+            fields.lane_ResultTime, 
+            fields.lane_country_CountryCode, 
+            fields.lane_country,
+            fields.lane__finished, 
+            fields.lane_InvalidMarkResult, 
+            fields.lane_Remark,
+        ]], on=fields.raceBoats
     )
     live_data['raceDistance'] = race_distance
     return live_data, intermediate_times 

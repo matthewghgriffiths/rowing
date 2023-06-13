@@ -352,7 +352,7 @@ def set_gmts(cbts, *competition_types):
 
     return pd.to_timedelta(gmts)
 
-def set_competition_gmts(competition_id, competition_type):
+def set_competition_gmts(competition_id, competition_type=None):
     comp_boat_classes = get_competition_boat_classes(competition_id)
     cbts = select_best_times(comp_boat_classes, competition_type)
 

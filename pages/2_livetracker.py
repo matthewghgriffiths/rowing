@@ -52,7 +52,8 @@ if races.empty:
     state.update_query_params()
     st.experimental_rerun()
 
-competition_id = races[fields.race_competitionId].iloc[0]
+print(races.dtypes)
+competition_id = races[fields.race_event_competitionId].iloc[0]
 with st.expander("Select GMTs"):
     gmts = select.set_competition_gmts(competition_id)
 
