@@ -13,6 +13,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 app_GMTs = importlib.import_module("pages.1_GMTs", "..")
 app_livetracker = importlib.import_module("pages.2_livetracker", "..")
+app_realtime = importlib.import_module("pages.3_realtime", "..")
 
 @pytest.mark.parametrize(
     "params", [
@@ -68,3 +69,10 @@ def test_GMTs(params):
 )
 def test_livetracker(params):
     app_livetracker.main(params)
+
+
+@pytest.mark.parametrize(
+    "params", [{'dummy_step': 50,},]
+)
+def test_realtime(params):
+    app_realtime.main(params)

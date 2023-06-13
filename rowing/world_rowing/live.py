@@ -214,7 +214,10 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
 
 
 class RealTimeLivetracker:
-    def __init__(self, race_id, realtime_sleep=3, dummy=False, dummy_index=0):
+    def __init__(
+            self, race_id, realtime_sleep=3, 
+            dummy=False, dummy_index=0, dummy_step=1
+    ):
         self.race_id = race_id
         
         self.realtime_sleep = realtime_sleep 
@@ -225,6 +228,7 @@ class RealTimeLivetracker:
         self.dummy = dummy
         self.dummy_data = None
         self.dummy_index = dummy_index
+        self.dummy_step = dummy_step 
         self._shutdown = False
     
     @classmethod
@@ -263,7 +267,7 @@ class RealTimeLivetracker:
             lane_data['live'] = lane_data['live'][s]
             live_data['config']['lanes'][lane] = lane_data
 
-        self.dummy_index += 1
+        self.dummy_index += self.dummy_step
         return live_data
     
     def get_livetracker(self):
@@ -367,7 +371,7 @@ class LiveRaceData:
                 lane_update = update_dataframe(self.lane_info, lane_update)
 
             if livetracker_update is not None:
-                track_count = livetracker_update['trackCount'].mean(axis=1).sort_values()
+                track_count = livetracker_update[fields.live_trackCount].mean(axis=1).sort_values()
                 self.livetracker = livetracker_update.loc[track_count.index]
                 self.new_points = livetracker_update.index.difference(current_points)
         
@@ -377,7 +381,11 @@ class LiveRaceData:
         if self.livetracker is None:
             return None 
         
-        index_names = ['id', "boat", "distanceTravelled"]
+        index_names = [
+            fields.live_raceBoatTracker_id, 
+            fields.raceBoats, 
+            fields.live_raceBoatTracker_distanceTravelled
+        ]
         stacked = self.livetracker.stack(
             1
         ).droplevel(0).reset_index().set_index(

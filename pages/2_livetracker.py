@@ -71,10 +71,10 @@ def main(params=None):
 
     with st.expander("Filter livetracker data"):
         live_data = select.filter_livetracker(live_data)
-        live_data, PGMT = select.set_livetracker_PGMT(live_data)
 
     st.subheader("Show livetracker")
 
+    live_data, PGMT = select.set_livetracker_PGMT(live_data)
     facets = [
         fields.PGMT, 
         fields.distance_from_pace, 
