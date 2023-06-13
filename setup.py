@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='rowing',
-    version='0.3.1',
+    version='0.3.2',
     description='Library for loading and presenting data from the worldrowing.com',
     author='Matthew Griffiths',
     author_email='matthewghgriffiths@gmail.com',
@@ -15,7 +15,7 @@ setup(
     packages=['rowing'],
     entry_points={
         'console_scripts': [
-            'worldrowing = rowing.worldrowing.app:main [WORLDROWING]'
+            'worldrowing = rowing.worldrowing.app:main [WORLDROWING]',
             'garmin = rowing.analysis.garmin:main [GARMIN]',
             'gpx = rowing.analysis.files:main [GPX]',
         ]
