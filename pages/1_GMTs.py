@@ -46,7 +46,7 @@ with st.expander("Filter Results"):
 
 st.subheader("View PGMTs")
 
-st.dataframe(fields.format_dataframe(results))
+st.dataframe(fields.to_streamlit_dataframe(results))
 
 name = f"{competition.competition} results"
 st.download_button(
@@ -126,7 +126,7 @@ cols = st.multiselect(
 )
 
 for col in cols:
-    st.dataframe(fields.format_dataframe(intermediate_results[col]))
+    st.dataframe(fields.to_streamlit_dataframe(intermediate_results[col]))
 
     name = f"{competition.competition} {col}"
     st.download_button(

@@ -52,16 +52,12 @@ if races.empty:
     state.update_query_params()
     st.experimental_rerun()
 
-print(races.dtypes)
 competition_id = races[fields.race_event_competitionId].iloc[0]
 with st.expander("Select GMTs"):
     gmts = select.set_competition_gmts(competition_id)
+    races = races.set_index("race_id").join(
+        gmts.rename(fields.GMT), on=fields.boatClass)
 
-
-races = races.set_index("race_id").join(
-    gmts.dt.total_seconds().rename(fields.GMT), 
-    on=fields.boatClass
-)
 
 if not download:
     st.caption(f"Selected {len(races)} races")
@@ -73,16 +69,22 @@ with st.spinner("Downloading livetracker data"), st.empty():
 
 with st.expander("Filter livetracker data"):
     live_data = select.filter_livetracker(live_data)
+    live_data, PGMT = select.set_livetracker_PGMT(live_data)
 
 st.subheader("Show livetracker")
 
-live_data, PGMT = select.set_livetracker_PGMT(live_data)
-distance_from_pace = "distance from PGMT"
-facets = ["PGMT", "distance from PGMT", "split", "strokeRate"]
+facets = [
+    fields.PGMT, 
+    fields.distance_from_pace, 
+    fields.split, 
+    fields.live_raceBoatTracker_strokeRate,
+]
 
 with st.spinner("Generating livetracker plot"):
+    plot_data, facet_axes, facet_format = args = \
+        plots.melt_livetracker_data(live_data, 100)
     fig = plots.make_livetracker_plot(
-        facets, *plots.melt_livetracker_data(live_data, 100), 
+        facets, *args, 
     )
     st.plotly_chart(fig, use_container_width=True)
 

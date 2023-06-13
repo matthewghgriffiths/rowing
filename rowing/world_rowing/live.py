@@ -137,7 +137,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     diffs = - distances.diff(-1).replace(0, np.nan)
     boat_time_diff = diffs / speed.replace(0, np.nan)
     mean_time_diff = boat_time_diff.mean(1).fillna(0)
-    times = mean_time_diff.cumsum().rename("time")
+    times = mean_time_diff.cumsum().rename(fields.live_time)
 
     # Make sure timepoints around intermediates are correct
     int_times = pd.Series(np.nan, live_data.index)
@@ -186,7 +186,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
             fields.lane_Remark,
         ]], on=fields.raceBoats
     )
-    live_data['raceDistance'] = race_distance
+    live_data[fields.race_distance] = race_distance
     return live_data, intermediate_times 
 
 

@@ -76,7 +76,7 @@ def get_races_livedata(races, max_workers=10):
             fields.Category, fields.Phase, fields.boatClass, 
             fields.GMT
         ]], 
-        on=fields.raceId
+        on=fields.live_raceId
     )
     live_data[fields.race_Date] = pd.to_datetime(live_data[fields.race_Date])
     return live_data, intermediates
@@ -394,25 +394,28 @@ LIVE_COLS = [
     fields.Category, 
     fields.Gender,
     fields.boatClass, 
-    fields.Rank,
+    fields.live_raceBoatTracker_currentPosition,
     fields.Date, 
 ]
 def filter_livetracker(live_data):
+    rank_col = fields.live_raceBoatTracker_currentPosition
     live_data = inputs.filter_dataframe(
         live_data, key='live_data', 
         options=LIVE_COLS, 
-        default=["Rank"],
+        default=[rank_col],
         select=False, 
         **{
-            "Rank": sorted(live_data.Rank.unique())
+            rank_col: sorted(live_data[rank_col].unique())
         }
     )
-    live_data[fields.split] = pd.to_datetime(
-        500 / live_data.metrePerSecond, unit='s', errors='coerce') 
-    live_data[fields.avg_split] = pd.to_datetime(
-        500. / live_data.avg_speed, unit='s', errors='coerce')
-    live_data[fields.ResultTime] = pd.to_datetime(
-        live_data.ResultTime.dt.total_seconds(), unit='s', errors='coerce')
+    # live_data[fields.split] = pd.to_datetime(
+    #     500 / live_data[fields.live_raceBoatTracker_metrePerSecond], 
+    #     unit='s', errors='coerce') 
+    # live_data[fields.avg_split] = pd.to_datetime(
+    #     500. / live_data.avg_speed, unit='s', errors='coerce')
+    # live_data[fields.ResultTime] = pd.to_datetime(
+    #     live_data[fields.ResultTime].dt.total_seconds(), 
+    #     unit='s', errors='coerce')
     return live_data
 
 
@@ -427,12 +430,15 @@ def set_livetracker_PGMT(live_data):
             label_visibility="collapsed"
         )
 
-    gmt_speed = live_data.raceDistance / live_data.GMT 
-    gmt_distance = live_data.time * gmt_speed
+    gmt_speed = (
+        live_data[fields.race_distance] 
+        / live_data[fields.GMT].dt.total_seconds() 
+    )
+    gmt_distance = live_data[fields.live_time] * gmt_speed
     pace_distance = gmt_distance * PGMT
 
-    distance_from_pace = f"distance from PGMT"
-    live_data[distance_from_pace] = pace_distance - live_data.distanceTravelled
-    live_data['PGMT'] = live_data.distanceTravelled / pace_distance
+    distance = live_data[fields.live_raceBoatTracker_distanceTravelled]
+    live_data[fields.distance_from_pace] = pace_distance - distance
+    live_data[fields.PGMT] = distance / pace_distance
 
     return live_data, PGMT

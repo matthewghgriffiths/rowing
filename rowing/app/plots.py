@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd 
 import plotly.express as px
 
+from ..world_rowing import fields
+
 FORMATS = {
     "default": {
         "format": ':.1%'
@@ -26,27 +28,45 @@ def to_plot_data(
     pass
 
 def melt_livetracker_data(live_data, filter_distance=100):
+    live_data = fields.to_plotly_dataframe(live_data)
     plot_data = live_data.dropna(
-        subset=['distanceTravelled', "split", "avg split"]
+        subset=[
+            fields.live_raceBoatTracker_distanceTravelled,
+            fields.split, 
+            fields.avg_split, 
+        ]
     ).melt([
-        "time", "distanceTravelled", "boat", "boatClass", "raceId"
+        fields.live_time, 
+        fields.live_raceBoatTracker_distanceTravelled, 
+        fields.raceBoats, 
+        fields.boatClass, 
+        fields.live_raceId,
     ])
-    plot_data['crew'] = plot_data.boat + " " + plot_data['boatClass']
-    
+    plot_data[fields.crew] = (
+        plot_data[fields.raceBoats] + " " + plot_data[fields.boatClass])
+
+    distance_travelled = live_data[fields.live_raceBoatTracker_distanceTravelled]
     facet_groups = live_data[
-        (live_data.distanceTravelled > filter_distance)
-        & (live_data.distanceTravelled < live_data.raceDistance)
+        (distance_travelled > filter_distance)
+        & (distance_travelled < live_data[fields.race_distance])
     ].dropna(
-        subset=["split", "avg split", "avg_speed"]
+        subset=[fields.split, fields.avg_split, fields.avg_speed]
     ).melt([
-        "time", "distanceTravelled", "raceBoatId"
+        fields.live_time, 
+        fields.live_raceBoatTracker_distanceTravelled, 
+        fields.live_raceBoatTracker_raceBoatId,
     ]).groupby("variable")
     
     variable_types = facet_groups.value.first().map(type)
     facets = variable_types.index[variable_types != str]
 
     plot_data = plot_data.merge(
-        live_data, on=['time', 'distanceTravelled', 'boat', 'raceId']
+        live_data, on=[
+            fields.live_time, 
+            fields.live_raceBoatTracker_distanceTravelled, 
+            fields.raceBoats, 
+            fields.live_raceId,
+        ]
     )
 
 
@@ -58,13 +78,13 @@ def melt_livetracker_data(live_data, filter_distance=100):
     axis=1).apply(tuple, axis=1).rename("range").to_frame()
 
     facet_format = {f: True for f in facets}
-    facet_format['kilometrePersSecond'] = False
-    facet_format['avg_speed'] = ":0.1f"
-    facet_format["distance from PGMT"] = ":0.1f"
-    facet_format['PGMT'] = ':.1%'
-    facet_format['split'] = "|%-M:%S.%L"
-    facet_format['avg split'] = "|%-M:%S.%L"
-    facet_format['ResultTime'] = "|%-M:%S.%L"
+    # facet_format['kilometrePersSecond'] = False
+    facet_format[fields.avg_speed] = ":0.1f"
+    facet_format[fields.distance_from_pace] = ":0.1f"
+    facet_format[fields.PGMT] = ':.1%'
+    facet_format[fields.split] = "|%-M:%S.%L"
+    facet_format[fields.avg_split] = "|%-M:%S.%L"
+    facet_format[fields.lane_ResultTime] = "|%-M:%S.%L"
 
     facet_data['matches'] = None
     facet_data['title_text'] = facet_data.index
@@ -75,11 +95,14 @@ def melt_livetracker_data(live_data, filter_distance=100):
         if fmt is not True:
             facet_axes[facet]['tickformat'] = fmt
 
-    facet_axes['PGMT']['tickformat'] = ',.1%'
-    facet_axes['split']['tickformat'] = "%-M:%S"
-    facet_axes['ResultTime']['tickformat'] = "%-M:%S"
-
-    for col in ["distance from PGMT", "distanceFromLeader"]:
+    facet_axes[fields.PGMT]['tickformat'] = ',.1%'
+    facet_axes[fields.split]['tickformat'] = "%-M:%S"
+    facet_axes[fields.lane_ResultTime]['tickformat'] = "%-M:%S"
+    for col in [
+        fields.distance_from_pace, 
+        fields.live_raceBoatTracker_distanceFromLeader,
+        fields.split,
+    ]:
         facet_axes[col]['range'] =  facet_axes[col]['range'][::-1]
 
     return plot_data, facet_axes, facet_format
@@ -91,9 +114,9 @@ def make_livetracker_plot(
     facet_rows = {facet: len(facets) - i for i, facet in enumerate(facets)}
     fig = px.line(
         plot_data[plot_data.variable.isin(facets)], 
-        x = 'distanceTravelled', 
+        x = fields.live_raceBoatTracker_distanceTravelled, 
         y = "value", 
-        color = 'crew', 
+        color = fields.crew, 
         hover_data=facet_format, 
         facet_row="variable", 
         category_orders={
