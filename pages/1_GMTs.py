@@ -38,12 +38,12 @@ def main(params=None):
             competition_id, gmts,
             default=[
                 fields.Phase, 
-                fields.distance, 
+                fields.Distance, 
                 fields.raceBoatIntermediates_Rank
             ],
             **{
                 fields.Phase: ['Final A'], 
-                fields.distance: [2000], 
+                fields.Distance: [2000], 
                 fields.raceBoatIntermediates_Rank: [1],
             },
             key='results', 
@@ -101,7 +101,7 @@ def main(params=None):
             filters=False, 
             key='intermediate_results'
         ).groupby([
-            fields.race, fields.raceBoats, fields.distance
+            fields.Race, fields.raceBoats, fields.Distance
         ]).first().unstack(-1)
 
     name = f"{competition.competition} all intermediates"
@@ -118,7 +118,7 @@ def main(params=None):
         fields.GMT: '{:}',
         fields.boatClass: '{:}',
         fields.Day: '{:}',
-        fields.event: '{:}',
+        fields.Event: '{:}',
         fields.race_event_competition: '{:}',
         fields.Phase: '{:}',
         fields.raceBoatIntermediates_Rank: '{:}',

@@ -53,13 +53,6 @@ def get_cbts(boat_classes=None):
     return cbts[cbts[fields.bestTimes_BoatClass].isin(boat_classes)]
 
 @st.cache_data(persist=True)
-def get_livedata(race_id, gmt=None):
-    logger.debug("get_livedata(%s)", race_id)
-    live_data, live_boat_data, intermediates, race_distance = \
-        live.get_race_livetracker(race_id, gmt=gmt, live=False)
-    return live_data, live_boat_data, intermediates, race_distance
-
-@st.cache_data(persist=True)
 def load_livetracker(race_id, cached=True):
     logger.debug("load_livetracker(%s)", race_id)
     return live.load_livetracker(race_id, cached=cached)
@@ -72,7 +65,7 @@ def get_races_livedata(races, max_workers=10):
     )
     live_data = live_data.join(
         races[[
-            fields.race_Date, fields.race, fields.Gender, 
+            fields.race_Date, fields.Race, fields.Gender, 
             fields.Category, fields.Phase, fields.boatClass, 
             fields.GMT
         ]], 
@@ -85,7 +78,7 @@ def get_races_livedata(races, max_workers=10):
 get_realtime_race_data = st.cache_resource(live.LiveRaceData)
 
 COMPETITION_COL = [
-    fields.competition, 
+    fields.Competition, 
     fields.started, 
     fields.competition_venue, 
     fields.competition_StartDate, 
@@ -164,8 +157,8 @@ def select_competition(current=True):
 
         competition_id = state.get("CompetitionId")
         if competition_id in competitions.index:
-            name = competitions[fields.competition][competition_id]
-            index = int((competitions[fields.competition] == name).values.nonzero()[0][0])
+            name = competitions[fields.Competition][competition_id]
+            index = int((competitions[fields.Competition] == name).values.nonzero()[0][0])
         else:
             index = int(competitions.started.values.nonzero()[0][-1])
 
@@ -186,7 +179,7 @@ def select_competition(current=True):
 
 RACE_COL = [
     fields.boatClass,
-    fields.race, 
+    fields.Race, 
     fields.Phase,
     fields.Gender, 
     fields.Category, 
@@ -255,9 +248,9 @@ def select_races(
 
 def select_race(races):
     sel_race = st.selectbox(
-        "select race to load", races[fields.race], 
+        "select race to load", races[fields.Race], 
     )
-    race = races.loc[races[fields.race] == sel_race]
+    race = races.loc[races[fields.Race] == sel_race]
     return race.iloc[0]
 
 
@@ -268,13 +261,13 @@ RESULT_COLS = [
     fields.boatClass, 
     fields.raceBoats, 
     fields.Day, 
-    fields.event, 
+    fields.Event, 
     fields.race_event_competition, 
-    fields.race, 
+    fields.Race, 
     fields.Phase,  
     fields.raceBoatIntermediates_Rank, 
     fields.raceBoats_Lane, 
-    fields.distance, 
+    fields.Distance, 
     fields.race_Date, 
 ]
 
@@ -392,7 +385,7 @@ def select_competition_results(
 
 
 LIVE_COLS = [
-    fields.race,
+    fields.Race,
     fields.Phase,
     fields.Gender, 
     fields.Category, 

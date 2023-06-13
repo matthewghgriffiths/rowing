@@ -425,13 +425,13 @@ def extract_results(races):
         read_times(race_intermediates[fields.raceBoatIntermediates_ResultTime])
     
     inter_distances = race_intermediates[fields.raceBoatIntermediates_distance]
-    race_intermediates[fields.distance] = \
+    race_intermediates[fields.Distance] = \
         inter_distances.str.extract("([0-9]+)")[0].astype(int)
     
     race_distances = race_intermediates[(
         race_intermediates[fields.raceBoats_ResultTime]
         == race_intermediates[fields.raceBoatIntermediates_ResultTime]
-    )].groupby(fields.raceBoats_raceId)[fields.distance].max()
+    )].groupby(fields.raceBoats_raceId)[fields.Distance].max()
 
     race_intermediates[fields.race_distance] = \
         race_distances.loc[race_intermediates[fields.raceBoats_raceId]].values
@@ -532,7 +532,7 @@ def get_last_race_started(fisa=True, competition=None):
     races = get_last_races(n=1, fisa=fisa, competition=competition)
     if races is not None:    
         race = races.iloc[0]
-        logger.info(f"loaded last race started: {race.race}")
+        logger.info(f"loaded last race started: %s", race[fields.Race])
         return race
 
 get_most_recent_race = get_last_race_started
@@ -743,8 +743,8 @@ def get_competition_best_times(timeout=2., load_event_info=False):
 def get_world_best_times():
     return (
         get_competition_best_times()
-        .sort_values("ResultTime")
-        .groupby("BoatClass")
+        .sort_values(fields.bestTimes_ResultTime)
+        .groupby(fields.bestTimes_BoatClass)
         .min()
     )
 
@@ -826,7 +826,7 @@ def merge_competition_results(
         race_data[fields.PGMT] = (
             race_data[fields.GMT].dt.total_seconds() 
             / race_data[fields.raceBoatIntermediates_ResultTime].dt.total_seconds() 
-            * race_data[fields.distance] / race_data[fields.race_distance]
+            * race_data[fields.Distance] / race_data[fields.race_distance]
         )
     else:
         race_data[fields.PGMT] = (
@@ -840,8 +840,8 @@ def merge_competition_results(
     #     n = col.rsplit(".")[-2]
     #     race_data[n] = race_data[col]
 
-    race_data = race_data.dropna(subset=[fields.distance])
-    race_data[fields.distance] = race_data[fields.distance].astype(int)
+    race_data = race_data.dropna(subset=[fields.Distance])
+    race_data[fields.Distance] = race_data[fields.Distance].astype(int)
 
     return race_data
 

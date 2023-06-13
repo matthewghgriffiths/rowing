@@ -1,6 +1,5 @@
 
 import json 
-import atexit
 import logging
 import datetime 
 import copy
@@ -77,6 +76,3 @@ def reset_button(label='reset'):
         clear()
         st.experimental_set_query_params()
         st.experimental_rerun()
-
-
-atexit.register(update_query_params)

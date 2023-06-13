@@ -72,7 +72,7 @@ def test_livetracker(params):
 
 
 @pytest.mark.parametrize(
-    "params", [{'dummy_step': 50,},]
+    "params", [{'dummy_step': 50, }, ]
 )
 def test_realtime(params):
     app_realtime.main(params)

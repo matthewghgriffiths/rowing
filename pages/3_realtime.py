@@ -40,7 +40,7 @@ def main(params=None):
         races = select.select_races(
             filters=True, select_all=True
         )
-        race = inputs.select_dataframe(races, fields.race)
+        race = inputs.select_dataframe(races, fields.Race)
     else:
         race = api.get_live_race()
         if race is None:
@@ -49,7 +49,7 @@ def main(params=None):
                 st.experimental_rerun()
             st.stop()
 
-    race
+    st.write(race)
 
     race_id = race.race_id
 

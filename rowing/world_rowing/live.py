@@ -12,7 +12,8 @@ from scipy import stats
 
 from tqdm.auto import tqdm 
 
-from . import api, utils, fields
+from rowing.world_rowing import api, utils, fields
+# from . import api, utils, fields
 from .api import (
     get_worldrowing_data, get_race_results, get_worldrowing_record,
     find_world_best_time, INTERMEDIATE_FIELDS, get_most_recent_competition,
@@ -288,6 +289,7 @@ class RealTimeLivetracker:
 
     def wait_for_livetrack(self):
         max_age = self.livetracker_max_age
+        data = None
         while self.livetracker_age < max_age:
             wait = max_age - time.time()
             logger.info(
