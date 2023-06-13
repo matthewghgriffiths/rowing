@@ -4,7 +4,6 @@ pandas>=1.3.0
 matplotlib>=3.5.1
 requests>=2.27.1
 tqdm>=4.0.0
-cmd2>=2.0.0
 gpxpy>=1.5.0
 fitparse>=1.2.0
 garminconnect>=0.1.45

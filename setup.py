@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='rowing',
-    version='0.3.2',
+    version='0.3.3',
     description='Library for loading and presenting data from the worldrowing.com',
     author='Matthew Griffiths',
     author_email='matthewghgriffiths@gmail.com',
@@ -27,13 +27,13 @@ setup(
         'numpy>=1.21.0',
         'scipy>=1.7.0',
         'pandas>=1.3.0',
-        'matplotlib>=3.0.0',
+        'matplotlib>=3.5.1',
         'tqdm>=4.0.0',
     ],
     extras_require={
         'WORLDROWING': ['streamlit>=1.22.0', 'plotly>=5.14.1'],
         # Requests is not required if using pyodide
-        'REQ': ['requests>=2.0.0'],
+        'REQ': ['requests>=2.27.1'],
         'GARMIN': [
             'garminconnect>=0.1.45',
             'fitparse>=1.2.0',
