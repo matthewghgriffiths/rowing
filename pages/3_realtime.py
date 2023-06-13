@@ -6,13 +6,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tqdm.autonotebook import tqdm 
+from tqdm.autonotebook import tqdm
 import streamlit as st
 
 import plotly as pl
 from plotly import express as px, subplots
 
-from rowing.world_rowing import api, live, utils, fields 
+from rowing.world_rowing import api, live, utils, fields
 from rowing.app import select, inputs, state, plots
 
 logging.basicConfig(level=logging.INFO)
@@ -56,18 +56,18 @@ def main(params=None):
     get_live_race_data = st.cache_resource(live.LiveRaceData)
 
     live_race = get_live_race_data(
-        race_id, 
-        realtime_sleep=0.1, 
-        dummy=dummy, 
-        dummy_index=dummy_index, 
+        race_id,
+        realtime_sleep=0.1,
+        dummy=dummy,
+        dummy_index=dummy_index,
         dummy_step=dummy_step
     )
 
     fig_plot = st.empty()
 
     facets = [
-        fields.live_raceBoatTracker_distanceFromLeader, 
-        fields.live_raceBoatTracker_metrePerSecond, 
+        fields.live_raceBoatTracker_distanceFromLeader,
+        fields.live_raceBoatTracker_metrePerSecond,
         fields.live_raceBoatTracker_strokeRate,
     ]
     with utils.ThreadPoolExecutor(max_workers=5) as executor, tqdm() as pbar:
@@ -80,11 +80,11 @@ def main(params=None):
 
             if plot_data is not None:
                 fig = px.line(
-                    plot_data, 
-                    x=fields.live_raceBoatTracker_distanceTravelled, 
-                    y='value', 
-                    color=fields.raceBoats, 
-                    facet_row="live", 
+                    plot_data,
+                    x=fields.live_raceBoatTracker_distanceTravelled,
+                    y='value',
+                    color=fields.raceBoats,
+                    facet_row="live",
                     hover_data=facets
                 )
                 fig.update_yaxes(
@@ -95,7 +95,6 @@ def main(params=None):
             else:
                 with fig_plot:
                     st.write("no live data could be loaded")
-
 
     live_race.tracker.realtime_history
     live_race.tracker.livetracker_history

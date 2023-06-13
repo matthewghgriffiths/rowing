@@ -1,5 +1,5 @@
 
-import importlib 
+import importlib
 import logging
 
 import pytest
@@ -15,9 +15,10 @@ app_GMTs = importlib.import_module("pages.1_GMTs", "..")
 app_livetracker = importlib.import_module("pages.2_livetracker", "..")
 app_realtime = importlib.import_module("pages.3_realtime", "..")
 
+
 @pytest.mark.parametrize(
     "params", [
-        None, 
+        None,
         {
             'current_competition': True,
             'pickCBT': True,
@@ -25,27 +26,28 @@ app_realtime = importlib.import_module("pages.3_realtime", "..")
             'intermediate_results.modal': False
         },
         {
-            'current_competition': False, 
-            'pickCBT': False, 
-            'results.modal': False, 
+            'current_competition': False,
+            'pickCBT': False,
+            'results.modal': False,
             'intermediate_results.modal': False
         },
         {
-            'current_competition': False, 
-            'pickCBT': False, 
-            'results.modal': False, 
+            'current_competition': False,
+            'pickCBT': False,
+            'results.modal': False,
             'intermediate_results.modal': False,
-            'competition.modal': True, 
-            'GMT.modal': False, 
+            'competition.modal': True,
+            'GMT.modal': False,
         },
     ]
 )
 def test_GMTs(params):
     app_GMTs.main(params)
 
+
 @pytest.mark.parametrize(
     "params", [
-        None, 
+        None,
         {
             'current_competition': True,
             'filter_races.modal': True,
@@ -53,7 +55,7 @@ def test_GMTs(params):
             'live_data.modal': True
         },
         {
-            'current_competition': False, 
+            'current_competition': False,
             'pickCBT': False,
             'live_data.modal': False
         },

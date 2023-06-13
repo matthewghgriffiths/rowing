@@ -4,7 +4,7 @@ from matplotlib import category
 import streamlit as st
 from io import StringIO
 
-import numpy as np 
+import numpy as np
 import pandas as pd
 from pandas.api.types import (
     is_categorical_dtype,
@@ -18,6 +18,7 @@ from ..world_rowing import fields
 from . import state
 
 logger = logging.getLogger(__name__)
+
 
 def modal_button(label1, label2, key=None, mode=False):
     key = key or ".".join(["modal_button", label1, label2])
@@ -43,10 +44,9 @@ def modal_button(label1, label2, key=None, mode=False):
     return mode
 
 
-
 def filter_dataframe(
         df: pd.DataFrame, options=None, default=None, key=None, categories=(), filters=True,
-        select=True, select_col='select', select_all=True, select_first=False, 
+        select=True, select_col='select', select_all=True, select_first=False,
         **kwargs
 ) -> pd.DataFrame:
     """
@@ -60,7 +60,8 @@ def filter_dataframe(
     """
     logger.debug("filter_dataframe: %s", key)
     model_key = f"{key}.modal"
-    modify = modal_button("Remove Filters", "Add filters", key=model_key, mode=filters)
+    modify = modal_button("Remove Filters", "Add filters",
+                          key=model_key, mode=filters)
 
     if not modify:
         return df
@@ -70,9 +71,9 @@ def filter_dataframe(
     with modification_container:
         column_options = options or df.columns
         to_filter_columns = st.multiselect(
-            "Filter dataframe on", 
-            column_options, 
-            default, 
+            "Filter dataframe on",
+            column_options,
+            default,
             key=f"{key}.filter_columns"
         )
         for column in to_filter_columns:
@@ -80,7 +81,7 @@ def filter_dataframe(
             col_key = f"{key}.{column}"
             # Treat columns with < 10 unique values as categorical
             categorical = (
-                is_categorical_dtype(df[column]) 
+                is_categorical_dtype(df[column])
                 or df[column].nunique() < 10
                 or column in categories
             )
@@ -94,7 +95,8 @@ def filter_dataframe(
                     key=f"{key}.{column}",
                 )
                 if len(user_date_input) == 2:
-                    user_date_input = tuple(map(pd.to_datetime, user_date_input))
+                    user_date_input = tuple(
+                        map(pd.to_datetime, user_date_input))
                     start_date, end_date = user_date_input
                     df = df.loc[df[column].between(start_date, end_date)]
             elif categorical:
@@ -104,7 +106,7 @@ def filter_dataframe(
                     state.get(col_key, kwargs.get(column, []))
                 )
                 logger.debug(
-                    "filter_dataframe: %s: options=%r default=%s", 
+                    "filter_dataframe: %s: options=%r default=%s",
                     col_key, default, options
                 )
                 user_cat_input = right.multiselect(
@@ -136,11 +138,13 @@ def filter_dataframe(
                     key=col_key,
                 )
                 if user_text_input:
-                    df = df[df[column].astype(str).str.contains(user_text_input)]
+                    df = df[df[column].astype(
+                        str).str.contains(user_text_input)]
 
     if select and not df.empty:
-        df[select_col] = st.checkbox("Select all", value=select_all, key=f"{key}.select_all")
-        if select_first: 
+        df[select_col] = st.checkbox(
+            "Select all", value=select_all, key=f"{key}.select_all")
+        if select_first:
             df[select_col] = np.r_[True, df[select_col].iloc[1:]]
 
         sel_df = st.data_editor(
@@ -157,6 +161,7 @@ def select_dataframe(df, column, label=None):
     sel_val = st.selectbox(label, df[column])
     sel = df.loc[df[column] == sel_val].iloc[0]
     return sel
+
 
 @st.cache_data
 def df_to_csv(df, **kwargs):
@@ -175,29 +180,31 @@ def download_csv(df, name='data', button="Create download", key=None, **kwargs):
                 mime='text/csv',
             )
 
+
 def upload_csv(name="Upload csv", encoding="utf-8", key=None, **kwargs):
     uploaded = st.file_uploader(name, key=key)
     if uploaded:
         raw = StringIO(uploaded.getvalue().decode(encoding))
         df = pd.read_csv(raw, **kwargs)
         return df
-    
+
 
 def set_plotly_inputs(
-    data, 
-    x_cols=None, 
-    y_cols=None, 
-    color_cols=None, 
-    facet_cols=None, 
-    facet_rows=None, 
-    category_orders=None, 
+    data,
+    x_cols=None,
+    y_cols=None,
+    color_cols=None,
+    facet_cols=None,
+    facet_rows=None,
+    category_orders=None,
     col_labels=None,
-    max_unique=8, 
+    max_unique=8,
     **kwargs
 ):
     cols = st.columns(5)
     numeric_columns = fields.filter_numerical_columns(data)
-    cat_columns = fields.filter_categorical_columns(data, max_unique=max_unique)
+    cat_columns = fields.filter_categorical_columns(
+        data, max_unique=max_unique)
 
     col_options = {
         "x": numeric_columns if x_cols is None else x_cols,
@@ -208,10 +215,10 @@ def set_plotly_inputs(
     }
     choose_cols = {k: len(opts) > 1 for k, opts in col_options.items()}
     col_labels = {
-        "x": "Choose x", 
-        "y": "Choose y", 
-        "color": "Label", 
-        "facet_col": "Choose columns", 
+        "x": "Choose x",
+        "y": "Choose y",
+        "color": "Label",
+        "facet_col": "Choose columns",
         "facet_row": "Choose rows"
     }
     col_labels.update(col_labels or {})
@@ -226,14 +233,14 @@ def set_plotly_inputs(
         "category_orders": cat_orders,
     }
 
-    i = 0 
+    i = 0
     for col, options in col_options.items():
         val = kwargs.get(col, options[0])
         if choose_cols[col]:
             with cols[i]:
                 val = st.selectbox(
-                    col_labels[col],  
-                    options=options, 
+                    col_labels[col],
+                    options=options,
                     index=list(options).index(val)
                 )
             i += 1

@@ -3,7 +3,7 @@
 import logging
 
 import streamlit as st
-import plotly.express as px 
+import plotly.express as px
 import pandas as pd
 
 from rowing.world_rowing import api, utils, fields
@@ -15,6 +15,7 @@ st.set_page_config(
     page_title="PGMTs",
     layout='wide'
 )
+
 
 def main(params=None):
     state.update(params or {})
@@ -37,16 +38,16 @@ def main(params=None):
         results = select.select_competition_results(
             competition_id, gmts,
             default=[
-                fields.Phase, 
-                fields.Distance, 
+                fields.Phase,
+                fields.Distance,
                 fields.raceBoatIntermediates_Rank
             ],
             **{
-                fields.Phase: ['Final A'], 
-                fields.Distance: [2000], 
+                fields.Phase: ['Final A'],
+                fields.Distance: [2000],
                 fields.raceBoatIntermediates_Rank: [1],
             },
-            key='results', 
+            key='results',
         )
 
     st.subheader("View PGMTs")
@@ -65,16 +66,16 @@ def main(params=None):
         results[fields.raceBoatIntermediates_ResultTime] + pd.Timestamp(0)
 
     plot_inputs = inputs.set_plotly_inputs(
-        results.reset_index(), 
-        x=fields.race_Date, 
-        y=fields.PGMT, 
-        group=fields.crew, 
-        facet_col=fields.Day, 
+        results.reset_index(),
+        x=fields.race_Date,
+        y=fields.PGMT,
+        group=fields.crew,
+        facet_col=fields.Day,
     )
     facets_axes = {
         fields.race_Date: {"matches": None},
         fields.ResultTime: {"tickformat": "%-M:%S"},
-        fields.PGMT: {"tickformat": ",.0%"} 
+        fields.PGMT: {"tickformat": ",.0%"}
     }
     # hover_data = {
     #     'race_Date': True,
@@ -95,10 +96,10 @@ def main(params=None):
 
     with st.expander("Filter Intermediate Results"):
         intermediate_results = select.select_competition_results(
-            competition_id, gmts, 
+            competition_id, gmts,
             default=[fields.Phase,],
-            Phase=['Final A'], 
-            filters=False, 
+            Phase=['Final A'],
+            filters=False,
             key='intermediate_results'
         ).groupby([
             fields.Race, fields.raceBoats, fields.Distance
@@ -125,7 +126,7 @@ def main(params=None):
         fields.raceBoats_Lane: '{:}',
     }
     cols = st.multiselect(
-        "select which data to show", 
+        "select which data to show",
         options=col_formats,
         default=[fields.PGMT, fields.raceBoatIntermediates_ResultTime]
     )
@@ -141,11 +142,11 @@ def main(params=None):
             mime='text/csv',
         )
 
-
     state.reset_button()
     state.update_query_params()
 
     return state.get_state()
+
 
 if __name__ == "__main__":
     main()

@@ -13,13 +13,13 @@ from scipy import integrate
 from .utils import to_2d
 
 SQPI2 = jnp.sqrt(jnp.pi/2)
-ISQ2 = jnp.sqrt(0.5) 
+ISQ2 = jnp.sqrt(0.5)
 
 
 class AbstractKernel(ABC, hk.Module):
     @abstractmethod
-    def k(self, X0, X1=None)-> numpy.ndarray:
-        pass 
+    def k(self, X0, X1=None) -> numpy.ndarray:
+        pass
 
     def K(self, X0, X1=None) -> numpy.ndarray:
         X1 = X0 if X1 is None else X1
@@ -28,7 +28,7 @@ class AbstractKernel(ABC, hk.Module):
 
     def __add__(self, other) -> "SumKernel":
         if isinstance(other, AbstractKernel):
-            return SumKernel(self, other) 
+            return SumKernel(self, other)
         elif jnp.isscalar(other):
             return SumKernel(self, Bias(other))
         else:
@@ -39,7 +39,7 @@ class AbstractKernel(ABC, hk.Module):
 
     def __mul__(self, other) -> "ProductKernel":
         if isinstance(other, AbstractKernel):
-            return ProductKernel(self, other) 
+            return ProductKernel(self, other)
         elif jnp.isscalar(other):
             return ProductKernel(self, Bias(other))
         else:
@@ -115,16 +115,17 @@ class IntSEKernel(AbstractKernel):
         super().__init__(name=name)
         self.t0 = t0
         self.active_dim = active_dim
-        self.variance = variance or  jnp.exp(hk.get_parameter(
+        self.variance = variance or jnp.exp(hk.get_parameter(
             "log_var", shape=(), dtype="f", init=jnp.zeros))
-        self.scale = scale or  jnp.exp(hk.get_parameter(
+        self.scale = scale or jnp.exp(hk.get_parameter(
             "log_scale", shape=(), dtype="f", init=jnp.zeros))
 
     def k(self, X1, X2=None):
         X1 = X2 if X1 is None else X1
         X1, X2 = to_2d(X1, X2)
         K = iint_se_kernel(
-            self.t0, X1[..., self.active_dim], X2[..., self.active_dim], self.scale
+            self.t0, X1[..., self.active_dim], X2[...,
+                                                  self.active_dim], self.scale
         )
         return self.variance * K
 
@@ -133,11 +134,11 @@ class IntegralSEKernel(AbstractKernel):
     def __init__(self, scale=None, variance=None, bias=None, *, name=None, active_dim=0):
         super().__init__(name=name)
         self.active_dim = active_dim
-        self.variance = variance or  jnp.exp(hk.get_parameter(
+        self.variance = variance or jnp.exp(hk.get_parameter(
             "log_var", shape=(), dtype="f", init=jnp.zeros))
-        self.scale = scale or  jnp.exp(hk.get_parameter(
+        self.scale = scale or jnp.exp(hk.get_parameter(
             "log_scale", shape=(), dtype="f", init=jnp.zeros))
-        self.bias = bias or  jnp.exp(hk.get_parameter(
+        self.bias = bias or jnp.exp(hk.get_parameter(
             "bias", shape=(), dtype="f", init=jnp.zeros))
 
     def k(self, X1, X2=None):
@@ -148,23 +149,22 @@ class IntegralSEKernel(AbstractKernel):
         ) / self.scale
         k = self.variance * self.scale**2 * jnp.clip(
             1 + self.bias
-            - jnp.exp( - jnp.square(d12)/2)
+            - jnp.exp(- jnp.square(d12)/2)
             - SQPI2 * d12 * jsp.special.erf(d12 * ISQ2),
             0, None
         )
         return k
 
 
-
 def se_kernel(X1, X2, s=1.):
-    d12 = (X1 - X2) / s 
+    d12 = (X1 - X2) / s
     return jnp.exp(-jnp.square(d12).sum(-1) / 2)
 
 
 def nint_se_kernel(t0, t1, t2, s=1., with_err=False):
     val, err = integrate.quad(
-        se_kernel, 
-        t0, t1, 
+        se_kernel,
+        t0, t1,
         args=(t2, s),
     )
     if with_err:
@@ -175,19 +175,19 @@ def nint_se_kernel(t0, t1, t2, s=1., with_err=False):
 
 def niint_se_kernel(t0, t1, t2, s=1., with_err=False):
     val, err = integrate.dblquad(
-        se_kernel, 
+        se_kernel,
         t0, t1, t0, t2,
         args=(s,),
     )
     if with_err:
         return val, err
-        
+
     return val
 
 
 @jax.jit
 def int_se_kernel(t0, t1, t2, s=1.):
-    d12 = (t1 - t2) / s 
+    d12 = (t1 - t2) / s
     d02 = (t0 - t2) / s
     return SQPI2 * jnp.abs(
         jsp.special.erf(d12 * ISQ2)
@@ -197,7 +197,7 @@ def int_se_kernel(t0, t1, t2, s=1.):
 
 @jax.jit
 def iint_se_kernel(t0, t1, t2, s=1.):
-    d12 = (t1 - t2) / s 
+    d12 = (t1 - t2) / s
     d01 = (t0 - t1) / s
     d02 = (t0 - t2) / s
     return (

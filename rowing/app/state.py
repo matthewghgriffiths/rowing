@@ -1,15 +1,16 @@
 
-import json 
+import json
 import logging
-import datetime 
+import datetime
 import copy
 
-import streamlit as st 
+import streamlit as st
 
 import numpy as np
 from pandas.api.types import is_datetime64_any_dtype
 
 logger = logging.getLogger(__name__)
+
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -28,28 +29,30 @@ class NumpyEncoder(json.JSONEncoder):
 
         return super(NumpyEncoder, self).default(obj)
 
+
 def as_json(val):
     try:
         return json.dumps(val, cls=NumpyEncoder)
     except TypeError:
         return None
-    
 
 
 STATE = {
-    k: json.loads(v[0]) 
-    for k, v in  st.experimental_get_query_params().items()
+    k: json.loads(v[0])
+    for k, v in st.experimental_get_query_params().items()
 }
 
-get = STATE.get 
-items = STATE.items 
-keys = STATE.keys 
-values = STATE.values 
-clear = STATE.clear 
+get = STATE.get
+items = STATE.items
+keys = STATE.keys
+values = STATE.values
+clear = STATE.clear
+
 
 def set(key, val):
     STATE[key] = val
     update_query_params()
+
 
 def update(*args, **kwargs):
     STATE.update(*args, **kwargs)

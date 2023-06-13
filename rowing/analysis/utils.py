@@ -1,20 +1,20 @@
 
 import logging
-import string 
-from datetime import timedelta  
-import re 
+import string
+from datetime import timedelta
+import re
 import numpy as np
-from typing import Optional 
+from typing import Optional
 
 from ..utils import (
     cached_property, map_concurrent, format_totalseconds,
-    format_timedelta, format_timedelta_hours, 
+    format_timedelta, format_timedelta_hours,
     format_yaxis_splits, format_xaxis_splits, format_axis_splits,
     _to_merge_index, load_gsheet, to_gspread, cached_map_concurrent,
-    json_cache, parquet_cache, format_series_timedelta, format_gsheet, 
+    json_cache, parquet_cache, format_series_timedelta, format_gsheet,
     CachedClient, to_timestamp, from_timestamp
 )
-from .. import utils 
+from .. import utils
 
 _YMD = "%Y-%m-%d"
 
@@ -27,11 +27,12 @@ _LOGGING_LEVELS = {
     'debug': logging.DEBUG,
 }
 
+
 def add_logging_argument(parser):
     parser.add_argument(
         "-l"
-        "-log", 
-        "--log", 
+        "-log",
+        "--log",
         '--logging',
         default="warning",
         help=(
@@ -39,6 +40,7 @@ def add_logging_argument(parser):
             "Example --log debug', default='warning'"
         ),
     )
+
 
 def add_credentials_arguments(parser):
     parser.add_argument(
@@ -57,16 +59,19 @@ def add_credentials_arguments(parser):
         help='path to json file containing credentials (email and password)'
     )
 
+
 def add_gspread_arguments(parser):
     parser.add_argument(
-        '--gspread', 
-        type=str, nargs='?', 
+        '--gspread',
+        type=str, nargs='?',
         help='name, url, or id of the spreadsheet'
     )
+
 
 def load_gspread(options):
     if options.gspread:
         return load_gsheet(options.gspread)
+
 
 def set_logging(options):
     level = _LOGGING_LEVELS.get(options.log.lower())
@@ -85,6 +90,8 @@ def random_alphanumeric(size, p=None):
 
 _MSH_STR_FORMAT = "{minutes:d}:{seconds:02d}.{hundredths:02d}"
 _HMSH_STR_FORMAT = "{hours}:{minutes:02d}:{seconds:02d}.{hundredths:02d}"
+
+
 def strfsplit(tdelta, hours=False):
     components = tdelta.components._asdict()
     components['hundredths'] = tdelta.components.milliseconds // 10
@@ -110,7 +117,7 @@ def unflatten_json(entity, key=()):
         yield key, entity
 
 
-def is_pareto_efficient(costs, return_mask = True):
+def is_pareto_efficient(costs, return_mask=True):
     """
     Find the pareto-efficient points
     :param costs: An (n_points, n_costs) array
@@ -122,15 +129,17 @@ def is_pareto_efficient(costs, return_mask = True):
     is_efficient = np.arange(costs.shape[0])
     n_points = costs.shape[0]
     next_point_index = 0  # Next index in the is_efficient array to search for
-    while next_point_index<len(costs):
-        nondominated_point_mask = np.any(costs<costs[next_point_index], axis=1)
+    while next_point_index < len(costs):
+        nondominated_point_mask = np.any(
+            costs < costs[next_point_index], axis=1)
         nondominated_point_mask[next_point_index] = True
-        is_efficient = is_efficient[nondominated_point_mask]  # Remove dominated points
+        # Remove dominated points
+        is_efficient = is_efficient[nondominated_point_mask]
         costs = costs[nondominated_point_mask]
         next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1
-    
+
     if return_mask:
-        is_efficient_mask = np.zeros(n_points, dtype = bool)
+        is_efficient_mask = np.zeros(n_points, dtype=bool)
         is_efficient_mask[is_efficient] = True
         return is_efficient_mask
     else:
@@ -147,4 +156,4 @@ def flatten_json(obj, key=''):
         for i, val in enumerate(obj):
             yield from flatten_json(val, key + str(i))
     else:
-        yield key, obj 
+        yield key, obj

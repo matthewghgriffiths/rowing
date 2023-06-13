@@ -11,7 +11,7 @@ from .utils import solve_triangular, transform, MatrixProduct
 
 class LinearGPCorrelatedRegression(GaussianProcessRegression):
     kernel: AbstractMultiKernel
-    
+
     def K(self) -> MatrixProduct:
         return self.kernel.K(self.X, self.X)
 
@@ -28,7 +28,8 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
 
     def _gp_init(self):
         K = self.K()
-        Kf = K.einsum("ijkl,ik,jl->ij", self.W, self.W) + jnp.eye(self.n_obs) * self.obs_var
+        Kf = K.einsum("ijkl,ik,jl->ij", self.W, self.W) + \
+            jnp.eye(self.n_obs) * self.obs_var
         L = jsp.linalg.cho_factor(Kf)
         y = self.y - (self.W * self.mean(self.X)).sum(1)
         a = jsp.linalg.cho_solve(L, y)
@@ -45,7 +46,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
 
     def predict_var(self, X1, W1):
         Z1, Z1_var = self.predict_coef_var(X1)
-        y = (W1 * Z1).sum(-1) 
+        y = (W1 * Z1).sum(-1)
         y_var = (W1**2 * Z1_var).sum(-1)
         return y, y_var
 
@@ -61,7 +62,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
             K11.values - jnp.einsum("ijk,ilm->jlkm", LWk1, LWk1)
         )
         return Z1, Z1_covar
-        
+
     def predict_coef_var(self, X1):
         Kf, L, y, a = self._gp_init()
         k1 = self.k(X1)
@@ -79,7 +80,7 @@ def get_linear_gpr(times, X, observations, kernel=None, multi_kernel='cov', **kw
     if kernel == 'integral':
         if multi_kernel == 'cov':
             kernel = CovMultiKernel(
-                jnp.shape(X)[1], 
+                jnp.shape(X)[1],
                 kernel=IntSEKernel()
             )
         elif multi_kernel == 'diag':

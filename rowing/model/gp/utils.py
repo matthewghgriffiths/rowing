@@ -3,9 +3,9 @@ from math import prod
 from functools import partial
 from typing import Dict, List, Tuple, Optional, Generator
 
-import numpy 
+import numpy
 
-import jax 
+import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 from jax._src.flatten_util import ravel_pytree
@@ -14,6 +14,7 @@ import haiku as hk
 from ...utils import map_concurrent
 
 vdot = jax.vmap(jnp.dot)
+
 
 def get_pos_def(n, dof=None, log_diag=0., name="pos_def"):
     diag = jnp.exp(hk.get_parameter(
@@ -31,17 +32,19 @@ def get_pos_def(n, dof=None, log_diag=0., name="pos_def"):
 
 def solve_triangular(A, b, **kwargs):
     return jax.vmap(
-        lambda b: jsp.linalg.solve_triangular(A, b, **kwargs), 0, 
+        lambda b: jsp.linalg.solve_triangular(A, b, **kwargs), 0,
     )(b.reshape(b.shape[0], -1).T).T.reshape(b.shape)
 
 
 def transform(func):
     return hk.without_apply_rng(hk.transform(func))
 
+
 def init_apply(func, *args, **kwargs):
     func_t = transform(func)
     params = func_t.init(None, *args, **kwargs)
     return func_t.apply(params, *args, **kwargs), params
+
 
 def apply(func, *args, **kwargs):
     return init_apply(func, *args, **kwargs)[0]
@@ -66,7 +69,7 @@ class MatrixProduct:
         inputs, *out = subscripts.split("->", 1)
         self.indices = inputs.split(",")
         self.subscripts = out[0] if out else "".join(self.dims)
-        
+
     @property
     def dims(self) -> Dict[str, int]:
         return {
@@ -78,7 +81,7 @@ class MatrixProduct:
     def shape(self) -> Tuple[int, ...]:
         return tuple(self.dims[i] for i in self.subscripts)
 
-    @property 
+    @property
     def size(self) -> int:
         return prod(self.shape)
 
@@ -90,14 +93,14 @@ class MatrixProduct:
         replace = dict(zip(self.subscripts, mat_subscript))
         return ["".join(replace[i] for i in ind) for ind in self.indices]
 
-    def norm_subscripts(self, subscripts: str, *args: numpy.ndarray):        
+    def norm_subscripts(self, subscripts: str, *args: numpy.ndarray):
         inputs, *out = subscripts.split("->", 1)
         operands = (self,) + args
         operand_subs = inputs.split(",")
         expanded_subs, expanded_ops = map(
             lambda l: sum(l, []),
             zip(*(
-                (M.expand_subscript(sub), list(M.operands)) 
+                (M.expand_subscript(sub), list(M.operands))
                 if isinstance(M, type(self)) else ([sub], [M])
                 for M, sub in zip(operands, operand_subs)
             ))
@@ -109,10 +112,10 @@ class MatrixProduct:
         cls = type(self)
         sub = ",".join(self.indices) + "->" + self.subscripts
         return f"{cls.__name__}({sub!r}, shape={self.shape})"
-        
+
     def sum(self, axis=None) -> numpy.ndarray:
         if isinstance(axis, int):
-            axis=(axis,)
+            axis = (axis,)
 
         subscripts = self.subscripts
 
@@ -126,7 +129,7 @@ class MatrixProduct:
 
         return self.einsum(subscripts + "->" + out)
 
-    @property 
+    @property
     def values(self) -> numpy.ndarray:
         return self.einsum(self.subscripts + "->" + self.subscripts)
 
@@ -150,10 +153,11 @@ class MatrixProduct:
             "".join(j for j in ind if not jnp.isscalar(sub_index.get(j)))
             for ind in self.indices
         )
-        out = "".join(j for j in self.subscripts if not jnp.isscalar(sub_index.get(j)))
+        out = "".join(
+            j for j in self.subscripts if not jnp.isscalar(sub_index.get(j)))
         return MatrixProduct(new_indices + "->" + out, *new_operands)
 
-    def diagonal(self, subscripts: Optional[str] = None, axis1: Optional[str] = None, axis2: Optional[str] =None):
+    def diagonal(self, subscripts: Optional[str] = None, axis1: Optional[str] = None, axis2: Optional[str] = None):
         subs: str = subscripts or self.subscripts
         ax1: str = axis1 or subs[-2]
         ax2: str = axis2 or subs[-1]
@@ -162,7 +166,8 @@ class MatrixProduct:
             for M, sub in zip(self.operands, self.expand_subscript(subs)):
                 if ax2 in sub:
                     if ax1 in sub:
-                        M = M.diagonal(axis1=sub.index(ax1), axis2=sub.index(ax2))
+                        M = M.diagonal(axis1=sub.index(
+                            ax1), axis2=sub.index(ax2))
                         sub = sub.replace(ax2, "")
                     sub = sub.replace(ax2, ax1)
                 yield M, sub
@@ -176,6 +181,7 @@ def func_jac(func, params, *args, **kwargs):
     l, vjp = jax.vjp(lambda p: func(p, *args, **kwargs), params)
     grad = vjp(1.)
     return l, grad
+
 
 def make_func_jac(func):
     return partial(func_jac, func)
@@ -198,9 +204,9 @@ class OptMultiFunction:
         }
         params = self.unravel(x)
         res, errors = map_concurrent(
-            func, 
+            func,
             {
-                k: (params, *args) 
+                k: (params, *args)
                 for k, args in self.args_groups.items()
             },
             **kwargs,
@@ -254,7 +260,8 @@ class OptTransform:
 
     def func_jac(self, x):
         params = self.unravel(x)
-        l, vjp = jax.vjp(lambda p: self.func(p, *self.args, **self.kwargs), params)
+        l, vjp = jax.vjp(lambda p: self.func(
+            p, *self.args, **self.kwargs), params)
         grad = vjp(1.)
         G = self.sign * self.ravel(grad)
         return self.sign * l, G
@@ -273,12 +280,12 @@ class OptTransform:
 
         x0 = self.ravel(params)
         if jac:
-            res = optimize.minimize(self.func_jac, x0, method=method, jac=True, **kwargs)
+            res = optimize.minimize(
+                self.func_jac, x0, method=method, jac=True, **kwargs)
         else:
-            res = optimize.minimize(self, x0, method=method, jac=self.jac, **kwargs)
+            res = optimize.minimize(
+                self, x0, method=method, jac=self.jac, **kwargs)
 
         res['params'] = self.unravel(res.x)
         res['gradient'] = self.unravel(res.jac)
         return res
-
-

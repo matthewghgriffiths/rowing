@@ -14,36 +14,40 @@ from rowing.analysis import geodesy, utils, splits
 
 _SEMICIRCLE_SCALE = 180 / 2**31
 
+
 def read_gpx(filename):
     with open(filename, 'r') as f:
         gpx_data = gpxpy.parse(f)
 
     return parse_gpx_data(gpx_data)
 
+
 def parse_gpx_data(gpx_data):
     positions = pd.DataFrame.from_records(
         {
-            'latitude': point.latitude, 
-            'longitude': point.longitude, 
+            'latitude': point.latitude,
+            'longitude': point.longitude,
             'time': point.time
-        } 
-        for track in gpx_data.tracks 
-        for segment in track.segments 
+        }
+        for track in gpx_data.tracks
+        for segment in track.segments
         for point in segment.points
     )
     if positions.empty:
         return pd.DataFrame(
             [], columns=[
-                'latitude', 'longitude', 'time', 'timeElapsed', 
+                'latitude', 'longitude', 'time', 'timeElapsed',
                 'distanceDelta', 'distance', 'bearing_r', 'bearing'
-        ]) 
+            ])
 
     last = positions.index[-1]
     positions['timeElapsed'] = positions.time - positions.time[0]
-    positions['distanceDelta'] = geodesy.haversine_km(positions, positions.shift(-1))
+    positions['distanceDelta'] = geodesy.haversine_km(
+        positions, positions.shift(-1))
     positions.loc[last, 'distanceDelta'] = 0
     positions['distance'] = np.cumsum(positions.distanceDelta)
-    positions['bearing_r'] = geodesy.rad_bearing(positions, positions.shift(-1))
+    positions['bearing_r'] = geodesy.rad_bearing(
+        positions, positions.shift(-1))
     positions.loc[0, 'bearing_r'] = positions.bearing_r[1]
     positions['bearing'] = np.rad2deg(positions.bearing_r)
 
@@ -90,6 +94,7 @@ def parse_fit_data(fit_file):
     ).rename(columns={'timestamp': 'time'})
     return _parse_fit_positions(positions)
 
+
 def _parse_fit_positions(positions):
     if 'position_lat' in positions.columns:
         positions = positions.dropna(
@@ -107,7 +112,8 @@ def _parse_fit_positions(positions):
         positions['longitude'] = positions.position_long * _SEMICIRCLE_SCALE
         positions['distanceDelta'] = - positions.distance.diff(-1)
         positions.loc[last, 'distanceDelta'] = 0
-        positions['bearing_r'] = geodesy.rad_bearing(positions, positions.shift(-1))
+        positions['bearing_r'] = geodesy.rad_bearing(
+            positions, positions.shift(-1))
         positions.loc[last, 'bearing_r'] = positions.bearing_r.iloc[-2]
         positions['bearing'] = np.rad2deg(positions.bearing_r)
 
@@ -115,9 +121,9 @@ def _parse_fit_positions(positions):
 
 
 def activity_data_to_excel(
-        activities, 
+        activities,
         locations=None, cols=None,
-        additional_info=None, sheet_names=None, 
+        additional_info=None, sheet_names=None,
         xlpath='excel_data.xlsx',
 ):
     activity_info, best_times, location_timings = splits.process_activities(
@@ -131,7 +137,7 @@ def activity_data_to_excel(
                 activity_info.index.astype(str), sep=' '
             )
         )
-    
+
     with pd.ExcelWriter(xlpath) as xlf:
         activity_info.to_excel(xlf, "activities")
         best_times.loc[:, ['time', 'split']] = best_times[['time', 'split']].applymap(
@@ -144,10 +150,11 @@ def activity_data_to_excel(
 
     return best_times, location_timings
 
+
 def get_parser():
     parser = argparse.ArgumentParser(
         description='Analyse gpx data files')
-    
+
     parser.add_argument(
         "gpx_file", type=str, nargs='*',
         help="gpx files to process, accepts globs, e.g. activity_*.gpx"
@@ -160,7 +167,7 @@ def get_parser():
         ", default='gpx_data.xlsx'"
     )
     utils.add_logging_argument(parser)
-    
+
     return parser
 
 
@@ -175,17 +182,17 @@ def run(args=None):
     }
     print("processing %d gpx files" % len(gpx_files))
     activity_data, errors = utils.map_concurrent(read_gpx, gpx_files)
-    
+
     if not activity_data:
         print("no gpx files could be parsed")
-        return 
-        
+        return
+
     for data in activity_data.values():
         data.time = pd.to_datetime(data.time).dt.tz_localize(None)
-    
+
     activities = pd.DataFrame.from_dict({
         k: data.iloc[-1] for k, data in activity_data.items()
-        }, 
+    },
         orient='index'
     ).rename(columns={
         "distance": "totalDistance",
@@ -200,17 +207,19 @@ def run(args=None):
     )
     print("saving analysis to %s" % options.out_file)
     activity_data_to_excel(
-        activities, activity_data, locations=None, 
+        activities, activity_data, locations=None,
         xlpath=options.out_file,
     )
+
 
 def main():
     try:
         run(sys.argv[1:])
     except Exception as err:
-        logging.error(err) 
-        
+        logging.error(err)
+
     input("Press enter to finish")
+
 
 if __name__ == "__main__":
     main()

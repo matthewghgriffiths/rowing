@@ -1,12 +1,13 @@
 
-import json 
+import json
 
-import pandas as pd 
+import pandas as pd
 
 from ..analysis import geodesy
 
 accel_cols = ['accX', 'accY', 'accZ']
 gyro_cols = ['gyroX', 'gyroY', 'gyroZ']
+
 
 def load_raw_pico_data(json_path):
     with open(json_path, 'rb') as f:
@@ -24,6 +25,7 @@ def load_raw_pico_data(json_path):
     }
     return capture_data
 
+
 def process_pico_data(capture_data):
     accelgyro_data = capture_data['AccelGyro'].sort_index()
     accelgyro_data.index.name = 'timestamp'
@@ -33,7 +35,7 @@ def process_pico_data(capture_data):
 
     gps_data.index.name = 'timestamp'
     gps_data['latitude'] = gps_data.Lat
-    gps_data['longitude'] = gps_data.Lon 
+    gps_data['longitude'] = gps_data.Lon
 
     valid_gps_data = gps_data.loc[
         (gps_data.Hor_accuracy < 1000)
@@ -41,7 +43,8 @@ def process_pico_data(capture_data):
         & (gps_data.HDOP < 5)
     ].copy()
     valid_gps_data.index /= 1e6
-    valid_gps_data['distanceDelta'] = geodesy.haversine_km(valid_gps_data, valid_gps_data.shift()).fillna(0)
+    valid_gps_data['distanceDelta'] = geodesy.haversine_km(
+        valid_gps_data, valid_gps_data.shift()).fillna(0)
     valid_gps_data['distance'] = valid_gps_data.distanceDelta.cumsum()
     valid_gps_data['timeElapsed'] = pd.to_timedelta(valid_gps_data.index, 's')
 

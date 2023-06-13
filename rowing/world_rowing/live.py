@@ -1,23 +1,23 @@
 
 import logging
-from pathlib import Path 
-import json 
+from pathlib import Path
+import json
 import threading
-import time 
-import copy 
+import time
+import copy
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from tqdm.auto import tqdm 
+from tqdm.auto import tqdm
 
 from rowing.world_rowing import api, utils, fields
 # from . import api, utils, fields
 from .api import (
     get_worldrowing_data, get_race_results, get_worldrowing_record,
     find_world_best_time, INTERMEDIATE_FIELDS, get_most_recent_competition,
-    get_races, get_events, get_world_best_times, 
+    get_races, get_events, get_world_best_times,
     get_live_race
 )
 from .utils import (
@@ -43,25 +43,28 @@ RESULTS_FIELDS = {
     'ResultTime': ('ResultTime',),
     # 'raceBoatIntermediates': ('raceBoatIntermediates',),
 }
+
+
 def parse_livetracker_lane_data(data, field, index):
     lanes = {
-        lane['Lane']: lane 
+        lane['Lane']: lane
         for lane in data['config']['lanes']
         if lane.get(field)
     }
     if not lanes:
         return pd.DataFrame([])
-    
+
     lane_boat = pd.Series({
         lane_data['DisplayName']: lane
         for lane, lane_data in lanes.items()
     }).sort_values()
     parsed = pd.concat(
         {
-            lane['DisplayName']: pd.json_normalize(lane[field]).set_index(index) 
+            lane['DisplayName']: pd.json_normalize(
+                lane[field]).set_index(index)
             for lane in lanes.values()
-        }, 
-        axis=1, 
+        },
+        axis=1,
         names=[fields.raceBoats, field]
     ).swaplevel(0, 1, 1).rename(
         columns=fields.renamer(field), level=0
@@ -72,8 +75,8 @@ def parse_livetracker_lane_data(data, field, index):
 def parse_livetracker_data(data):
     live_data = parse_livetracker_lane_data(data, 'live', 'id')
     if live_data.empty:
-        return live_data 
-    
+        return live_data
+
     return live_data
 
 
@@ -81,12 +84,15 @@ def parse_intermediates_data(data):
     intermediates = parse_livetracker_lane_data(
         data, 'intermediates', 'distance.DisplayName'
     )
-    intermediates.index = intermediates.index.str.extract("([0-9]+)")[0].astype(int)
+    intermediates.index = intermediates.index.str.extract(
+        "([0-9]+)")[0].astype(int)
     if fields.intermediates_ResultTime in intermediates:
         for c, times in intermediates[fields.intermediates_ResultTime].items():
-            intermediates[(fields.intermediates_ResultTime, c)] = pd.to_timedelta(times)
+            intermediates[(fields.intermediates_ResultTime, c)
+                          ] = pd.to_timedelta(times)
 
     return intermediates
+
 
 def parse_livetracker_info(data):
     lane_info = pd.concat([
@@ -95,7 +101,8 @@ def parse_livetracker_info(data):
         )
         for lane in data['config']['lanes']
     ]).set_index("DisplayName").rename(columns=fields.renamer("lane"))
-    lane_info[fields.lane_ResultTime] = utils.read_times(lane_info[fields.lane_ResultTime])
+    lane_info[fields.lane_ResultTime] = utils.read_times(
+        lane_info[fields.lane_ResultTime])
     race_distance = data['config']['plot']['totalLength']
     return lane_info, race_distance
 
@@ -103,7 +110,7 @@ def parse_livetracker_info(data):
 def parse_livetracker(data):
     live_boat_data = parse_livetracker_data(data)
     if live_boat_data.empty:
-        live_boat_data = None 
+        live_boat_data = None
     intermediates = parse_intermediates_data(data)
     lane_info, race_distance = parse_livetracker_info(data)
     return live_boat_data, intermediates, lane_info, race_distance
@@ -143,13 +150,13 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     # Make sure timepoints around intermediates are correct
     int_times = pd.Series(np.nan, live_data.index)
     for d in intermediate_distances:
-        #timepoints before boat passes 
+        # timepoints before boat passes
         m0 = (
             (distances <= d) & (distances.shift(-1) > d)
         )
         d_times = (
             intermediate_times.loc[d] - (
-                # backtrack time to time point if not at intermediate distance 
+                # backtrack time to time point if not at intermediate distance
                 (d - distances) / speed * m0
             )[m0.any(axis=1)].max()
         ).groupby(m0.idxmax()).mean()
@@ -172,43 +179,43 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
             c_data[fields.live_raceBoatTracker_distanceTravelled] / c_data.index
         )
         live_time_data[(fields.split, c)] = pd.to_timedelta(
-            500 / live_time_data[fields.live_raceBoatTracker_metrePerSecond][c], unit='s', errors='coerce') 
+            500 / live_time_data[fields.live_raceBoatTracker_metrePerSecond][c], unit='s', errors='coerce')
         live_time_data[(fields.avg_split, c)] = pd.to_timedelta(
             500. / live_time_data[fields.avg_speed, c], unit='s', errors='coerce')
 
     live_data = live_time_data.stack(1).reset_index().join(
         lane_info[[
-            fields.lane_Rank, 
-            fields.lane_ResultTime, 
-            fields.lane_country_CountryCode, 
+            fields.lane_Rank,
+            fields.lane_ResultTime,
+            fields.lane_country_CountryCode,
             fields.lane_country,
-            fields.lane__finished, 
-            fields.lane_InvalidMarkResult, 
+            fields.lane__finished,
+            fields.lane_InvalidMarkResult,
             fields.lane_Remark,
         ]], on=fields.raceBoats
     )
     live_data[fields.race_distance] = race_distance
-    return live_data, intermediate_times 
+    return live_data, intermediate_times
 
 
 def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetracker, **kwargs):
     race_livetracks, errors = utils.map_concurrent(
-        load_livetracker, 
+        load_livetracker,
         {race_id: race_id for race_id in race_ids},
         singleton=True, max_workers=max_workers, **kwargs
     )
     logger.info("load_livetracker errors: %s", errors)
     results, errors = utils.map_concurrent(
-        estimate_livetracker_times, 
+        estimate_livetracker_times,
         race_livetracks, max_workers=max_workers, **kwargs
     )
     logger.info("estimate_livetracker_times errors: %s", errors)
     intermediates = pd.concat(
-        {race_id: inters for race_id, (_, inters) in results.items()}, 
+        {race_id: inters for race_id, (_, inters) in results.items()},
         axis=1
     )
     races_live_data = pd.concat(
-        {race_id: live_data for race_id, (live_data, _) in results.items()}, 
+        {race_id: live_data for race_id, (live_data, _) in results.items()},
         axis=0
     ).reset_index(drop=True)
     return races_live_data, intermediates
@@ -216,12 +223,12 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
 
 class RealTimeLivetracker:
     def __init__(
-            self, race_id, realtime_sleep=3, 
+            self, race_id, realtime_sleep=3,
             dummy=False, dummy_index=0, dummy_step=1
     ):
         self.race_id = race_id
-        
-        self.realtime_sleep = realtime_sleep 
+
+        self.realtime_sleep = realtime_sleep
         self.livetracker_max_age = time.time()
 
         self.realtime_history = {}
@@ -229,15 +236,15 @@ class RealTimeLivetracker:
         self.dummy = dummy
         self.dummy_data = None
         self.dummy_index = dummy_index
-        self.dummy_step = dummy_step 
+        self.dummy_step = dummy_step
         self._shutdown = False
-    
+
     @classmethod
     def from_live_race(cls, **kwargs):
         race = api.get_live_race()
         if race is not None:
             return cls(race.name, **kwargs)
-        
+
         logger.warning("RealTimeLivetracker: no live race could be found")
 
     def get_realtime(self):
@@ -248,11 +255,12 @@ class RealTimeLivetracker:
         )
         self.realtime_history[curr_time] = data
         return data
-    
+
     def get_dummy_realtime(self):
         if self.dummy_data is None:
-            self.dummy_data = api.get_worldrowing_data("livetracker", self.race_id)
-        
+            self.dummy_data = api.get_worldrowing_data(
+                "livetracker", self.race_id)
+
         i = self.dummy_index
         live_data = copy.deepcopy(self.dummy_data)
         for lane, lane_data in enumerate(live_data['config']['lanes']):
@@ -270,7 +278,7 @@ class RealTimeLivetracker:
 
         self.dummy_index += self.dummy_step
         return live_data
-    
+
     def get_livetracker(self):
         curr_time = time.time()
         logger.debug("RealTimeLivetracker.get_livetracker")
@@ -285,7 +293,7 @@ class RealTimeLivetracker:
 
         data = r.json()['data']
         self.livetracker_history[curr_time] = data
-        return data 
+        return data
 
     def wait_for_livetrack(self):
         max_age = self.livetracker_max_age
@@ -297,7 +305,7 @@ class RealTimeLivetracker:
             )
             time.sleep(wait)
             data = self.get_livetracker()
-        
+
         return data
 
     def run(self):
@@ -316,22 +324,22 @@ class RealTimeLivetracker:
                 data = self.get_realtime()
 
             finished = self.is_finished(data)
-            yield data, 
+            yield data,
 
             if finished:
                 logger.info("finished polling realtime data")
                 return
-            
+
             curr_time = time.time()
             sleep_time = max(0, (last_time + self.realtime_sleep) - curr_time)
             logger.debug(
                 "RealTimeLivetracker.poll sleeping: "
-                "realtime=%.2f, livetracker=%.2f", 
+                "realtime=%.2f, livetracker=%.2f",
                 sleep_time, self.livetracker_max_age - curr_time
             )
             last_time = curr_time
             time.sleep(sleep_time)
-            
+
     def is_finished(self, data):
         return all(lane['_finished'] for lane in data['config']['lanes'])
 
@@ -356,9 +364,9 @@ class LiveRaceData:
 
     def update(self, data):
         (
-            livetracker_update, 
-            inter_update, 
-            lane_update, 
+            livetracker_update,
+            inter_update,
+            lane_update,
             self.race_distance
         ) = parse_livetracker(data)
 
@@ -366,26 +374,30 @@ class LiveRaceData:
         with self.mutex:
             if self.livetracker is not None:
                 current_points = self.livetracker.index
-                livetracker_update = update_dataframe(self.livetracker, livetracker_update)
+                livetracker_update = update_dataframe(
+                    self.livetracker, livetracker_update)
             if self.intermediates is not None:
-                self.intermediates = update_dataframe(self.intermediates, inter_update)
+                self.intermediates = update_dataframe(
+                    self.intermediates, inter_update)
             if self.lane_info is not None:
                 lane_update = update_dataframe(self.lane_info, lane_update)
 
             if livetracker_update is not None:
-                track_count = livetracker_update[fields.live_trackCount].mean(axis=1).sort_values()
+                track_count = livetracker_update[fields.live_trackCount].mean(
+                    axis=1).sort_values()
                 self.livetracker = livetracker_update.loc[track_count.index]
-                self.new_points = livetracker_update.index.difference(current_points)
-        
+                self.new_points = livetracker_update.index.difference(
+                    current_points)
+
         return self
-    
+
     def plot_data(self, facets=None):
         if self.livetracker is None:
-            return None 
-        
+            return None
+
         index_names = [
-            fields.live_raceBoatTracker_id, 
-            fields.raceBoats, 
+            fields.live_raceBoatTracker_id,
+            fields.raceBoats,
             fields.live_raceBoatTracker_distanceTravelled
         ]
         stacked = self.livetracker.stack(
@@ -401,4 +413,3 @@ class LiveRaceData:
             ).join(stacked[facets], on=index_names)
         else:
             return stacked.reset_index().melt(index_names)
-    

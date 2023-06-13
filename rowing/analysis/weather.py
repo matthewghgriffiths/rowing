@@ -1,15 +1,15 @@
 
 import argparse
 import sys
-import json 
-import os 
-import datetime 
+import json
+import os
+import datetime
 from pathlib import Path
-import logging 
+import logging
 import collections
 import itertools
 
-import numpy as np 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -45,13 +45,13 @@ class WeatherClient(utils.CachedClient):
     reverse_url = "http://api.openweathermap.org/geo/1.0/reverse"
 
     def __init__(
-            self, api_key=None, path="weather-data", map_kws=None, 
+            self, api_key=None, path="weather-data", map_kws=None,
     ):
         super().__init__(
             username=None,
-            password=api_key, 
-            path=path, 
-            local_cache=utils.json_cache, 
+            password=api_key,
+            path=path,
+            local_cache=utils.json_cache,
             map_kws=map_kws
         )
 
@@ -121,12 +121,13 @@ class WeatherClient(utils.CachedClient):
     def download_weather_history(self, latitude, longitude, time, **params):
         timestamp = utils.to_timestamp(time, unit="1s")
         params = {
-            "lat": latitude, 
-            "lon": longitude, 
-            "dt": timestamp, 
+            "lat": latitude,
+            "lon": longitude,
+            "dt": timestamp,
             "appid": self.password
         }
-        logger.debug("downloading data at %.4f, %.4f for %s", latitude, longitude, time)
+        logger.debug("downloading data at %.4f, %.4f for %s",
+                     latitude, longitude, time)
         r = requests.get(self.history_url, params=params)
         r.raise_for_status()
         return r.json()
@@ -136,7 +137,7 @@ class WeatherClient(utils.CachedClient):
             map(parse_history_path, self.weather_history())
         )
         weather_data, errors = self.map_concurrent(
-            self.get_weather_history,  
+            self.get_weather_history,
             list(points)
         )
         return pd.json_normalize([data for data in weather_data if data])
@@ -163,7 +164,8 @@ def load_dtg_data():
         pd.to_datetime(dtg_data['Timestamp (GMT)'])
     dtg_data['timestamp'] = dtg_data.datetime.astype(int) // 1e9
     dtg_data['temperature'] = dtg_data['Temperature (Celcius * 10)'] / 10
-    dtg_data['wind_speed'] = dtg_data['Mean wind speed (knots * 10)'] * 1852 / 3600
+    dtg_data['wind_speed'] = dtg_data['Mean wind speed (knots * 10)'] * \
+        1852 / 3600
     dtg_data['bearing'] = dtg_data['Average wind bearing (degrees)']
 
     dtg_filtered = dtg_data[
@@ -185,23 +187,24 @@ def get_parser():
     )
     parser.add_argument(
         '-c', '--credentials',
-        type=str, 
-        default="weather_credentials.json", 
+        type=str,
+        default="weather_credentials.json",
         nargs='?',
         help='path to json file containing credentials (api-key)'
     )
     parser.add_argument(
-        '--path', 
-        type=str, default="weather-data", nargs='?', 
+        '--path',
+        type=str, default="weather-data", nargs='?',
         help='folder path to download weather to'
     )
     parser.add_argument(
-        'n', 
+        'n',
         type=int, default=1, nargs='?',
         help='number of downloads'
     )
     utils.add_logging_argument(parser)
     return parser
+
 
 def run(args):
     options = get_parser().parse_args(args)
@@ -218,7 +221,7 @@ def run(args):
         raise argparse.ArgumentError("need credentials or api-key")
 
     history = weather_api.download_missing(options.n, reload=True)
-    
+
     with pd.option_context('display.max_rows', None):
         print(history)
 
@@ -233,9 +236,10 @@ def main():
     try:
         run(sys.argv[1:])
     except Exception as err:
-        logger.error(err) 
-        
+        logger.error(err)
+
     input("Press enter to finish")
+
 
 if __name__ == "__main__":
     main()

@@ -10,17 +10,22 @@ from .. import utils
 
 T_BASE = 4 * 60
 
+
 def to_year(dt):
     return dt.year + dt.dayofyear / 365.25
+
 
 def power_to_pace(power):
     return (2.8 / power)**(1/3)
 
+
 def pace_to_power(pace):
-    return 2.8 * pace ** -3 
+    return 2.8 * pace ** -3
+
 
 def estimate_distance_time(D, P, coef, t_base=T_BASE):
     return ((2.8 * D**3)/P/t_base**coef)**(1/(3 - coef))
+
 
 def estimate_distance_time_jac(D, P, coef, t_base=T_BASE):
     t, vjp = jax.vjp(
@@ -28,6 +33,7 @@ def estimate_distance_time_jac(D, P, coef, t_base=T_BASE):
         P, coef
     )
     return t, vjp(jnp.ones_like(t))
+
 
 def predict_distance_split(distance, P, P_std, coef, coef_std, t_base=T_BASE):
     est_time, (jac_P, jac_coef) = estimate_distance_time_jac(
@@ -37,8 +43,10 @@ def predict_distance_split(distance, P, P_std, coef, coef_std, t_base=T_BASE):
     est_split_std = est_time_std * 500 / distance
     return est_split, est_split_std
 
+
 def estimate_split(t, P, coef, t_base=T_BASE):
     return 500 * power_to_pace(P * (t / t_base)**(-coef))
+
 
 def estimate_split_jac(t, P, coef, t_base=T_BASE):
     split, vjp = jax.vjp(
@@ -47,12 +55,15 @@ def estimate_split_jac(t, P, coef, t_base=T_BASE):
     )
     return split, vjp(jnp.ones_like(split))
 
+
 def predict_time_split(t, P, P_std, coef, coef_std, t_base=T_BASE):
-    est_split, (jac_P, jac_coef) = estimate_split_jac(t, P, coef, t_base=t_base)
+    est_split, (jac_P, jac_coef) = estimate_split_jac(
+        t, P, coef, t_base=t_base)
     est_split_std = np.sqrt((jac_P * P_std)**2 + (coef_std * jac_coef)**2)
     return est_split, est_split_std
 
-### Power law modelling
+# Power law modelling
+
 
 def create_power_law_data(year, duration, power, t_base=T_BASE, **kwargs):
     kwargs.update({
@@ -62,20 +73,23 @@ def create_power_law_data(year, duration, power, t_base=T_BASE, **kwargs):
     })
     return pd.DataFrame(kwargs).sort_values("t")
 
+
 class PowerLawInput(NamedTuple):
     t: np.ndarray
     W: np.ndarray
     y: np.ndarray
+
 
 def create_power_law_inputs(power_data):
     data = power_data.sort_values("t")
     t = jnp.array(data.t)
     W = jnp.c_[
         jnp.ones(len(data.log_t)),
-        jnp.array(- data.log_t), 
+        jnp.array(- data.log_t),
     ]
     y = jnp.array(data.log_p)
     return PowerLawInput(t, W, y)
+
 
 def power_posterior(Z, Z_std):
     logp, coef = Z.T
@@ -84,7 +98,8 @@ def power_posterior(Z, Z_std):
     P_std = P * logp_std
     return P, P_std, coef, coef_std
 
-### Plotting
+# Plotting
+
 
 def plot_posterior(t, mean, std, ax=None, alpha=0.3, format_splits=True, **kwargs):
     import matplotlib.pyplot as plt
@@ -98,7 +113,7 @@ def plot_posterior(t, mean, std, ax=None, alpha=0.3, format_splits=True, **kwarg
         lines.append(line)
         bands.append(ax.fill_between(
             t, m_i - s_i, m_i + s_i,
-            facecolor=line.get_color(), 
+            facecolor=line.get_color(),
             alpha=alpha
         ))
 
@@ -113,10 +128,10 @@ def plot_athlete_data(data, ax=None, ls=':', marker='+', label='', format_splits
     lines = []
     for piece, piece_data in data.groupby("piece"):
         l, = ax.plot(
-            piece_data.year, 
-            piece_data.split.dt.total_seconds(), 
-            label=label + piece, 
-            ls=ls, marker=marker, 
+            piece_data.year,
+            piece_data.split.dt.total_seconds(),
+            label=label + piece,
+            ls=ls, marker=marker,
             **kwargs
         )
         lines.append(l)
@@ -136,12 +151,13 @@ def make_predictions(t, make_model, params, inputs, t_pred=None, t_base=T_BASE, 
         t_pred, P, P_std, coef, coef_std, t_base=t_base
     )
     preds = {
-        "P": P, "P_std": P_std, 
+        "P": P, "P_std": P_std,
         "coef": coef, "coef_std": coef_std,
         "split": split, "split_std": split_std,
     }
     if W is not None:
-        preds['pred_log_p'], preds['log_p_var'] = transform(model.predict_var).apply(params, t, W)
+        preds['pred_log_p'], preds['log_p_var'] = transform(
+            model.predict_var).apply(params, t, W)
 
     for i, (z, z_std) in enumerate(zip(Z.T, Z_std.T)):
         preds[f"z_{i}"] = z
@@ -173,22 +189,22 @@ def plot_model_posterior(
     ax = axes[1]
     if t_plot:
         tplot_min = t_plot/60
-        
+
         if tplot_min < 1:
-            label=f"Power law: predicted {t_plot} s split"
+            label = f"Power law: predicted {t_plot} s split"
         else:
             if tplot_min % 1 == 0:
                 tplot_min = int(tplot_min)
             else:
                 tplot_min = round(tplot_min, 2)
 
-            label=f"Power law: predicted {tplot_min} min split"
-        
+            label = f"Power law: predicted {tplot_min} min split"
+
         split, split_std = predict_time_split(
             t_plot, P, P_std, coef, coef_std, t_base=t_base)
 
         plot_posterior(
-            t, split, split_std, format_splits=False, ax=ax, 
+            t, split, split_std, format_splits=False, ax=ax,
             label=label,
             **kwargs
         )
@@ -197,8 +213,8 @@ def plot_model_posterior(
 
 
 def plot_model_preds(
-        t, make_model, params, inputs, 
-        distances=(2000, 5000), times=(180, 300, 720), t_base=T_BASE, 
+        t, make_model, params, inputs,
+        distances=(2000, 5000), times=(180, 300, 720), t_base=T_BASE,
         alpha=0.3, figsize=(10, 8), axes=None, **kwargs
 ):
     import matplotlib.pyplot as plt
@@ -219,13 +235,13 @@ def plot_model_preds(
         Dkm = D/1000
         if Dkm % 1 == 0:
             Dkm = int(Dkm)
-            
+
         plot_posterior(
             t, *predict_distance_split(
-                D, P, P_std, coef, coef_std, t_base=t_base, 
+                D, P, P_std, coef, coef_std, t_base=t_base,
             ),
             label=f"Power law: predicted {Dkm}k split",
-            format_splits=False, alpha=alpha, ax=ax    
+            format_splits=False, alpha=alpha, ax=ax
         )
     for duration in times:
         dmin = duration/60
@@ -234,10 +250,10 @@ def plot_model_preds(
 
         plot_posterior(
             t, *predict_time_split(
-                duration, P, P_std, coef, coef_std, t_base=t_base, 
+                duration, P, P_std, coef, coef_std, t_base=t_base,
             ),
             label=f"Power law: predicted {dmin} min split",
-            format_splits=False, alpha=alpha, ax=ax    
+            format_splits=False, alpha=alpha, ax=ax
         )
 
     utils.format_yaxis_splits(ax)

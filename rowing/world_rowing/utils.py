@@ -11,7 +11,7 @@ from scipy.special import erf
 
 from ..utils import (
     cached_property, format_totalseconds,
-    format_timedelta, format_timedelta_hours, 
+    format_timedelta, format_timedelta_hours,
     map_concurrent, WorkQueue, ThreadPoolExecutor,
     format_yaxis_splits, format_xaxis_splits, format_axis_splits
 )

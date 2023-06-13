@@ -10,7 +10,7 @@ from .kernels import SEKernel, IntSEKernel
 
 class GaussianProcessRegression(hk.Module):
     def __init__(
-            self, X, y, *, kernel=None, mean=None, obs_var=None, name=None, 
+            self, X, y, *, kernel=None, mean=None, obs_var=None, name=None,
             kernel_kws=None
     ):
         super().__init__(name=name)
@@ -20,7 +20,7 @@ class GaussianProcessRegression(hk.Module):
 
         self._set_mean(mean)
         self._set_kernel(kernel, **(kernel_kws or {}))
-            
+
         if obs_var is None:
             obs_var = jnp.eye(self.n_obs) * jnp.exp(hk.get_parameter(
                 "obs_var", shape=(), dtype="f", init=jnp.zeros))
@@ -43,7 +43,7 @@ class GaussianProcessRegression(hk.Module):
         elif jnp.isscalar(mean):
             self.mean_val = jnp.full((1,) + self.dims, mean)
         elif mean:
-            self.mean = mean 
+            self.mean = mean
         else:
             self.mean_val = hk.get_parameter(
                 "gp_mean", shape=self.dims, dtype="f", init=jnp.zeros
@@ -79,7 +79,7 @@ class GaussianProcessRegression(hk.Module):
             L[0] if L[1] else L[0].T, k1.T, lower=True
         )
         pred_var = self.kernel.k(X1, X1) - jnp.square(Lk1).sum(0)
-        
+
         return pred, pred_var
 
     def predict_covar(self, X1):
@@ -92,7 +92,7 @@ class GaussianProcessRegression(hk.Module):
             L[0] if L[1] else L[0].T, k1.T, lower=True
         )
         pred_covar = self.kernel.K(X1, X1) - Lk1.T.dot(Lk1)
-        
+
         return pred, pred_covar
 
     def log_likelihood(self):
@@ -111,7 +111,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
             coef_cov = jnp.diag(jnp.exp(hk.get_parameter(
                 "coef_var", shape=(self.n_coef,), dtype="f", init=jnp.zeros
             )))
-        
+
         self.coef_cov = coef_cov
 
     def mean(self, t):
@@ -144,19 +144,19 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
         Kf, L, y, a, covW, acovW = self._linear_gp_init()
         k1 = self.k(X1)
         Z1 = k1.dot(acovW) + self.mean(X1)
-        
+
         LcovWk1 = solve_triangular(
-            L[0] if L[1] else L[0].T, 
-            (covW[..., None] * k1.T[:, None, :]), 
+            L[0] if L[1] else L[0].T,
+            (covW[..., None] * k1.T[:, None, :]),
             lower=True
         )
         K11 = self.kernel.K(X1, X1)
         Z1_covar = (
             (self.coef_cov[..., None, None] * K11[None, None, ...])
             - jnp.einsum("ijk,ilm->jlkm", LcovWk1, LcovWk1)
-        )        
+        )
         return Z1, Z1_covar
-        
+
     def predict_coef_var(self, X1):
         Kf, L, y, a, covW, acovW = self._linear_gp_init()
         k1 = self.k(X1)
@@ -187,4 +187,3 @@ make_gpr = transform(get_gpr)
 def gpr_likelihood(times, observations, **kwargs):
     gp = get_gp(times, observations, **kwargs)
     return gp.log_likelihood()
-

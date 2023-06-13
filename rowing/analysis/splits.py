@@ -1,5 +1,5 @@
 
-import os 
+import os
 from pathlib import Path
 from functools import lru_cache
 
@@ -11,15 +11,15 @@ from .utils import is_pareto_efficient, distance_to_km
 
 
 _STANDARD_DISTANCES = {
-    '250m': 0.25, 
+    '250m': 0.25,
     '500m': 0.5,
     '1km': 1,
     '1.5km': 1.5,
     '2km': 2,
     '3km': 3,
     '5km': 5,
-    '7km': 7, 
-    '10km': 10, 
+    '7km': 7,
+    '10km': 10,
 }
 
 _file_path = Path(os.path.abspath(__file__))
@@ -45,7 +45,8 @@ def load_place_locations(loc=None):
         for l in loc
     }
 
-def load_landmarks(loc=None):        
+
+def load_landmarks(loc=None):
     return load_location_landmarks(loc).droplevel(0)
 
 
@@ -63,7 +64,7 @@ def find_all_crossing_times(positions, locations=None, thresh=0.15):
         loc: find_crossing_times(positions, pos, thresh=thresh)
         for loc, pos in locations.iterrows()
     },
-        names = names
+        names=names
     ).sort_index(level=-1).reset_index()
 
     times['leg'] = 0
@@ -75,23 +76,25 @@ def find_all_crossing_times(positions, locations=None, thresh=0.15):
 
     return times.set_index(['leg'] + names)[0]
 
+
 def find_all_crossing_data(positions, locations=None, thresh=0.15, cols=None):
     crossing_times = find_all_crossing_times(positions, locations, thresh)
     crossing_data = crossing_times.to_frame("time")
 
     if cols:
         crossings = pd.concat([
-            crossing_times, 
+            crossing_times,
             pd.Series([pd.NaT], [("",) * crossing_times.index.nlevels])
         ]).index
-        intervals = pd.IntervalIndex.from_breaks(crossing_times, closed='neither')
+        intervals = pd.IntervalIndex.from_breaks(
+            crossing_times, closed='neither')
         groups = crossings[intervals.get_indexer(positions.time)]
         crossing_groups = positions.groupby(groups)
         for c in cols:
-            crossing_data[c] = crossing_groups[c].mean().reindex(crossing_times.index)
+            crossing_data[c] = crossing_groups[c].mean().reindex(
+                crossing_times.index)
 
     return crossing_data
-
 
 
 def get_location_timings(positions, locations=None, thresh=0.15):
@@ -103,7 +106,7 @@ def get_location_timings(positions, locations=None, thresh=0.15):
     times = loc_times.values
     loc_timings = pd.DataFrame(
         times[:, None] - times[None, :],
-        index=loc_times.index, 
+        index=loc_times.index,
         columns=loc_times.index
     )
     distances = loc_times.index.get_level_values('distance')
@@ -130,34 +133,33 @@ def find_crossing_times(positions, loc, thresh=0.15):
         return pd.Series([], dtype=float)
 
     crossings = bearings.index[sgns != sgns.shift(fill_value=sgns.iloc[0])]
-        
+
     def weight(*ds):
         return ds[0] / sum(ds)
 
     crossing_weights = pd.Series([
         weight(*geodesy.haversine(intersections.loc[i:i+2], loc))
         for i in crossings
-    ], 
+    ],
         index=crossings,
-        dtype=float, 
+        dtype=float,
     )
 
     time_deltas = (
         positions.time[crossings + 1].values - positions.time[crossings].values
     )
     crossing_times = (
-        positions.time[crossings] + time_deltas * crossing_weights 
+        positions.time[crossings] + time_deltas * crossing_weights
     )
     distance_deltas = (
-        positions.distance[crossings + 1].values 
+        positions.distance[crossings + 1].values
         - positions.distance[crossings].values
     )
     crossing_distances = (
-        positions.distance[crossings] + distance_deltas * crossing_weights 
+        positions.distance[crossings] + distance_deltas * crossing_weights
     )
     crossing_times.index = crossing_distances.round(3)
     crossing_times.index.name = 'distance'
-
 
     return crossing_times
 
@@ -198,7 +200,7 @@ def group_positions(positions, locations=None, freq='1h', thresh=10, update=Fals
     closest_location = location_distances.idxmin(1)
     closest_distance = location_distances.min(1)
     closest_location[closest_distance > thresh] = np.nan
-    
+
     positions['location'] = closest_location.reindex(
         positions.index
     )
@@ -208,7 +210,6 @@ def group_positions(positions, locations=None, freq='1h', thresh=10, update=Fals
     grouped_locations = locations.loc[
         position_groups["location"]
     ].reset_index()
-    
 
     return pd.concat([position_groups, grouped_locations], axis=1)
 
@@ -217,7 +218,7 @@ def find_best_times(positions, distance, cols=None):
     positions = positions.reset_index()
 
     pos_distances = (
-        positions.distance 
+        positions.distance
         + np.minimum(positions.distance.diff(), 0).fillna(0)
     )
 
@@ -228,10 +229,10 @@ def find_best_times(positions, distance, cols=None):
     end_distances = distances + distance
 
     dist_elapsed = np.interp(
-        end_distances, pos_distances, time_elapsed    
+        end_distances, pos_distances, time_elapsed
     )
 
-    dist_times = dist_elapsed - time_elapsed[sel] 
+    dist_times = dist_elapsed - time_elapsed[sel]
     best_ordering = dist_times.argsort().values
 
     best = []
@@ -246,9 +247,9 @@ def find_best_times(positions, distance, cols=None):
         n1 = unblocked.sum()
         if n == n1:
             best = []
-            break 
+            break
         n = n1
-    
+
     best_times = pd.to_timedelta(dist_times[best], 'S')
     best_timesplits = pd.DataFrame.from_dict({
         'time': best_times,
@@ -274,7 +275,7 @@ def find_all_best_times(positions, distances=None, cols=None):
             name: find_best_times(positions, distance, cols=cols)
             for name, distance in distances.items()
         },
-            names = ('length', 'distance'),
+            names=('length', 'distance'),
         )
     return pd.DataFrame([])
 
@@ -283,7 +284,7 @@ def process_activities(activities, locations=None, cols=None):
     activity_id = activities.index.names[0]
     each_activity = activities.groupby(level=0)
     activity_info = pd.DataFrame({
-        "startTime": each_activity.time.min(), 
+        "startTime": each_activity.time.min(),
         "totalDistance": each_activity.distance.max(),
     }).sort_values("startTime", ascending=False)
     best_times = each_activity.apply(
@@ -303,7 +304,7 @@ def process_activities(activities, locations=None, cols=None):
         for actid, activity in each_activity if not activity.empty
     )
     location_timings = {
-        actid: timings 
+        actid: timings
         for actid, timings in location_timings if not timings.empty
     }
     return activity_info, best_times, location_timings
@@ -313,21 +314,22 @@ def calc_pareto_front(positions):
     i, j = np.triu_indices(len(positions), 1)
 
     time_diffs = (
-        positions.timeElapsed[j].dt.total_seconds().values - 
+        positions.timeElapsed[j].dt.total_seconds().values -
         positions.timeElapsed[i].dt.total_seconds().values
     )
-    dist_diffs =(
+    dist_diffs = (
         positions.distance[j].values - positions.distance[i].values)
     speeds = 1000 * np.nan_to_num(dist_diffs / time_diffs)
     mask = is_pareto_efficient(np.c_[-dist_diffs, -speeds])
     return pd.DataFrame.from_dict({
         'distance': dist_diffs[mask],
-        'speeds': speeds[mask], 
+        'speeds': speeds[mask],
     })
 
+
 def calc_time_above_hr(
-    activities, 
-    key='activity_id', 
+    activities,
+    key='activity_id',
     hrs=None,
     rescale=3600
 ):

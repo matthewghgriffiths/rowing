@@ -15,14 +15,14 @@ data_store = 'live_tracker.h5'
 
 def main():
     races, events, competitions = load_races(
-            year_start=2008, year_end=2022, 
+        year_start=2008, year_end=2022,
     )
     races = merge_race_event_competitions(races, events, competitions)
     race_results = load_competition_results(competitions.index)
     race_live_data = load_livedata(races.index)
 
     with pd.HDFStore(data_store) as store:
-        store['races'] = races 
+        store['races'] = races
         store['race_results'] = race_results
         for race_id, livetrack in race_live_data.items():
             live_data, results, intermediates = livetrack
@@ -32,13 +32,12 @@ def main():
                 # store['livetracker/intermediates/' + race_id] = intermediates
 
 
-
 def load_races(
-        year_start=2008, year_end=2022, 
+        year_start=2008, year_end=2022,
 ):
 
     competitions = api.get_worldrowing_records(
-        'competition', 
+        'competition',
         filter=(
             ('Year', tuple(range(year_start, year_end))),
             ('IsFisa', 1)
@@ -48,7 +47,7 @@ def load_races(
         api.get_races,
         dict(
             zip(
-                competitions.index, 
+                competitions.index,
                 zip(competitions.index)
             )
         )
@@ -62,7 +61,7 @@ def load_races(
         api.get_events,
         dict(
             zip(
-                competitions.index, 
+                competitions.index,
                 zip(competitions.index)
             )
         )
@@ -79,13 +78,13 @@ def load_races(
                 str if dtype == np.dtype('O') else dtype
             )
 
-
     return races, events, competitions
-    
+
+
 def merge_race_event_competitions(races, events, competitions):
     return utils.merge(
         (
-            races.reset_index(), events, 
+            races.reset_index(), events,
             competitions, api.get_boat_classes()
         ),
         how='left',
@@ -98,21 +97,24 @@ def merge_race_event_competitions(races, events, competitions):
         )
     ).set_index('id')
 
+
 def get_competition_results(comp_id):
     return api.get_race_results(competition_id=comp_id)
 
+
 def load_competition_results(competition_ids):
     comp_results, errors = utils.map_concurrent(
-        get_competition_results, 
+        get_competition_results,
         {c: (c,) for c in competition_ids}
     )
     race_results = pd.concat({
         k: df for k, df in comp_results.items() if len(df)
-    }, 
-        names = ['competition_id', 'race_id', 'id'],
+    },
+        names=['competition_id', 'race_id', 'id'],
         axis=0).reset_index(0)
 
     return race_results
+
 
 def load_livedata(race_ids):
     race_live_data, errors = utils.map_concurrent(
@@ -121,6 +123,7 @@ def load_livedata(race_ids):
         max_workers=30,
     )
     return race_live_data
+
 
 def save_livedata(race_live_data, data_store):
     with pd.HDFStore(data_store) as store:

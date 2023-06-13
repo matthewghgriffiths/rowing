@@ -14,6 +14,7 @@ st.set_page_config(
     # page_icon="👋",
 )
 
+
 def main(params=None):
     state.update(params or {})
 
@@ -23,8 +24,8 @@ def main(params=None):
         download = st.checkbox("automatically load livetracker data", True)
         with st.expander("Settings"):
             threads = st.number_input(
-                "number of threads to use", min_value=1, max_value=20, 
-                value=state.get("threads", 6), 
+                "number of threads to use", min_value=1, max_value=20,
+                value=state.get("threads", 6),
                 step=1
             )
             threads = int(threads)
@@ -33,10 +34,10 @@ def main(params=None):
     st.subheader("Select livetracker data")
 
     races = select.select_races(
-        filters=True, select_all=False, select_first=True, 
+        filters=True, select_all=False, select_first=True,
         default=[
-            fields.Phase, 
-            fields.Gender, 
+            fields.Phase,
+            fields.Gender,
             fields.race_raceStatus
         ],
         **{
@@ -63,11 +64,13 @@ def main(params=None):
 
     if not download:
         st.caption(f"Selected {len(races)} races")
-        st.caption("Checkbox 'load livetracker data' in sidebar to view race data")
+        st.caption(
+            "Checkbox 'load livetracker data' in sidebar to view race data")
         st.stop()
 
     with st.spinner("Downloading livetracker data"), st.empty():
-        live_data, intermediates = select.get_races_livedata(races, max_workers=threads)
+        live_data, intermediates = select.get_races_livedata(
+            races, max_workers=threads)
 
     with st.expander("Filter livetracker data"):
         live_data = select.filter_livetracker(live_data)
@@ -76,9 +79,9 @@ def main(params=None):
 
     live_data, PGMT = select.set_livetracker_PGMT(live_data)
     facets = [
-        fields.PGMT, 
-        fields.distance_from_pace, 
-        fields.split, 
+        fields.PGMT,
+        fields.distance_from_pace,
+        fields.split,
         fields.live_raceBoatTracker_strokeRate,
     ]
 
@@ -86,10 +89,9 @@ def main(params=None):
         plot_data, facet_axes, facet_format = args = \
             plots.melt_livetracker_data(live_data, 100)
         fig = plots.make_livetracker_plot(
-            facets, *args, 
+            facets, *args,
         )
         st.plotly_chart(fig, use_container_width=True)
-
 
     state.reset_button()
     state.update_query_params()

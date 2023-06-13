@@ -1,14 +1,15 @@
 
 import numpy as np
 
-import jax 
+import jax
 import jax.numpy as jnp
 from tensorflow_probability.substrates.jax.math import cholesky_update
 
+
 def estimate_orientation(accel_data, gyro_data):
     z = accel_data.mean()
-    z /= np.linalg.norm(z) 
-    
+    z /= np.linalg.norm(z)
+
     gyro_cov = gyro_data.cov()
     x = ((1 - np.eye(3).dot(z)) * np.eye(3)).sum(1)
     for i in range(5):
@@ -20,6 +21,7 @@ def estimate_orientation(accel_data, gyro_data):
 
     return np.array([x, y, z])
 
+
 @jax.jit
 def rowing_stroke_model(dt, n, s, v0, cs, ds):
     cs = jnp.array(cs)
@@ -28,11 +30,11 @@ def rowing_stroke_model(dt, n, s, v0, cs, ds):
 
     cj, dj = (cs.T/j).T, (ds.T/j).T
     cjj, djj = (cj.T/j).T, (dj.T/j).T
-    
-    ns = (n.T * j).T 
+
+    ns = (n.T * j).T
     n1 = n + s * dt
-    n1s = (n1.T * j).T 
-    
+    n1s = (n1.T * j).T
+
     cosn = jnp.cos(ns)
     sinn = jnp.sin(ns)
     cosn1 = jnp.cos(n1s)
@@ -47,23 +49,25 @@ def rowing_stroke_model(dt, n, s, v0, cs, ds):
 
     return n1, dx, v1, a1
 
-@jax.jit 
+
+@jax.jit
 def follow_bearing(lat, lon, bearing, distance, radius=1):
     d = distance / radius
     lat1 = jnp.arcsin(
         jnp.sin(lat)*jnp.cos(d) + jnp.cos(lat)*jnp.sin(d)*jnp.cos(bearing))
     lon1 = lon + jnp.arctan2(
-        jnp.sin(bearing)*jnp.sin(d)*jnp.cos(lat), 
+        jnp.sin(bearing)*jnp.sin(d)*jnp.cos(lat),
         jnp.cos(d)-jnp.sin(lat)*jnp.sin(lat1)
     )
     return lat1, lon1
+
 
 @jax.jit
 def euler2mat(vec):
     s_1, s_2, s_3 = jnp.sin(vec)
     c_1, c_2, c_3 = jnp.cos(vec)
     return jnp.array([
-        [c_1 * c_3 - c_2 * s_1 * s_3, -c_1 * s_3 - c_2 * c_3 * s_1, s_1 * s_2], 
+        [c_1 * c_3 - c_2 * s_1 * s_3, -c_1 * s_3 - c_2 * c_3 * s_1, s_1 * s_2],
         [c_3 * s_1+c_1 * c_2 * s_3, c_1 * c_2 * c_3-s_1 * s_3, -c_1 * s_2],
         [s_2 * s_3, c_3 * s_2, c_2]
     ])
@@ -75,10 +79,10 @@ def _exp_rolling_lombscargle(carry, xt):
     t, x = xt
     dt = t - t0
     e1 = 1 - dt * alpha
-    
+
     a = jnp.c_[
-        jnp.ones((n_freqs, 1)), 
-        jnp.sin(freqs[:, None] * harms[None, :] * t), 
+        jnp.ones((n_freqs, 1)),
+        jnp.sin(freqs[:, None] * harms[None, :] * t),
         jnp.cos(freqs[:, None] * harms[None, :] * t),
     ]
     AAT1 = AAT * e1 + a[:, None, :] * a[:, :, None]
@@ -108,10 +112,10 @@ def _exp_rolling_lombscargle_cho(carry, xt):
     t, x = xt
     dt = t - t0
     e1 = 1 - dt * alpha
-    
+
     a = jnp.c_[
-        jnp.ones((n_freqs, 1)), 
-        jnp.cos(freqs[:, None] * harms[None, :] * t), 
+        jnp.ones((n_freqs, 1)),
+        jnp.cos(freqs[:, None] * harms[None, :] * t),
         jnp.sin(freqs[:, None] * harms[None, ::-1] * t),
     ]
     AAT1 = cholesky_update(AAT * jnp.sqrt(e1), a)

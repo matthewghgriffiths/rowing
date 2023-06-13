@@ -2,12 +2,12 @@
 
 from .utils import OptTransform, transform, apply, init_apply
 from .kernels import (
-    SEKernel, IntSEKernel, Bias, WhiteNoise, 
+    SEKernel, IntSEKernel, Bias, WhiteNoise,
     SumKernel, ProductKernel
 )
 
 from .gpr import (
-    GaussianProcessRegression, 
+    GaussianProcessRegression,
     gpr_likelihood,
     make_gpr
 )

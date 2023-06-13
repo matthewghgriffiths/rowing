@@ -1,17 +1,17 @@
 
-import sys 
-import logging 
-from typing import Callable, Dict, TypeVar, Tuple, Any, Optional 
+import sys
+import logging
+from typing import Callable, Dict, TypeVar, Tuple, Any, Optional
 from contextlib import nullcontext
 from datetime import timedelta, datetime
-import re 
-import json 
+import re
+import json
 from functools import lru_cache
 from pathlib import Path
 import threading
 
 from concurrent.futures import (
-    ThreadPoolExecutor, as_completed, 
+    ThreadPoolExecutor, as_completed,
     wait, FIRST_COMPLETED, ALL_COMPLETED
 )
 try:
@@ -19,28 +19,30 @@ try:
 except ModuleNotFoundError:
     ProcessPoolExecutor = None
 
-from tqdm.auto import tqdm 
+from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
 
-# Python 3.7 compatible cached_property 
+# Python 3.7 compatible cached_property
 try:
-    from functools import cached_property 
+    from functools import cached_property
 except ImportError:
-    from ._compat import cached_property 
+    from ._compat import cached_property
 
 _pyodide = "pyodide" in sys.modules
 
 logger = logging.getLogger(__name__)
+
 
 @lru_cache
 def load_gsheet(sheet):
     from gspread_pandas import Spread
     return Spread(sheet)
 
+
 def to_gspread(
-    df, spread, sheet_name="Sheet1", 
-    index=True, header=True, merge_cells=True, freeze=True, 
+    df, spread, sheet_name="Sheet1",
+    index=True, header=True, merge_cells=True, freeze=True,
     max_workers=4, **kwargs
 ):
     spread = load_gsheet(spread)
@@ -50,9 +52,9 @@ def to_gspread(
     spread.freeze(0, 0, sheet_name)
 
     if merge_cells:
-        flat_df = df 
+        flat_df = df
         rowstart = df.columns.nlevels + 1
-        if index: 
+        if index:
             flat_df = flat_df.reset_index()
         if header:
             flat_df = flat_df.T.reset_index().T
@@ -129,12 +131,14 @@ def to_gspread(
     )
     return spread
 
+
 def read_gspread(sheet, sheet_name="Sheet1", **kwargs):
     gspread = load_gsheet(sheet)
     return gspread.sheet_to_df(sheet=sheet_name, **kwargs)
 
+
 def _to_merge_index(index, rowcounter=0, gcolidx=0):
-    import pandas as pd 
+    import pandas as pd
     if not isinstance(index, pd.MultiIndex):
         index = pd.MultiIndex.from_product([index])
 
@@ -170,13 +174,13 @@ def _to_merge_index(index, rowcounter=0, gcolidx=0):
 
 
 def to_a1_notation(*args):
-    import gspread 
-    
+    import gspread
+
     if len(args) == 4:
         range_start = gspread.utils.rowcol_to_a1(*args[:2])
         range_end = gspread.utils.rowcol_to_a1(*args[-2:])
         range_name = ":".join((range_start, range_end))
-        return range_name 
+        return range_name
     elif len(args) == 2:
         return gspread.utils.rowcol_to_a1(*args[:2])
     else:
@@ -202,7 +206,7 @@ def format_timedelta(td, hours=False, hundreths=True):
     if np.isnan(secs):
         return ""
         # return ("--:" if hours else '') + "--:--" + ('' if hundreths else ".--")
-    
+
     secs = int(secs)
     end = f".{(td.microseconds // 10_000):02d}" if hundreths else ''
     if hours:
@@ -222,13 +226,13 @@ def format_series_timedelta(s):
     components['hundredths'] = components.milliseconds // 10
     components = components.astype(str)
     times = (
-        components.hours + ":" 
-        + components.minutes.str.zfill(2) 
-        + ":" + components.seconds.str.zfill(2) 
-        + "." + components.hundredths.str.zfill(2) 
+        components.hours + ":"
+        + components.minutes.str.zfill(2)
+        + ":" + components.seconds.str.zfill(2)
+        + "." + components.hundredths.str.zfill(2)
     )
     times[na_vals] = ''
-    return times 
+    return times
 
 
 def format_gsheet(df, index=True, columns=True):
@@ -242,7 +246,7 @@ def format_gsheet(df, index=True, columns=True):
         gsheet.index = pd.MultiIndex.from_frame(format_gsheet(
             df.index.to_frame(), index=False, columns=False
         ))
-        
+
     if columns:
         gsheet.columns = pd.MultiIndex.from_frame(format_gsheet(
             df.columns.to_frame(), index=False, columns=False
@@ -277,11 +281,11 @@ def format_axis_splits(ax=None, yticks=True, xticks=False, hundreths=False):
             [format_totalseconds(s, hundreths) for s in xticks]
         )
 
+
 K = TypeVar("K")
 A = TypeVar('A')
 V = TypeVar('V')
 
-                
 
 def map_concurrent(
     func: Callable[..., V],
@@ -289,10 +293,10 @@ def map_concurrent(
     threaded: bool = True,
     max_workers: int = 10,
     progress_bar=tqdm,
-    singleton: bool = False, 
-    total: Optional[int] = None, 
+    singleton: bool = False,
+    total: Optional[int] = None,
     raise_on_err: bool = False,
-    executor_kws: Optional[dict] = None, 
+    executor_kws: Optional[dict] = None,
     **kwargs,
 ) -> Tuple[Dict[K, V], Dict[K, Exception]]:
     """
@@ -363,14 +367,16 @@ def map_concurrent(
 
     if singleton:
         def get(args):
-            return args, 
+            return args,
     else:
         def get(args):
-            return args 
-        
-    pbar = progress_bar(total=total or len(items)) if progress_bar else nullcontext()
+            return args
+
+    pbar = progress_bar(total=total or len(
+        items)) if progress_bar else nullcontext()
     with pbar, Executor(max_workers=max_workers, **(executor_kws or {})) as executor:
-        work = {executor.submit(func, *get(args), **kwargs): k for k, args in items}
+        work = {executor.submit(func, *get(args), **kwargs)
+                                : k for k, args in items}
 
         status: Dict[str, Any] = {}
         for future in as_completed(work):
@@ -398,19 +404,19 @@ def map_concurrent(
 class WorkQueue:
     """
     A Work Queue to allow straightforward multithreading. calling 
-    
+
     `WorkQueue(executor, queue_size=5).run(func, work)`
 
     is broadly equivalent to generating an iterator, 
 
     `((func(*args), *args) for args in work)`
-    
+
     except the iterator of the WorkQueue returns the work out of order. 
     multiple work queues can be created which pass their results together. 
 
     passing queue_size > 0 caps the maximum number of jobs the work queue
     will allow to be simultaneously running
-    
+
     Examples
     --------
     def func1(*args):
@@ -424,7 +430,7 @@ class WorkQueue:
     def func3(*args):
         time.sleep(1)
         return args[0] * 4
-        
+
 
     max_workers = 20
     queue_size = 10
@@ -436,9 +442,9 @@ class WorkQueue:
         queue3 = WorkQueue(executor, queue_size=queue_size).run(func3, queue2)
         for out in queue3:
             print(out[0], out[3])
-            
+
     print(time.time() - start)
-    
+
     0 0
     216 9
     168 7
@@ -451,6 +457,7 @@ class WorkQueue:
     48 2
     4.009526968002319
     """
+
     def __init__(self, executor, queue_size=None):
         self.executor = executor
         self.queue = {}
@@ -460,11 +467,11 @@ class WorkQueue:
         self.not_empty = threading.Condition(self.mutex)
         self.running = None
         self._shutdown = False
-        
+
     def qsize(self):
         with self.mutex:
             return len(self.queue)
-        
+
     def _submit(self, func, *args, **kwargs):
         with self.not_full:
             future = self.executor.submit(func, *args, **kwargs)
@@ -477,7 +484,7 @@ class WorkQueue:
 
     def is_alive(self):
         return not (self.executor._shutdown or self._shutdown)
-            
+
     def _consume(self, func, work, **kwargs):
         for args in work:
             if self.is_alive():
@@ -485,9 +492,9 @@ class WorkQueue:
                 self._submit(func, *args, **kwargs)
             else:
                 break
-            
+
         self.running = False
-                    
+
     def run(self, func, work, **kwargs):
         """
         equivalent to creating a generator, 
@@ -496,11 +503,12 @@ class WorkQueue:
 
         Except that the generator returns values as they are calculated
         """
-        self.running = True     
-        self.work_thread = threading.Thread(target=self._consume, args=(func, work), kwargs=kwargs)
+        self.running = True
+        self.work_thread = threading.Thread(
+            target=self._consume, args=(func, work), kwargs=kwargs)
         self.work_thread.start()
         return self
-    
+
     def join(self, timeout=None):
         """
         Calling WorkQueue(executor).run(func, work).join() will block until
@@ -510,22 +518,21 @@ class WorkQueue:
         wait(self.queue, return_when=ALL_COMPLETED)
 
         return self
-                    
+
     def __iter__(self):
         if self.running is None:
             raise RuntimeError("")
-            
+
         while self.running or self.queue:
             with self.not_empty:
                 while not self.queue:
                     self.not_empty.wait()
-                    
+
                 done_and_not = wait(self.queue, return_when=FIRST_COMPLETED)
                 for future in done_and_not.done:
                     args = self.queue.pop(future)
                     self.not_full.notify()
                     yield (future.result(), *args)
-
 
 
 def _map_singlethreaded(
@@ -540,7 +547,7 @@ def _map_singlethreaded(
     output = {}
     errors = {}
 
-    status: Dict[str, Any] = {}    
+    status: Dict[str, Any] = {}
     pbar = progress_bar(total=len(inputs)) if progress_bar else nullcontext()
     with pbar:
         for key, args in inputs.items():
@@ -568,10 +575,10 @@ if _pyodide:
 def cached_map_concurrent(
     func: Callable[..., V],
     inputs: Dict[K, Tuple],
-    singleton: bool = False, 
-    local_cache: Optional["LocalCache"] = None, 
-    path = ".", 
-    total = None,
+    singleton: bool = False,
+    local_cache: Optional["LocalCache"] = None,
+    path=".",
+    total=None,
     **kwargs,
 ):
     if local_cache is None:
@@ -591,12 +598,13 @@ def cached_map_concurrent(
 
     if singleton:
         def get(args):
-            return args, 
+            return args,
     else:
         def get(args):
-            return args 
+            return args
 
     path = Path(path)
+
     def cached_func(k, *args, **kwargs):
         return local_cache.get(k, path, func, *args, **kwargs)
 
@@ -614,13 +622,13 @@ def cached_map_concurrent(
 
 class LocalCache:
     def __init__(
-            self, serialise, deserialise, file_ending, 
-            read_mode=None, write_mode=None
-        ):
-        self._serialise = serialise 
+        self, serialise, deserialise, file_ending,
+        read_mode=None, write_mode=None
+    ):
+        self._serialise = serialise
         self._deserialise = deserialise
         self.file_ending = file_ending
-        self.read_mode = read_mode 
+        self.read_mode = read_mode
         self.write_mode = write_mode
 
     def get_path(self, key, path):
@@ -629,7 +637,7 @@ class LocalCache:
             for k in key[:-1]:
                 obj_path = obj_path / str(k)
             key = key[-1]
-            
+
         obj_path = obj_path / f"{key}.{self.file_ending}"
         return obj_path
 
@@ -656,19 +664,19 @@ class LocalCache:
         else:
             self._serialise(obj, obj_path, **kwargs)
 
-        return obj_path 
+        return obj_path
 
     def deserialise(self, obj_path, **kwargs):
         if self.read_mode:
-            with open(obj_path, self.read_mode) as f: 
+            with open(obj_path, self.read_mode) as f:
                 return self._deserialise(f, **kwargs)
         else:
             return self._deserialise(obj_path, **kwargs)
 
 
 parquet_cache = LocalCache(
-    pd.DataFrame.to_parquet, 
-    pd.read_parquet, 
+    pd.DataFrame.to_parquet,
+    pd.read_parquet,
     "parquet"
 )
 
@@ -679,16 +687,16 @@ json_cache = LocalCache(
 
 class CachedClient:
     def __init__(
-            self, username=None, password=None, path=None, 
-            local_cache: Optional[LocalCache] = None, map_kws = None
-        ):
-        self.username = username 
-        self.password = password 
+        self, username=None, password=None, path=None,
+        local_cache: Optional[LocalCache] = None, map_kws=None
+    ):
+        self.username = username
+        self.password = password
         self.path = Path(path).resolve()
         self.local_cache = local_cache
         self.map_kws = map_kws or {}
 
-    @classmethod 
+    @classmethod
     def from_credentials(cls, credentials, **kwargs):
         if not isinstance(credentials, dict):
             with open(credentials, 'r') as f:
@@ -700,8 +708,8 @@ class CachedClient:
         return map_concurrent(func, *args, **{**self.map_kws, **kwargs})
 
     def cached(self, key, func, *args, local_cache=None, path=None, reload=False, **kwargs):
-        local_cache = local_cache or self.local_cache 
-        path = path or self.path 
+        local_cache = local_cache or self.local_cache
+        path = path or self.path
         if local_cache:
             if reload:
                 return local_cache.update(

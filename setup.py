@@ -20,8 +20,8 @@ setup(
             'gpx = rowing.analysis.files:main [GPX]',
         ]
     },
-    license='MIT', 
-    long_description=long_description, 
+    license='MIT',
+    long_description=long_description,
     long_description_content_type="text/markdown",
     install_requires=[
         'numpy>=1.21.0',
@@ -32,10 +32,11 @@ setup(
     ],
     extras_require={
         'WORLDROWING': ['streamlit>=1.22.0', 'plotly>=5.14.1'],
-        'REQ': ['requests>=2.0.0'], # Requests is not required if using pyodide
+        # Requests is not required if using pyodide
+        'REQ': ['requests>=2.0.0'],
         'GARMIN': [
-            'garminconnect>=0.1.45', 
-            'fitparse>=1.2.0', 
+            'garminconnect>=0.1.45',
+            'fitparse>=1.2.0',
             "openpyxl>=3.0.0",
             "pyarrow>=7.0.0"
         ],
@@ -44,9 +45,9 @@ setup(
     python_requires=">=3.8",
     package_data={
         'rowing': [
-            'data/*.csv.gz', 
-            'data/iso_country.json', 
-            'data/flags/*.png', 
+            'data/*.csv.gz',
+            'data/iso_country.json',
+            'data/flags/*.png',
             'data/*.tsv'
         ],
     }
