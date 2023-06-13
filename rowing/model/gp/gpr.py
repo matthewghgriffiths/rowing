@@ -185,5 +185,5 @@ make_gpr = transform(get_gpr)
 
 @transform
 def gpr_likelihood(times, observations, **kwargs):
-    gp = get_gp(times, observations, **kwargs)
+    gp = get_gpr(times, observations, **kwargs)
     return gp.log_likelihood()

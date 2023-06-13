@@ -16,7 +16,7 @@ import re
 import numpy as np
 import pandas as pd
 import gpxpy
-import cloudscraper
+# import cloudscraper
 from garminconnect import (
     Garmin,
     GarminConnectConnectionError,
@@ -338,7 +338,7 @@ def download_activity(activity_id, path=None, api=None):
     return path
 
 
-def download_activities(activities, folder='./', max_workers=4, api=None, **kwargs):
+def _download_activities(activities, folder='./', max_workers=4, api=None, **kwargs):
     api = get_api(api)
 
     activity_ids = (act["activityId"] for act in activities)
@@ -451,7 +451,11 @@ def load_fit_activities(activity_ids, max_workers=4, api=None, **kwargs):
     )
 
 
-def get_activities(start=0, limit=20, *, api=None, activityType=None, startDate=None, endDate=None, minDistance=None, maxDistance=None, **params):
+def get_activities(
+        start=0, limit=20, *, api=None, activityType=None, 
+        startDate=None, endDate=None, minDistance=None, maxDistance=None, 
+        **params
+):
     if activityType:
         if activityType in _ACTIVITY_TYPES:
             params.update(_ACTIVITY_TYPES[activityType])
@@ -744,13 +748,13 @@ def run(args=None):
 
         with pd.ExcelWriter(options.hr_file, mode='w') as xlf:
             time_above_hr.to_excel(
-                xlf, f"time above hr per session")
+                xlf, "time above hr per session")
             time_above_hr.groupby(
                 pd.Grouper(freq='w')
-            ).sum().to_excel(xlf, f"time above hr per week")
+            ).sum().to_excel(xlf, "time above hr per week")
             time_above_hr.groupby(
                 pd.Grouper(freq='M')
-            ).sum().to_excel(xlf, f"time above hr per month")
+            ).sum().to_excel(xlf, "time above hr per month")
 
         print(f"saved heart rate data to {options.hr_file}")
 

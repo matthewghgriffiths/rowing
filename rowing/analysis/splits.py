@@ -68,7 +68,7 @@ def find_all_crossing_times(positions, locations=None, thresh=0.15):
     ).sort_index(level=-1).reset_index()
 
     times['leg'] = 0
-    legs = times[names[:-1] + ['leg']]
+    # legs = times[names[:-1] + ['leg']]
     duplicates = times[names[:-1] + ['leg']].duplicated(keep='first')
     while duplicates.any():
         times['leg'] += np.maximum.accumulate(duplicates)
