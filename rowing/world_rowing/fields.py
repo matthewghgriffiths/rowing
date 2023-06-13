@@ -141,6 +141,17 @@ field_names = {
     'lane_country_CountryCode': 'Country Code',
     'lane_country_IsNOC': 'lane_country_IsNOC',
     'lane_country_IsFormerCountry': 'lane_country_IsFormerCountry',
+    'bestTimes_CompetitionType': 'bestTimes_CompetitionType', 
+    'bestTimes_BoatClass': 'bestTimes_BoatClass',
+    'bestTimes_ResultTime': 'Best Time',
+    'bestTimes_Competition': 'bestTimes_Competition',
+    'bestTimes_Venue': 'bestTimes_Venue',
+    'bestTimes_Event': 'bestTimes_Event',
+    'bestTimes_EventId': 'bestTimes_EventId',
+    'bestTimes_Race': 'bestTimes_Race',
+    'bestTimes_RaceId': 'bestTimes_RaceId',
+    'bestTimes_Country': 'bestTimes_Country',
+    'bestTimes_Date': 'bestTimes_Date',
 }
 field_names.update(
     (k.casefold(), v) for k, v in list(field_names.items())

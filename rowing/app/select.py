@@ -50,7 +50,7 @@ def get_cbts(boat_classes=None):
     cbts = api.get_competition_best_times()
     if boat_classes is None:
         return cbts
-    return cbts[cbts.BoatClass.isin(boat_classes)]
+    return cbts[cbts[fields.bestTimes_BoatClass].isin(boat_classes)]
 
 @st.cache_data(persist=True)
 def get_livedata(race_id, gmt=None):
@@ -229,6 +229,7 @@ def filter_races(
         filters=filters,
         select_all=select_all,
         select_first=select_first,
+        key='filter_races', 
         **kwargs,
     ).reset_index(drop=True)
     races[fields.race_Date] = pd.to_datetime(races[fields.race_Date])
@@ -285,40 +286,43 @@ def select_results(race_results, **kwargs):
     return filtered 
 
 CBT_COLS = [
-    fields.time, 
-    fields.BoatClass, 
-    fields.CompetitionType, 
-    fields.Competition, 
-    fields.Venue,
-    fields.Event, 
-    fields.Race, 
-    fields.Country, 
-    fields.Date, 
+    fields.bestTimes_ResultTime, 
+    fields.bestTimes_BoatClass, 
+    fields.WBTCompetitionType, 
+    fields.bestTimes_Competition, 
+    fields.bestTimes_Venue,
+    fields.bestTimes_Event, 
+    fields.bestTimes_Race, 
+    fields.bestTimes_Country, 
+    fields.bestTimes_Date, 
 ]
 def select_best_times(boat_classes=None, *competition_types):
     cbts = get_cbts(boat_classes)
     if cbts.empty:
         return cbts
+    if boat_classes is None:
+        boat_classes = cbts[fields.bestTimes_BoatClass].unique()
     
-
     pick = inputs.modal_button(
         "Select competition best times", "Use world best times", "pickCBT", mode=True
     )
     if not pick:
         filtered_cbts = inputs.filter_dataframe(
-            cbts[CBT_COLS].sort_values("time", ascending=True), 
-            default=["CompetitionType", "BoatClass"],
-            CompetitionType=['Elite Overall', *competition_types], 
-            categories={"BoatClass"},
-            BoatClass=boat_classes, 
+            cbts[CBT_COLS].sort_values(fields.bestTimes_ResultTime, ascending=True), 
+            default=[fields.WBTCompetitionType, fields.bestTimes_BoatClass],
+            categories={fields.bestTimes_BoatClass},
             key='GMT', 
+            **{
+                fields.WBTCompetitionType: ['Elite Overall', *competition_types],
+                fields.bestTimes_BoatClass: boat_classes, 
+            },
         )
         cbts = cbts.loc[filtered_cbts.index]
 
     return cbts
 
 def set_gmts(cbts, *competition_types):
-    wbts = cbts.groupby("BoatClass").ResultTime.min()
+    wbts = cbts.groupby(fields.bestTimes_BoatClass)[fields.bestTimes_ResultTime].min()
     col1, col2 = st.columns(2)
     gmts = {
         "GMT": wbts, 
@@ -326,8 +330,8 @@ def set_gmts(cbts, *competition_types):
     }
     for competition_type in competition_types:
         gmts[f"{competition_type} best time"] = cbts[
-            cbts.CompetitionType == competition_type
-        ].groupby("BoatClass").ResultTime.min()
+            cbts[fields.bestTimes_CompetitionType] == competition_type
+        ].groupby(fields.bestTimes_BoatClass)[fields.bestTimes_ResultTime].min()
 
     with col2:
         uploaded = inputs.upload_csv(

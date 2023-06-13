@@ -310,7 +310,7 @@ def load_competition_best_times(json_url, **kwargs):
     return pd.DataFrame.from_records(
         extract_fields(record, WBT_RECORDS)
         for record in load_json_url(json_url, **kwargs)["BestTimes"]
-    )
+    ).rename(columns=fields.renamer("bestTimes"))
 
 
 def get_worldrowing_data(*endpoints, cached=True, request_kws=None, **kwargs):
@@ -716,25 +716,26 @@ def get_competition_best_times(timeout=2., load_event_info=False):
         timeout=timeout, 
     )
     wbts = (
-        pd.concat(wbts, names=["CompetitionType"]).reset_index(
+        pd.concat(wbts, names=[fields.bestTimes_CompetitionType]).reset_index(
             0).reset_index(drop=True)
     )
-    
-    wbts['CompetitionType.name'] = wbts.CompetitionType
-    wbts['CompetitionType.DisplayName'] = wbts.CompetitionType.str.extract(r": ([a-zA-Z]+)")
-    wbts['CompetitionType'] = wbts.CompetitionType.replace(WBT_TYPES)
-    wbts.ResultTime = pd.to_timedelta(wbts.ResultTime)
-    wbts['time'] = wbts.ResultTime.dt.total_seconds().apply(format_totalseconds)
-
+    wbts[fields.WBTCompetitionType] = \
+        wbts[fields.bestTimes_CompetitionType].replace(WBT_TYPES)
+    wbts[fields.bestTimes_ResultTime] = pd.to_timedelta(wbts[fields.bestTimes_ResultTime])
+    # wbts['time'] = wbts.ResultTime.dt.total_seconds().apply(format_totalseconds)
 
     if load_event_info:
-        event_information = pd.concat(map_concurrent(
-            lambda event_id: pd.json_normalize(get_worldrowing_data(
+        events, errors = map_concurrent(
+            lambda event_id: get_worldrowing_record(
                 "event", event_id, include="competition.competitionType"
-            )),
-            {i: (i,) for i in wbts.EventId}
-        )[0]).reset_index(1, drop=True)
-        return wbts.join(event_information, on='EventId')
+            ),
+            {i: (i,) for i in wbts[fields.bestTimes_EventId]}
+        )
+        if errors:
+            logger.warning(
+                "get_competition_best_times.load_event_info errors=%s", errors)
+        event_information = pd.DataFrame.from_dict(events, orient='index')
+        return wbts.join(event_information, on=fields.bestTimes_EventId)
     
     return wbts
 
