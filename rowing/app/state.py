@@ -3,6 +3,7 @@ import json
 import atexit
 import logging
 import datetime 
+import copy
 
 import streamlit as st 
 
@@ -63,6 +64,10 @@ def update_query_params():
         k: v for k, v in items if v is not None
     }
     st.experimental_set_query_params(**update_params)
+
+
+def get_state():
+    return copy.deepcopy(STATE)
 
 
 def reset_button(label='reset'):

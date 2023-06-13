@@ -358,7 +358,7 @@ def parse_records(endpoints, records):
 
 
 def get_events(competition_id=None, cached=True):
-    competition_id = competition_id or get_most_recent_competition().name
+    competition_id = competition_id or get_most_recent_competition().competition_id
     return get_worldrowing_records(
         "event",
         cached=True,
@@ -549,9 +549,9 @@ def get_last_races(n=1, fisa=True, competition=None):
 def get_next_races(n=1, fisa=True, competition=None):
     if competition is None:
         competition = get_most_recent_competition(fisa)
-    races = get_races(competition.name)
-    to_race = races.DateString > datetime.datetime.now().astimezone()
-    return races.loc[to_race].sort_values("DateString").iloc[:n]
+    races = get_races(competition.competition_id)
+    to_race = races[fields.race_Date] > pd.Timestamp.now()
+    return races.loc[to_race].sort_values(fields.race_Date).iloc[:n]
 
 
 def show_next_races(n=10, fisa=True, competition=None):
