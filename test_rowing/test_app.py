@@ -18,10 +18,24 @@ app_livetracker = importlib.import_module("pages.2_livetracker", "..")
     "params", [
         None, 
         {
-        'current_competition': True, 'pickCBT': True, 'results.modal': True, 
+            'current_competition': True,
+            'pickCBT': True,
+            'results.modal': True,
+            'intermediate_results.modal': False
         },
         {
-        'current_competition': False, 'pickCBT': False, 'results.modal': False, 
+            'current_competition': False, 
+            'pickCBT': False, 
+            'results.modal': False, 
+            'intermediate_results.modal': False
+        },
+        {
+            'current_competition': False, 
+            'pickCBT': False, 
+            'results.modal': False, 
+            'intermediate_results.modal': False,
+            'competition.modal': True, 
+            'GMT.modal': False, 
         },
     ]
 )
@@ -32,16 +46,23 @@ def test_GMTs(params):
     "params", [
         None, 
         {
-            'current_competition': True, 
-            'None.modal': True,
+            'current_competition': True,
+            'filter_races.modal': True,
             'pickCBT': True,
             'live_data.modal': True
         },
         {
             'current_competition': False, 
-            'None.modal': False,
             'pickCBT': False,
             'live_data.modal': False
+        },
+        {
+            'current_competition': False,
+            'filter_races.modal': True,
+            'pickCBT': False,
+            'live_data.modal': False,
+            'competition.modal': True,
+            'GMT.modal': False
         },
     ]
 )

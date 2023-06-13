@@ -44,7 +44,6 @@ def main(params=None):
             fields.race_raceStatus: ["Official"],
         }
     ).reset_index(drop=True)
-    boat_classes = races[fields.boatClass].unique()
 
     if races.empty:
         if state.get("expander.filter_races", False):
@@ -61,7 +60,6 @@ def main(params=None):
         gmts = select.set_competition_gmts(competition_id)
         races = races.set_index("race_id").join(
             gmts.rename(fields.GMT), on=fields.boatClass)
-
 
     if not download:
         st.caption(f"Selected {len(races)} races")

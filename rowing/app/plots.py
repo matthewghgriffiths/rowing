@@ -41,21 +41,17 @@ def melt_livetracker_data(live_data, filter_distance=100):
         fields.raceBoats, 
         fields.boatClass, 
         fields.live_raceId,
+        fields.race_distance, 
     ])
     plot_data[fields.crew] = (
         plot_data[fields.raceBoats] + " " + plot_data[fields.boatClass])
-
-    distance_travelled = live_data[fields.live_raceBoatTracker_distanceTravelled]
-    facet_groups = live_data[
+    
+    distance_travelled = plot_data[fields.live_raceBoatTracker_distanceTravelled]
+    facet_groups = plot_data[
         (distance_travelled > filter_distance)
-        & (distance_travelled < live_data[fields.race_distance])
-    ].dropna(
-        subset=[fields.split, fields.avg_split, fields.avg_speed]
-    ).melt([
-        fields.live_time, 
-        fields.live_raceBoatTracker_distanceTravelled, 
-        fields.live_raceBoatTracker_raceBoatId,
-    ]).groupby("variable")
+        & (distance_travelled < plot_data[fields.race_distance])
+        & plot_data.variable.notnull()
+    ].groupby("variable")
     
     variable_types = facet_groups.value.first().map(type)
     facets = variable_types.index[variable_types != str]

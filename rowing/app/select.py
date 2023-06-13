@@ -278,10 +278,10 @@ RESULT_COLS = [
     fields.race_Date, 
 ]
 
-def select_results(race_results, **kwargs):
+def select_results(race_results, key='race_results', **kwargs):
     filtered = inputs.filter_dataframe(
         race_results[RESULT_COLS].sort_values("PGMT", ascending=False), 
-        **kwargs
+        key=key, **kwargs
     )
     return filtered 
 
@@ -431,7 +431,8 @@ def set_livetracker_PGMT(live_data):
         PGMT = st.number_input(
             "input %GMT for pace boat", 
             min_value=0.01, max_value=1.1, value=1., 
-            label_visibility="collapsed"
+            label_visibility="collapsed", 
+            key='setPGMT'
         )
 
     gmt_speed = (
