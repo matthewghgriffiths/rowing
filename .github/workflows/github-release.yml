@@ -3,8 +3,10 @@ name: Build and upload release to Github
 on:
   push:
     # Sequence of patterns matched against refs/tags
-    tags:
-    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.
+    branches: 
+      - main
+    # tags:
+    # - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.
 
 jobs:
   build:
@@ -13,10 +15,10 @@ jobs:
     
     steps:
       - uses: actions/checkout@master
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v1
         with:
-          python-version: 3.8
+          python-version: 3.9
         
       - name: Checkout code
         uses: actions/checkout@v2
@@ -55,12 +57,12 @@ jobs:
           name: rowing-windows
           path: ./dist/windows # or path/to/artifact
 
-      - name: Release
-        if: contains(github.ref, 'tags/v')
-        id: release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ./dist/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Release
+      #   if: contains(github.ref, 'tags/v')
+      #   id: release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     files: ./dist/*
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

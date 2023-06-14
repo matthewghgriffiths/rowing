@@ -7,8 +7,7 @@ block_cipher = None
 
 project = 'rowing'
 scripts = {
-    'world_rowing': 'rowing/world_rowing/cli.py',
-    'rowing_live_tracker': 'rowing/world_rowing/dashboard.py',
+    'world_rowing': 'rowing/world_rowing/app.py',
     'garmin': 'rowing/analysis/garmin.py', 
     'gpx': 'rowing/analysis/files.py'
 }
