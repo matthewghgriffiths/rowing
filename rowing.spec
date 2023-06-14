@@ -21,6 +21,7 @@ datas = [
     ('data', 'data'), 
     ('cloudscraper', 'cloudscraper'),
     ('worldrowing_app.py', 'worldrowing_app.py'),
+    ('pages', 'pages'),
     (streamlit_path + '/static', 'streamlit/static'),
     (altair_path + '/vegalite/v5/schema/vega-lite-schema.json', 
     'altair/vegalite/v5/schema/vega-lite-schema.json'),
