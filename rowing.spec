@@ -2,6 +2,7 @@
 
 import os
 import sys
+import importlib
 
 block_cipher = None
 
@@ -11,9 +12,18 @@ scripts = {
     'garmin': 'rowing/analysis/garmin.py', 
     'gpx': 'rowing/analysis/files.py'
 }
+streamlit_path = os.path.split(
+    importlib.util.find_spec("streamlit").origin)[0] 
+altair_path = os.path.split(
+    importlib.util.find_spec("altair").origin)[0] 
+
 datas = [
     ('data', 'data'), 
-    ('cloudscraper', 'cloudscraper')
+    ('cloudscraper', 'cloudscraper'),
+    ('worldrowing_app.py', 'worldrowing_app.py'),
+    (streamlit_path + '/static', 'streamlit/static'),
+    (altair_path + '/vegalite/v5/schema/vega-lite-schema.json', 
+    'altair/vegalite/v5/schema/vega-lite-schema.json'),
 ]
 
 analyses = {
@@ -31,8 +41,9 @@ analyses = {
             'scipy.special',
             'scipy.linalg',
             'scipy.integrate',
+            'streamlit.runtime.scriptrunner.magic_funcs', 
         ],
-        hookspath=[],
+        hookspath=['./hooks'],
         runtime_hooks=[],
         excludes=[],
         win_no_prefer_redirects=False,
