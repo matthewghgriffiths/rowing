@@ -49,7 +49,7 @@ def main(dir, application, log_level):
     }
     os.chdir(work_dir)
     cli.bootstrap.load_config_options(flag_options=flag_options)
-    cli._main_run("main.py", flag_options)
+    cli._main_run("home.py", flag_options)
 
 if __name__ == "__main__":
     main()
