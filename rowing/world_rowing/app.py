@@ -8,6 +8,8 @@ import click
 import streamlit 
 from streamlit.web import cli
 
+from rowing.app import *
+
 DIR = Path(__file__).absolute().parent
 PACKAGE_DIR = (DIR / "../../..").resolve()
 

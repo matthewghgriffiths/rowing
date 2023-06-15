@@ -23,8 +23,7 @@ datas = [
     ('world_rowing_app', 'world_rowing_app'),
     ('rowing', 'rowing'),
     (streamlit_path + '/static', 'streamlit/static'),
-    (altair_path + '/vegalite/v5/schema/vega-lite-schema.json', 
-    'altair/vegalite/v5/schema/vega-lite-schema.json'),
+    # (altair_path + '/vegalite/v5/schema/vega-lite-schema.json', 'altair/vegalite/v5/schema/vega-lite-schema.json'),
 ]
 
 analyses = {
