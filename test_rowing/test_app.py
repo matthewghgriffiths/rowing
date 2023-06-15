@@ -11,9 +11,9 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
 
 
-app_GMTs = importlib.import_module("pages.1_GMTs", "..")
-app_livetracker = importlib.import_module("pages.2_livetracker", "..")
-app_realtime = importlib.import_module("pages.3_realtime", "..")
+app_GMTs = importlib.import_module("world_rowing_app.pages.1_GMTs", "..")
+app_livetracker = importlib.import_module("world_rowing_app.pages.2_livetracker", "..")
+app_realtime = importlib.import_module("world_rowing_app.pages.3_realtime", "..")
 
 
 @pytest.mark.parametrize(
