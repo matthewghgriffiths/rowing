@@ -31,7 +31,8 @@ def main(params=None):
 
     with st.sidebar:
         with st.expander("Settings"):
-            dummy = st.checkbox("load dummy data", True)
+            dummy = st.checkbox(
+                "load dummy data", state.get("dummy", False))
             dummy_index = st.number_input("dummy_index", 0, 1000, 0)
             dummy_step = st.number_input(
                 "dummy_step", 1, 100, state.get("dummy_step", 10))

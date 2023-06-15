@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='rowing',
-    version='0.3.0',
+    version='0.3.1',
     description='Library for loading and presenting data from the worldrowing.com',
     author='Matthew Griffiths',
     author_email='matthewghgriffiths@gmail.com',
