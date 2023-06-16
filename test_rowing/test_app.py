@@ -16,6 +16,15 @@ app_livetracker = importlib.import_module("world_rowing_app.pages.2_livetracker"
 app_realtime = importlib.import_module("world_rowing_app.pages.3_realtime", "..")
 
 
+def run_streamlit(main, params):
+    try:
+        main(params)
+    except (
+            st.runtime.scriptrunner.StopException,
+            st.runtime.scriptrunner.RerunException,
+    ):
+        pass
+
 @pytest.mark.parametrize(
     "params", [
         None,
@@ -42,7 +51,7 @@ app_realtime = importlib.import_module("world_rowing_app.pages.3_realtime", ".."
     ]
 )
 def test_GMTs(params):
-    app_GMTs.main(params)
+    run_streamlit(app_GMTs.main, params)
 
 
 @pytest.mark.parametrize(
@@ -70,11 +79,11 @@ def test_GMTs(params):
     ]
 )
 def test_livetracker(params):
-    app_livetracker.main(params)
+    run_streamlit(app_livetracker.main, params)
 
 
 @pytest.mark.parametrize(
     "params", [{'dummy': 50, 'dummy_step': 50, }, ]
 )
 def test_realtime(params):
-    app_realtime.main(params)
+    run_streamlit(app_realtime.main, params)

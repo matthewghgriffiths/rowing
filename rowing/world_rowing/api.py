@@ -828,12 +828,12 @@ def merge_competition_results(
     event_wbts = pd.merge(
         competition_events, boat_wbts,
         left_on=fields.event_boatClassId, right_on=fields.boatClass_id,
-        # suffixes = ('_event', '_boat'),
+        suffixes = ('', '_1'),
     )
     race_wbts = pd.merge(
         competition_races, event_wbts,
         left_on=fields.race_eventId, right_on=fields.event_id,
-        # suffixes = ('_race', '_event')
+        suffixes = ('', '_1'),
     )
     race_data = pd.merge(
         race_results.loc[
@@ -841,7 +841,8 @@ def merge_competition_results(
             & (race_results[fields.raceBoatIntermediates_ResultTime] > pd.Timedelta(0))
         ],
         race_wbts,
-        left_on='raceBoats_raceId',  right_on='race_id'
+        left_on=fields.raceBoats_raceId,  right_on=fields.race_id,
+        suffixes = ('', '_1'),
     )
     race_data[fields.raceBoatIntermediates_Rank] = \
         race_data[fields.raceBoatIntermediates_Rank].astype(int)
