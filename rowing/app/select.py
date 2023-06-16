@@ -220,7 +220,8 @@ def filter_races(
         races, boat_classes,
         left_on=fields.race_event_boatClassId,
         right_on=fields.boatClass_id,
-        how='left',
+        how='left', 
+        suffixes=("", "_1")
     )
     st.subheader("Filter races to look at")
     kwargs.setdefault(
@@ -426,14 +427,15 @@ LIVE_COLS = [
 
 
 def filter_livetracker(live_data):
-    rank_col = fields.live_raceBoatTracker_currentPosition
     live_data = inputs.filter_dataframe(
         live_data, key='live_data',
         options=LIVE_COLS,
-        default=[rank_col],
+        default=[fields.lane_Rank],
         select=False,
         **{
-            rank_col: sorted(live_data[rank_col].unique())
+            fields.lane_Rank: pd.Series(
+                live_data[fields.lane_Rank].unique()
+            ).dropna().sort_values().to_list()
         }
     )
     # live_data[fields.split] = pd.to_datetime(

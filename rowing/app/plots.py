@@ -91,10 +91,10 @@ def melt_livetracker_data(live_data, filter_distance=100):
         fmt = facet_format[facet]
         if fmt is not True:
             facet_axes[facet]['tickformat'] = fmt
-
-    facet_axes[fields.PGMT]['tickformat'] = ',.1%'
-    facet_axes[fields.split]['tickformat'] = "%-M:%S"
-    facet_axes[fields.lane_ResultTime]['tickformat'] = "%-M:%S"
+    
+    facet_axes.setdefault(fields.PGMT, {})['tickformat'] = ',.1%'
+    facet_axes.setdefault(fields.split, {})['tickformat'] = "%-M:%S"
+    facet_axes.setdefault(fields.lane_ResultTime, {})['tickformat'] = "%-M:%S"
     for col in [
         fields.distance_from_pace,
         fields.live_raceBoatTracker_distanceFromLeader,

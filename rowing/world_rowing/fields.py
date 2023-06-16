@@ -98,6 +98,7 @@ race_event = 'Race.Event'
 race_eventId = 'race_eventId'
 race_id = 'race_id'
 race_raceBoats = 'Race.Boat'
+race_boatClass = 'Boat Class'
 race_raceStatus = 'Results Status'
 raceBoatIntermediates_Rank = 'Intermediate Position'
 raceBoatIntermediates_ResultTime = 'Intermediate Time'
@@ -195,6 +196,7 @@ field_names = {
     'race_event_competitionId': 'race_event_competitionId',
     'race_event_RscCode': 'Rsc Code',
     'race_distance': 'Race Distance',
+    'race_boatClass': 'Boat Class',
     # 'raceDistance': 'Race Distance'
     'race_raceStatus': 'Results Status',
     'boatClass_id': 'boatClass_id',

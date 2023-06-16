@@ -382,7 +382,7 @@ def parse_races(races):
     race_codes = parse_race_codes(races.race_RscCode)
     boat_classes = races[
         'race_event_boatClassId'
-    ].replace(BOATCLASSES).rename("race_boatClass")
+    ].replace(BOATCLASSES).rename(fields.race_boatClass)
     races[fields.Day] = races[fields.race_Date].dt.date
     races = pd.concat([races, race_codes, boat_classes], axis=1)
     return races
@@ -447,8 +447,9 @@ def extract_results(races):
         == race_intermediates[fields.raceBoatIntermediates_ResultTime]
     )].groupby(fields.raceBoats_raceId)[fields.Distance].max()
 
-    race_intermediates[fields.race_distance] = \
-        race_distances.loc[race_intermediates[fields.raceBoats_raceId]].values
+    race_intermediates[fields.race_distance] = race_distances.reindex(
+        race_intermediates[fields.raceBoats_raceId]
+    ).values
 
     return race_intermediates
 
