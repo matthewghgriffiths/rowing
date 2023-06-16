@@ -519,9 +519,9 @@ def get_live_races(fisa=True, competition=None):
 def get_live_race(fisa=True, competition=None):
     finished = False
     live_races = get_live_races(fisa=fisa, competition=competition)
-    for race_id, race in live_races.iterrows():
+    for _, race in live_races.iterrows():
         data = get_worldrowing_data(
-            'livetracker', "live", race_id, cached=False
+            'livetracker', "live", race.race_id, cached=False
         )
         lanes = data['config'].get("lanes", [])
         started = (

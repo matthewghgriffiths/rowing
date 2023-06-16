@@ -84,8 +84,8 @@ def parse_intermediates_data(data):
     intermediates = parse_livetracker_lane_data(
         data, 'intermediates', 'distance.DisplayName'
     )
-    intermediates.index = intermediates.index.str.extract(
-        "([0-9]+)")[0].astype(int)
+    # intermediates.index = intermediates.index.str.extract(
+    #     "([0-9]+)")[0].astype(int)
     if fields.intermediates_ResultTime in intermediates:
         for c, times in intermediates[fields.intermediates_ResultTime].items():
             intermediates[(fields.intermediates_ResultTime, c)

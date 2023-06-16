@@ -2,6 +2,17 @@
 import logging
 import datetime
 
+import sys 
+import os
+from pathlib import Path 
+
+DIRPATH = Path(__file__).resolve().parent
+LIBPATH = str(DIRPATH.parent.parent)
+realpaths = [os.path.realpath(p) for p in sys.path]
+if LIBPATH not in realpaths:
+    sys.path.append(LIBPATH)
+    print("adding", LIBPATH)
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -58,7 +69,7 @@ def main(params=None):
 
     live_race = get_live_race_data(
         race_id,
-        realtime_sleep=0.1,
+        realtime_sleep=3,
         dummy=dummy,
         dummy_index=dummy_index,
         dummy_step=dummy_step
