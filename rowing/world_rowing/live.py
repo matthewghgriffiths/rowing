@@ -54,10 +54,6 @@ def parse_livetracker_lane_data(data, field, index):
     if not lanes:
         return pd.DataFrame([])
 
-    lane_boat = pd.Series({
-        lane_data['DisplayName']: lane
-        for lane, lane_data in lanes.items()
-    }).sort_values()
     parsed = pd.concat(
         {
             lane['DisplayName']: pd.json_normalize(
@@ -76,6 +72,13 @@ def parse_livetracker_data(data):
     live_data = parse_livetracker_lane_data(data, 'live', 'id')
     if live_data.empty:
         return live_data
+    
+    for boat, speed in live_data[
+        fields.live_raceBoatTracker_metrePerSecond
+    ].items():
+        live_data[fields.split, boat] = pd.to_timedelta(
+            500 / speed, unit='s'
+        )
 
     return live_data
 
@@ -187,13 +190,16 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     live_data = live_time_data.stack(1).reset_index().join(
         lane_info[[
             fields.lane_Rank,
+            fields.lane_Lane, 
             fields.lane_ResultTime,
             fields.lane_country_CountryCode,
             fields.lane_country,
             fields.lane__finished,
             fields.lane_InvalidMarkResult,
             fields.lane_Remark,
-        ]], on=fields.raceBoats
+        ]], 
+        on=fields.raceBoats,
+        rsuffix='_1'
     )
     live_data[fields.race_distance] = race_distance
     return live_data, intermediate_times
@@ -219,7 +225,13 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
         {race_id: live_data for race_id, (live_data, _) in results.items()},
         axis=0
     ).reset_index(drop=True)
-    return races_live_data, intermediates
+    lane_info = pd.concat(
+        {
+            race_id: data[2] for race_id, data in race_livetracks.items()
+        }, 
+        axis=0
+    ).reset_index(drop=True)
+    return races_live_data, intermediates, lane_info
 
 
 class RealTimeLivetracker:
@@ -378,11 +390,15 @@ class LiveRaceData:
                 livetracker_update = update_dataframe(
                     self.livetracker, livetracker_update)
             if self.intermediates is not None:
-                self.intermediates = update_dataframe(
+                inter_update = update_dataframe(
                     self.intermediates, inter_update)
+                # inter_update.index.name = fields.Distance
+
             if self.lane_info is not None:
                 lane_update = update_dataframe(self.lane_info, lane_update)
-
+            
+            self.lane_info = lane_update 
+            self.intermediates = inter_update
             if livetracker_update is not None:
                 track_count = livetracker_update[fields.live_trackCount].mean(
                     axis=1).sort_values()
@@ -407,10 +423,53 @@ class LiveRaceData:
             index_names
         )
         if facets:
-            return stacked[
+            plot_data = stacked[
                 facets
             ].reset_index().melt(
                 index_names
             ).join(stacked[facets], on=index_names)
         else:
-            return stacked.reset_index().melt(index_names)
+            plot_data = stacked.reset_index().melt(index_names)
+
+        plot_data = fields.to_plotly_dataframe(plot_data)
+        plot_data[fields.split] = plot_data[fields.split]
+        
+        distance = plot_data[fields.live_distanceTravelled]
+        filter_distance = min(distance.quantile(0.2), 100)
+        
+        data_filter = (
+            (distance > filter_distance)
+            & (distance < self.race_distance)
+        )
+        if data_filter.sum() < 10:
+            data_filter = slice(None)
+            
+        facet_groups = plot_data[data_filter].groupby("live")
+        facet_types = facet_groups.value.first().map(type)
+        if facets is None:
+            facets = facet_types.index[facet_types != str]
+
+        facet_format = {f: True for f in facets}
+        # facet_format['kilometrePersSecond'] = False
+        facet_format[fields.split] = "|%-M:%S.%L"
+            
+        facet_max = facet_groups.value.max()[facets]
+        facet_min = facet_groups.value.min()[facets]
+        facet_ptp = facet_max - facet_min
+        facet_data = pd.concat(
+            [facet_min - facet_ptp*0.1, facet_max + facet_ptp*0.1, ],
+            axis=1).apply(tuple, axis=1).rename("range").to_frame()
+
+        facet_data['matches'] = None
+        facet_data['title_text'] = facet_data.index
+        facet_axes = facet_data.T.to_dict()
+
+        facet_axes.setdefault(fields.split, {})['tickformat'] = "%-M:%S"
+
+        for col in [
+            fields.live_raceBoatTracker_distanceFromLeader,
+            fields.split,
+        ]:
+            facet_axes[col]['range'] = facet_axes[col]['range'][::-1]
+
+        return plot_data, facet_axes, facet_format

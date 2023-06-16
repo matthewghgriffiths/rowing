@@ -64,7 +64,8 @@ def melt_livetracker_data(live_data, filter_distance=100):
             fields.live_raceBoatTracker_distanceTravelled,
             fields.raceBoats,
             fields.live_raceId,
-        ]
+        ], 
+        suffixes=("", "_1")
     )
 
     facet_max = facet_groups.value.max()[facets]

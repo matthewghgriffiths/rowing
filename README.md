@@ -1,7 +1,7 @@
 # world_rowing
 Collection of code to load, process and analyse rowing data from [World Rowing](https://worldrowing.com/).
 
-Can view the world rowing data by running `streamlit run world_rowing_app/home.py` or visiting https://matthewghgriffiths-worldrowing.streamlit.app/
+Can view the world rowing data by running `streamlit run world_rowing_app/home.py` or visiting https://worldrowing.streamlit.app/
 
 # rowing.analysis
 A python library for analysing gps data, there are two main programs, `gpx` and `garmin`. `gpx` directly processes gpx files, calculating fastest times/splits over distances and timings/splits between specified rowing landmarks. See `Garmin.ipynb` for a more direct example of how to use the library.

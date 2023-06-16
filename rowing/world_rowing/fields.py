@@ -94,10 +94,10 @@ race_Date = 'Race Start'
 race_boatClass = 'Boat Class'
 race_competitionId = 'race_competitionId'
 race_distance = 'Race Distance'
-race_event = 'Race.Event'
+race_event = 'Event'
 race_eventId = 'race_eventId'
 race_id = 'race_id'
-race_raceBoats = 'Race.Boat'
+race_raceBoats = 'Boat'
 race_boatClass = 'Boat Class'
 race_raceStatus = 'Results Status'
 raceBoatIntermediates_Rank = 'Intermediate Position'
@@ -188,8 +188,8 @@ field_names = {
     'race_Date': 'Race Start',
     'race_id': 'race_id',
     'raceId': 'raceId',
-    'race_raceBoats': 'Race.Boat',
-    'race_event': 'Race.Event',
+    'race_raceBoats': 'Boat',
+    'race_event': 'Event',
     'race_eventId': 'race_eventId',
     'race_event_boatClassId': 'race_event_boatClassId',
     'race_competitionId': 'race_competitionId',

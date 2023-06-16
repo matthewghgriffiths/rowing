@@ -49,13 +49,13 @@ def main(params=None):
         filters=True, select_all=False, select_first=True,
         default=[
             fields.Phase,
-            fields.Gender,
-            fields.race_raceStatus
+            # fields.Gender,
+            # fields.race_raceStatus
         ],
-        **{
-            fields.Phase: ['Final A'],
-            fields.race_raceStatus: ["Official"],
-        }
+        # **{
+        #     fields.Phase: ['Final A'],
+        #     fields.race_raceStatus: ["Official"],
+        # }
     ).reset_index(drop=True)
 
     if races.empty:
@@ -81,7 +81,7 @@ def main(params=None):
         st.stop()
 
     with st.spinner("Downloading livetracker data"), st.empty():
-        live_data, intermediates = select.get_races_livedata(
+        live_data, intermediates, lane_info = select.get_races_livedata(
             races, max_workers=threads)
 
     with st.expander("Filter livetracker data"):

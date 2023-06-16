@@ -16,7 +16,7 @@ def get_competitions(**kwargs):
     return api.get_competitions(**kwargs)
 
 
-@st.cache_data(persist=True)
+@st.cache_data(persist=True, ttl=600)
 def get_races(competition_id):
     logger.debug("get_races(%s)", competition_id)
     return api.get_races(competition_id=competition_id).sort_values(
@@ -30,7 +30,7 @@ def get_events(competition_id):
     return api.get_events(competition_id=competition_id)
 
 
-@st.cache_data(persist=True)
+@st.cache_data(persist=True, ttl=600)
 def get_results(competition_id):
     logger.debug("get_results(%s)", competition_id)
     return api.get_intermediate_results(competition_id=competition_id)
@@ -53,7 +53,7 @@ def get_competition_boat_classes(competition_id):
     return event_boat_classes
 
 
-@st.cache_data(persist=True)
+@st.cache_data(persist=True, ttl=24 * 3600)
 def get_cbts(boat_classes=None):
     cbts = api.get_competition_best_times()
     if boat_classes is None:
@@ -70,20 +70,23 @@ def load_livetracker(race_id, cached=True):
 @st.cache_data(persist=True)
 def get_races_livedata(races, max_workers=10):
     logger.debug("get_races_livedata(race_ids[%d])", len(races))
-    live_data, intermediates = live.get_races_livetracks(
+    live_data, intermediates, lane_info = live.get_races_livetracks(
         races.index, max_workers=max_workers, load_livetracker=load_livetracker
     )
     live_data = live_data.join(
         races[[
-            fields.race_Date, fields.Race, fields.Gender,
-            fields.Category, fields.Phase, fields.boatClass,
-            fields.GMT
+            fields.race_Date, fields.Race, fields.race_event, 
+            fields.Gender, fields.Category, fields.Phase, 
+            fields.boatClass, fields.GMT
         ]],
-        on=fields.live_raceId
+        on=fields.live_raceId, 
+        lsuffix='',
+        rsuffix="_1"
     )
     live_data[fields.race_Date] = pd.to_datetime(live_data[fields.race_Date])
-    return live_data, intermediates
-
+    live_data[fields.crew] = (
+        live_data[fields.raceBoats] + " " + live_data[fields.boatClass])
+    return live_data, intermediates, lane_info
 
 get_realtime_race_data = st.cache_resource(live.LiveRaceData)
 
@@ -197,6 +200,7 @@ def select_competition(current=True):
 
 RACE_COL = [
     fields.boatClass,
+    fields.race_event, 
     fields.Race,
     fields.Phase,
     fields.Gender,
@@ -224,21 +228,31 @@ def filter_races(
         suffixes=("", "_1")
     )
     st.subheader("Filter races to look at")
-    kwargs.setdefault(
-        fields.Phase, ['Final A'])
+    
+    a_finals = races[
+        (races[fields.Phase] == 'Final A')
+        & (races[fields.race_raceStatus] == 'Official')
+    ]
+    phases = races[fields.race_raceStatus].unique() if a_finals.size else ['Final A']
+
+    print(phases)
+
+    kwargs.setdefault(fields.Phase, phases)
     kwargs.setdefault(
         fields.Gender, ['Men', 'Women', 'Mixed'])
     kwargs.setdefault(
         fields.Category, ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3'])
     kwargs.setdefault(
-        fields.race_raceStatus, ["Official"])
+        fields.race_raceStatus, ["Official", "Unofficial"])
     kwargs.setdefault(
         "default", [fields.Gender, fields.Category, fields.race_raceStatus])
-
+    kwargs.setdefault(
+        fields.race_boatClass, "*"
+    )
     races = inputs.filter_dataframe(
         races,
         options=RACE_COL,
-        categories=[fields.Phase],
+        categories=[fields.Phase, fields.race_event],
         filters=filters,
         select_all=select_all,
         select_first=select_first,
@@ -397,6 +411,9 @@ def select_competition_results(
     events = get_events(competition_id)
     results = api.extract_results(races)
     boat_classes = get_boat_classes()
+
+    print(races.shape, events.shape, results.shape)
+
     merged_results = api.merge_competition_results(
         results, races, events, boat_classes, gmts)
     results = select_results(
@@ -406,6 +423,8 @@ def select_competition_results(
         results[fields.raceBoats] + " " + results[fields.boatClass]
     results = results.set_index(fields.crew)
 
+    
+
     if results.empty and stop_if_empty:
         st.write("no results loaded")
         st.stop()
@@ -414,9 +433,11 @@ def select_competition_results(
 
 
 LIVE_COLS = [
-    fields.Race,
     fields.Phase,
+    fields.Event, 
+    fields.Race,
     fields.lane_Rank, 
+    fields.lane_Lane, 
     fields.Gender,
     fields.Category,
     fields.Gender,
@@ -432,6 +453,9 @@ def filter_livetracker(live_data):
         options=LIVE_COLS,
         default=[fields.lane_Rank],
         select=False,
+        categories={
+            fields.Event, 
+        },
         **{
             fields.lane_Rank: pd.Series(
                 live_data[fields.lane_Rank].unique()

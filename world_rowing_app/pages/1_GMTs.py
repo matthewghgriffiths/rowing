@@ -33,6 +33,12 @@ def main(params=None):
 
     st.title("PGMTs")
 
+    with st.sidebar:
+        with st.expander("Settings"):
+            clear = st.button("clear cache")
+            if clear:
+                st.cache_data.clear()
+
     with st.expander("Select competition"):
         competition = select.select_competition()
         competition_id = competition.competition_id
@@ -49,9 +55,9 @@ def main(params=None):
         results = select.select_competition_results(
             competition_id, gmts,
             default=[
-                fields.Phase,
+                # fields.Phase,
                 fields.Distance,
-                fields.raceBoatIntermediates_Rank
+                # fields.raceBoatIntermediates_Rank
             ],
             **{
                 fields.Phase: ['Final A'],

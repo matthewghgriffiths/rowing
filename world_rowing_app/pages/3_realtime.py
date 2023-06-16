@@ -50,6 +50,9 @@ def main(params=None):
             dummy_index = st.number_input("dummy_index", 0, 1000, 0)
             dummy_step = st.number_input(
                 "dummy_step", 1, 100, state.get("dummy_step", 10))
+            realtime_sleep = st.number_input(
+                "poll", 0, 5, 3
+            )
 
     if dummy:
         races = select.select_races(
@@ -57,7 +60,15 @@ def main(params=None):
         )
         race = inputs.select_dataframe(races, fields.Race)
     else:
-        race = api.get_live_race()
+        races = api.get_live_races()
+        if races.empty:
+            st.write("no live race could be loaded")
+            if st.button("refresh"):
+                st.experimental_rerun()
+            st.stop()
+
+        race = inputs.select_dataframe(races, fields.Race)
+        # race = api.get_live_race()
         if race is None:
             st.write("no live race could be loaded")
             if st.button("refresh"):
@@ -72,16 +83,17 @@ def main(params=None):
 
     live_race = get_live_race_data(
         race_id,
-        realtime_sleep=3,
+        realtime_sleep=realtime_sleep,
         dummy=dummy,
         dummy_index=dummy_index,
         dummy_step=dummy_step
     )
-
+    show_intermediates = st.empty()
     fig_plot = st.empty()
 
     facets = [
         fields.live_raceBoatTracker_distanceFromLeader,
+        fields.split,
         fields.live_raceBoatTracker_metrePerSecond,
         fields.live_raceBoatTracker_strokeRate,
     ]
@@ -92,27 +104,42 @@ def main(params=None):
         for i, (live_race, data) in enumerate(updates):
             pbar.update(1)
             plot_data = live_race.plot_data(facets)
+            intermediates = live_race.intermediates
+            if intermediates is not None and not intermediates.empty:
+                with show_intermediates:
+                    cols = st.columns(2)
+                    print(intermediates)
+                    with cols[0]:
+                        st.dataframe(
+                            intermediates[fields.intermediates_Rank]
+                        )
+                    with cols[1]:
+                        st.dataframe(fields.to_streamlit_dataframe(
+                            intermediates[fields.intermediates_ResultTime]
+                        ))
+
 
             if plot_data is not None:
+                facet_rows = {facet: len(facets) - i for i, facet in enumerate(facets)}
+                plot_data, facet_axes, facet_format = plot_data
                 fig = px.line(
                     plot_data,
                     x=fields.live_raceBoatTracker_distanceTravelled,
                     y='value',
                     color=fields.raceBoats,
                     facet_row="live",
-                    hover_data=facets
+                    category_orders={
+                        "live": facets,
+                    },
+                    hover_data=facet_format,
                 )
-                fig.update_yaxes(
-                    matches=None
-                )
+                for facet, row in facet_rows.items():
+                    fig.update_yaxes(row=row, **facet_axes[facet])
                 with fig_plot:
-                    st.plotly_chart(fig)
+                    st.plotly_chart(fig, use_container_width=True)
             else:
                 with fig_plot:
                     st.write("no live data could be loaded")
-
-    live_race.tracker.realtime_history
-    live_race.tracker.livetracker_history
 
     state.update_query_params()
     return state.get_state()
