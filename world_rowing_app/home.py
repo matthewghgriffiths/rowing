@@ -1,4 +1,7 @@
 
+
+import streamlit as st
+
 import sys 
 import os
 from pathlib import Path 
@@ -8,8 +11,6 @@ LIBPATH = str(DIRPATH.parent)
 realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
-
-import streamlit as st
 
 st.set_page_config(
     page_title="Home",

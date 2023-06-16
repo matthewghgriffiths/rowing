@@ -1,4 +1,6 @@
 
+import streamlit as st
+
 import logging
 import datetime
 
@@ -6,22 +8,21 @@ import sys
 import os
 from pathlib import Path 
 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from tqdm.autonotebook import tqdm
+
+import plotly as pl
+from plotly import express as px, subplots
+
 DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)
 realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
     print("adding", LIBPATH)
-
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-
-from tqdm.autonotebook import tqdm
-import streamlit as st
-
-import plotly as pl
-from plotly import express as px, subplots
 
 from rowing.world_rowing import api, live, utils, fields
 from rowing.app import select, inputs, state, plots
@@ -39,6 +40,8 @@ st.set_page_config(
 def main(params=None):
     state.update(params or {})
     st.title("World Rowing Realtime Livetracker")
+
+    state.reset_button()
 
     with st.sidebar:
         with st.expander("Settings"):
@@ -111,7 +114,6 @@ def main(params=None):
     live_race.tracker.realtime_history
     live_race.tracker.livetracker_history
 
-    state.reset_button()
     state.update_query_params()
     return state.get_state()
 

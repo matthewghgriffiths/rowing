@@ -4,17 +4,18 @@ import streamlit as st
 import sys 
 import os
 from pathlib import Path 
+
+import numpy as np
+import pandas as pd
+
+import plotly.express as px
+
 DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)
 realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
     print("adding", LIBPATH)
-
-import numpy as np
-import pandas as pd
-
-import plotly.express as px
 
 from rowing.world_rowing import fields
 from rowing.app import select, inputs, state, plots
