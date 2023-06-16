@@ -415,6 +415,7 @@ def select_competition_results(
 LIVE_COLS = [
     fields.Race,
     fields.Phase,
+    fields.lane_Rank, 
     fields.Gender,
     fields.Category,
     fields.Gender,
