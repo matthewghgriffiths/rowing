@@ -108,7 +108,7 @@ def main(params=None):
             if intermediates is not None and not intermediates.empty:
                 with show_intermediates:
                     cols = st.columns(2)
-                    print(intermediates)
+                    intermediates.index.name = fields.Distance
                     with cols[0]:
                         st.dataframe(
                             intermediates[fields.intermediates_Rank]

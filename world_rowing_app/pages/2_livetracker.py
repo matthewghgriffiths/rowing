@@ -48,14 +48,14 @@ def main(params=None):
     races = select.select_races(
         filters=True, select_all=False, select_first=True,
         default=[
-            fields.Phase,
+            # fields.Phase,
             # fields.Gender,
-            # fields.race_raceStatus
+            fields.race_raceStatus
         ],
-        # **{
+        **{
         #     fields.Phase: ['Final A'],
-        #     fields.race_raceStatus: ["Official"],
-        # }
+            fields.race_raceStatus: ["Official", "Unofficial"],
+        }
     ).reset_index(drop=True)
 
     if races.empty:

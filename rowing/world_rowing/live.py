@@ -392,7 +392,7 @@ class LiveRaceData:
             if self.intermediates is not None:
                 inter_update = update_dataframe(
                     self.intermediates, inter_update)
-                # inter_update.index.name = fields.Distance
+                inter_update.index.name = fields.Distance
 
             if self.lane_info is not None:
                 lane_update = update_dataframe(self.lane_info, lane_update)
@@ -432,7 +432,8 @@ class LiveRaceData:
             plot_data = stacked.reset_index().melt(index_names)
 
         plot_data = fields.to_plotly_dataframe(plot_data)
-        plot_data[fields.split] = plot_data[fields.split]
+
+        plot_data[fields.split] = pd.to_datetime(plot_data[fields.split])
         
         distance = plot_data[fields.live_distanceTravelled]
         filter_distance = min(distance.quantile(0.2), 100)
@@ -443,7 +444,7 @@ class LiveRaceData:
         )
         if data_filter.sum() < 10:
             data_filter = slice(None)
-            
+
         facet_groups = plot_data[data_filter].groupby("live")
         facet_types = facet_groups.value.first().map(type)
         if facets is None:
@@ -454,12 +455,13 @@ class LiveRaceData:
         facet_format[fields.split] = "|%-M:%S.%L"
             
         facet_max = facet_groups.value.max()[facets]
+        facet_max[fields.split] = facet_max[fields.split] + pd.Timestamp(0)
         facet_min = facet_groups.value.min()[facets]
+        facet_min[fields.split] = facet_min[fields.split] + pd.Timestamp(0)
         facet_ptp = facet_max - facet_min
         facet_data = pd.concat(
             [facet_min - facet_ptp*0.1, facet_max + facet_ptp*0.1, ],
             axis=1).apply(tuple, axis=1).rename("range").to_frame()
-
         facet_data['matches'] = None
         facet_data['title_text'] = facet_data.index
         facet_axes = facet_data.T.to_dict()
