@@ -3,6 +3,7 @@ import streamlit as st
 
 import logging
 import datetime
+import time 
 
 import sys 
 import os
@@ -45,16 +46,23 @@ def main(params=None):
 
     with st.sidebar:
         with st.expander("Settings"):
-            dummy = st.checkbox(
-                "load dummy data", state.get("dummy", False))
-            dummy_index = st.number_input("dummy_index", 0, 1000, 0)
-            dummy_step = st.number_input(
-                "dummy_step", 1, 100, state.get("dummy_step", 10))
+            replay = st.checkbox(
+                "replay race data", state.get("replay", False))
+            replay_step = st.number_input(
+                "replay step", 1, 100, state.get("replay_step", 10))
             realtime_sleep = st.number_input(
-                "poll", 0, 5, 3
+                "poll", 0., 10., 3.
             )
+            fig_height = st.number_input(
+                "plot size", 10, 2_000, 1000
+            )
+            fig_autosize = st.checkbox("autosize plot")
 
-    if dummy:
+            clear = st.button("clear cache")
+            if clear:
+                st.cache_data.clear()
+
+    if replay:
         races = select.select_races(
             filters=True, select_all=True
         )
@@ -62,15 +70,37 @@ def main(params=None):
     else:
         races = api.get_live_races()
         if races.empty:
-            st.write("no live race could be loaded")
-            if st.button("refresh"):
-                st.experimental_rerun()
+            next_races = api.get_next_races(5)
+            if not next_races.empty:
+                st.write("next races:")
+                st.dataframe(fields.to_streamlit_dataframe(next_races))
+
+                cols = st.columns(2)
+                if cols[0].checkbox("refresh until next race"):
+                    with cols[1]:
+                        countdown = st.empty()
+                        for t in range(10, -1, -1):
+                            countdown.metric(
+                                "Refresh in", f"{t} s"
+                            )
+                            time.sleep(1)
+                        st.experimental_rerun()
+                if st.button("refresh"):
+                    st.experimental_rerun()
+
+            st.write(
+                "no live race could be loaded, "
+                "check replay in sidebar to see race replay")
             st.stop()
 
         race = inputs.select_dataframe(races, fields.Race)
         # race = api.get_live_race()
         if race is None:
             st.write("no live race could be loaded")
+            if st.checkbox("refresh until next"):
+                time.sleep(10)
+                st.experimental_rerun()
+
             if st.button("refresh"):
                 st.experimental_rerun()
             st.stop()
@@ -84,9 +114,8 @@ def main(params=None):
     live_race = get_live_race_data(
         race_id,
         realtime_sleep=realtime_sleep,
-        dummy=dummy,
-        dummy_index=dummy_index,
-        dummy_step=dummy_step
+        replay=replay,
+        replay_step=replay_step
     )
     show_intermediates = st.empty()
     fig_plot = st.empty()
@@ -105,20 +134,23 @@ def main(params=None):
             pbar.update(1)
             plot_data = live_race.plot_data(facets)
             intermediates = live_race.intermediates
-            if intermediates is not None and not intermediates.empty:
-                with show_intermediates:
-                    cols = st.columns(2)
-                    intermediates.index.name = fields.Distance
-                    with cols[0]:
+
+            with show_intermediates:
+                cols = st.columns(3)
+                with cols[0]:
+                    st.metric("Distance", f"{live_race.distance:.0f} m")
+
+                if intermediates is not None and not intermediates.empty:
+                    with cols[1]:
                         st.dataframe(
                             intermediates[fields.intermediates_Rank]
                         )
-                    with cols[1]:
+                    with cols[2]:
                         st.dataframe(fields.to_streamlit_dataframe(
                             intermediates[fields.intermediates_ResultTime]
                         ))
 
-
+           
             if plot_data is not None:
                 facet_rows = {facet: len(facets) - i for i, facet in enumerate(facets)}
                 plot_data, facet_axes, facet_format = plot_data
@@ -135,6 +167,13 @@ def main(params=None):
                 )
                 for facet, row in facet_rows.items():
                     fig.update_yaxes(row=row, **facet_axes[facet])
+
+                fig.update_annotations(text="")
+                if fig_autosize:
+                    fig.update_layout(autosize=True)
+                else:
+                    fig.update_layout(height=fig_height)
+
                 with fig_plot:
                     st.plotly_chart(fig, use_container_width=True)
             else:

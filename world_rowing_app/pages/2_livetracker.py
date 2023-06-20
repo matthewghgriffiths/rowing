@@ -35,6 +35,8 @@ def main(params=None):
     with st.sidebar:
         download = st.checkbox("automatically load livetracker data", True)
         with st.expander("Settings"):
+            fig_height = st.number_input("plot size", 10, 2_000, 1000)
+            fig_autosize = st.checkbox("autosize plot")
             threads = st.number_input(
                 "number of threads to use", min_value=1, max_value=20,
                 value=state.get("threads", 6),
@@ -42,6 +44,10 @@ def main(params=None):
             )
             threads = int(threads)
             state.set("threads", threads)
+
+            clear = st.button("clear cache")
+            if clear:
+                st.cache_data.clear()
 
     st.subheader("Select livetracker data")
 
@@ -60,7 +66,6 @@ def main(params=None):
 
     if races.empty:
         if state.get("expander.filter_races", False):
-            print(state.STATE)
             st.caption("select races to load")
             st.stop()
 
@@ -103,6 +108,13 @@ def main(params=None):
         fig = plots.make_livetracker_plot(
             facets, *args,
         )
+        
+        fig.update_annotations(text="")
+        if fig_autosize:
+            fig.update_layout(autosize=True)
+        else:
+            fig.update_layout(height=fig_height)
+
         st.plotly_chart(fig, use_container_width=True)
 
     state.reset_button()

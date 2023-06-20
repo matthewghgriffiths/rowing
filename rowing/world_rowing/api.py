@@ -425,14 +425,12 @@ def extract_results(races):
         races[fields.race_raceBoats].map(pd.json_normalize).values
     ).reset_index(drop=True).rename(columns=fields.renamer('raceBoats'))
     
-    print(race_results[fields.raceBoats_raceBoatIntermediates])
     race_intermediates = pd.concat(
         race_results[fields.raceBoats_raceBoatIntermediates].map(
             pd.json_normalize).values,
     ).reset_index(drop=True).rename(
         columns=fields.renamer('raceBoatIntermediates')
     )
-    print(race_intermediates)
     race_intermediates = race_intermediates.join(
         race_results.set_index(fields.raceBoats_id),
         on=fields.raceBoatIntermediates_raceBoatId

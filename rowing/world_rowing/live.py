@@ -237,7 +237,7 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
 class RealTimeLivetracker:
     def __init__(
             self, race_id, realtime_sleep=3,
-            dummy=False, dummy_index=0, dummy_step=1
+            replay=False, replay_index=0, replay_step=1
     ):
         self.race_id = race_id
 
@@ -246,10 +246,10 @@ class RealTimeLivetracker:
 
         self.realtime_history = {}
         self.livetracker_history = {}
-        self.dummy = dummy
-        self.dummy_data = None
-        self.dummy_index = dummy_index
-        self.dummy_step = dummy_step
+        self.replay = replay
+        self.replay_data = None
+        self.replay_index = replay_index
+        self.replay_step = replay_step
         self._shutdown = False
 
     @classmethod
@@ -269,13 +269,13 @@ class RealTimeLivetracker:
         self.realtime_history[curr_time] = data
         return data
 
-    def get_dummy_realtime(self):
-        if self.dummy_data is None:
-            self.dummy_data = api.get_worldrowing_data(
+    def get_replay_realtime(self):
+        if self.replay_data is None:
+            self.replay_data = api.get_worldrowing_data(
                 "livetracker", self.race_id)
 
-        i = self.dummy_index
-        live_data = copy.deepcopy(self.dummy_data)
+        i = self.replay_index
+        live_data = copy.deepcopy(self.replay_data)
         for lane, lane_data in enumerate(live_data['config']['lanes']):
             lane_count = len(lane_data['live'])
 
@@ -289,7 +289,7 @@ class RealTimeLivetracker:
             lane_data['live'] = lane_data['live'][s]
             live_data['config']['lanes'][lane] = lane_data
 
-        self.dummy_index += self.dummy_step
+        self.replay_index += self.replay_step
         return live_data
 
     def get_livetracker(self):
@@ -329,8 +329,8 @@ class RealTimeLivetracker:
             logger.debug("RealTimeLivetracker.run %d", i)
             i += 1
             curr_time = time.time()
-            if self.dummy:
-                data = self.get_dummy_realtime()
+            if self.replay:
+                data = self.get_replay_realtime()
             elif curr_time > self.livetracker_max_age:
                 data = self.get_livetracker()
             else:
@@ -374,6 +374,12 @@ class LiveRaceData:
         self.race_distance = None
         self.new_points = None
         self.mutex = threading.Lock()
+
+    @property 
+    def distance(self):
+        if self.livetracker is not None:
+            return self.livetracker[fields.live_distanceOfLeader].max(1).max()
+        return 0
 
     def update(self, data):
         (
