@@ -8,6 +8,8 @@ from pandas.api.types import (
     is_timedelta64_dtype,
     is_numeric_dtype,
     is_object_dtype,
+    is_string_dtype,
+    infer_dtype,
 )
 
 from . import utils
@@ -145,6 +147,7 @@ dtype_checks = {
     is_numeric_dtype: "numeric",
     is_categorical_dtype: "categorical",
     is_object_dtype: "categorical",
+    is_string_dtype: "categorical", 
 }
 
 
@@ -152,6 +155,8 @@ def which_dtype(dtype):
     for check, dt in dtype_checks.items():
         if check(dtype):
             return dt
+        
+    return "categorical"
 
 
 field_names = {
@@ -298,10 +303,11 @@ def identity(x):
 
 
 def get_datatypes(data):
-    dtypes = data.dtypes.map(which_dtype).to_dict()
-    cols = data.columns[data.columns.isin(field_types)]
-    dtypes.update(zip(cols, cols.map(field_types.get)))
-    return dtypes
+    return data.dtypes.map(which_dtype).replace(field_types)
+    # dtypes = data.dtypes.map(which_dtype).to_dict()
+    # cols = data.columns[data.columns.isin(field_types)]
+    # dtypes.update(zip(cols, cols.map(field_types.get)))
+    # return dtypes
 
 
 def format_datatype(data, **formatters):
@@ -326,8 +332,14 @@ def to_timestamp(s):
 plotly_formatters = {
     "timedelta": to_timestamp
 }
-to_plotly_dataframe = partial(format_datatype, **plotly_formatters)
-
+def to_plotly_dataframe(data):
+    plotly_data = format_datatype(data, **plotly_formatters)
+    plotly_data = plotly_data.applymap(
+        lambda x: plotly_formatters.get(
+            infer_dtype([x]), identity
+        )(x)
+    )
+    return plotly_data
 
 def rename_column(s, prefix=''):
     c = f"{prefix}_{s}".replace(".", "_")

@@ -431,7 +431,7 @@ class LiveRaceData:
         else:
             plot_data = stacked.reset_index().melt(index_names)
 
-        plot_data = fields.to_plotly_dataframe(plot_data)
+        plot_data = fields.to_plotly_dataframe(plot_data.dropna(subset=["value"]))
 
         plot_data[fields.split] = pd.to_datetime(plot_data[fields.split])
         
@@ -454,10 +454,8 @@ class LiveRaceData:
         # facet_format['kilometrePersSecond'] = False
         facet_format[fields.split] = "|%-M:%S.%L"
             
-        facet_max = facet_groups.value.max()[facets]
-        facet_max[fields.split] = facet_max[fields.split] + pd.Timestamp(0)
-        facet_min = facet_groups.value.min()[facets]
-        facet_min[fields.split] = facet_min[fields.split] + pd.Timestamp(0)
+        facet_max = facet_groups.value.max().reindex(facets)
+        facet_min = facet_groups.value.min().reindex(facets)
         facet_ptp = facet_max - facet_min
         facet_data = pd.concat(
             [facet_min - facet_ptp*0.1, facet_max + facet_ptp*0.1, ],
