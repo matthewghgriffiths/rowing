@@ -86,6 +86,10 @@ lane_invalidMarkResultCode = 'lane_invalidMarkResultCode'
 lane_raceBoatAthletes = 'lane_raceBoatAthletes'
 lane_raceId = 'lane_raceId'
 lane_worldBestTimeId = 'lane_worldBestTimeId'
+lane_currentPoint_raceBoatTracker_currentPosition = 'Current Position'
+lane_currentPoint_raceBoatTracker_distanceTravelled = 'Distance Travelled'
+lane_currentPoint_raceBoatTracker_strokeRate = 'Stroke Rate'
+lane_currentPoint_raceBoatTracker_metrePerSecond = 'Speed'
 live_distanceOfLeader = 'live_distanceOfLeader'
 live_distanceOfLeaderFromFinish = 'live_distanceOfLeaderFromFinish'
 live_distanceTravelled = 'Distance'
@@ -275,6 +279,10 @@ field_names = {
     'lane_country_CountryCode': 'Country Code',
     'lane_country_IsNOC': 'lane_country_IsNOC',
     'lane_country_IsFormerCountry': 'lane_country_IsFormerCountry',
+    'lane_currentPoint_raceBoatTracker_currentPosition': 'Current Position',
+    'lane_currentPoint_raceBoatTracker_distanceTravelled': 'Distance Travelled',
+    'lane_currentPoint_raceBoatTracker_strokeRate': 'Stroke Rate',
+    'lane_currentPoint_raceBoatTracker_metrePerSecond': 'Speed',
     'bestTimes_CompetitionType': 'bestTimes_CompetitionType',
     'bestTimes_BoatClass': 'bestTimes_BoatClass',
     'bestTimes_ResultTime': 'Best Time',

@@ -107,16 +107,33 @@ def parse_livetracker_info(data):
     ]).set_index("DisplayName").rename(columns=fields.renamer("lane"))
     lane_info[fields.lane_ResultTime] = utils.read_times(
         lane_info[fields.lane_ResultTime])
+    lane_info.index.name = fields.raceBoats
     race_distance = data['config']['plot']['totalLength']
     return lane_info, race_distance
 
 
 def parse_livetracker(data):
     live_boat_data = parse_livetracker_data(data)
-    if live_boat_data.empty:
-        live_boat_data = None
     intermediates = parse_intermediates_data(data)
     lane_info, race_distance = parse_livetracker_info(data)
+
+    lane_info = lane_info.sort_values(fields.lane_Lane)
+    
+    if live_boat_data.empty:
+        live_boat_data = None
+    else:
+        ordered = pd.MultiIndex.from_product([
+            live_boat_data.columns.levels[0], lane_info.index, 
+        ])
+        live_boat_data = live_boat_data.reindex(columns=ordered)
+
+    if not intermediates.empty:
+        ordered = pd.MultiIndex.from_product([
+            intermediates.columns.levels[0], lane_info.index, 
+        ])
+        intermediates = intermediates.reindex(columns=ordered)
+
+
     return live_boat_data, intermediates, lane_info, race_distance
 
 
@@ -287,7 +304,9 @@ class RealTimeLivetracker:
                 lane_data["_finished"] = False
 
             lane_data['live'] = lane_data['live'][s]
+            lane_data['currentPoint'], = lane_data['live']
             live_data['config']['lanes'][lane] = lane_data
+            
 
         self.replay_index += self.replay_step
         return live_data
@@ -380,6 +399,13 @@ class LiveRaceData:
         if self.livetracker is not None:
             return self.livetracker[fields.live_distanceOfLeader].max(1).max()
         return 0
+    
+    @property 
+    def lanes(self):
+        if self.lane_info is None:
+            return None 
+        
+        return self.lane_info[fields.lane_Lane].sort_values()
 
     def update(self, data):
         (
@@ -389,19 +415,15 @@ class LiveRaceData:
             self.race_distance
         ) = parse_livetracker(data)
 
+
         current_points = pd.Index([])
         with self.mutex:
             if self.livetracker is not None:
                 current_points = self.livetracker.index
                 livetracker_update = update_dataframe(
                     self.livetracker, livetracker_update)
-            if self.intermediates is not None:
-                inter_update = update_dataframe(
-                    self.intermediates, inter_update)
+            if inter_update is not None:
                 inter_update.index.name = fields.Distance
-
-            if self.lane_info is not None:
-                lane_update = update_dataframe(self.lane_info, lane_update)
             
             self.lane_info = lane_update 
             self.intermediates = inter_update
@@ -425,7 +447,13 @@ class LiveRaceData:
         ]
         stacked = self.livetracker.stack(
             1
-        ).droplevel(0).reset_index().set_index(
+        ).reindex(
+            pd.MultiIndex.from_product(
+                [self.livetracker.index, self.lanes.index]
+            )
+        ).droplevel(0).reset_index().dropna(
+            subset=index_names
+        ).set_index(
             index_names
         )
         if facets:
@@ -439,7 +467,8 @@ class LiveRaceData:
 
         plot_data = fields.to_plotly_dataframe(plot_data.dropna(subset=["value"]))
 
-        plot_data[fields.split] = pd.to_datetime(plot_data[fields.split])
+        # if fields.split in plot_data.columns:
+        #     plot_data[fields.split] = pd.to_datetime(plot_data[fields.split])
         
         distance = plot_data[fields.live_distanceTravelled]
         filter_distance = min(distance.quantile(0.2), 100)

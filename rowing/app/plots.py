@@ -142,6 +142,57 @@ def make_livetracker_plot(
     return fig
 
 
+def show_lane_info(lane_info):
+    speed_col = fields.lane_currentPoint_raceBoatTracker_metrePerSecond
+    dist_col = fields.lane_currentPoint_raceBoatTracker_distanceTravelled
+    pos_col = fields.lane_currentPoint_raceBoatTracker_currentPosition
+    rate_col = fields.lane_currentPoint_raceBoatTracker_strokeRate
+    lane_info = lane_info[[
+        fields.lane_Lane, 
+        # pos_col,
+        dist_col, 
+        fields.lane_currentPoint_raceBoatTracker_strokeRate, 
+        speed_col, 
+    ]].sort_values(fields.lane_Lane).copy()
+    lane_info[fields.split] = pd.to_timedelta(
+        500 / lane_info[speed_col], unit='s',
+    ) + pd.Timestamp(0)
+    st.dataframe(
+        lane_info,
+        column_config = {
+            pos_col: st.column_config.ProgressColumn(
+                pos_col, 
+                min_value=0, 
+                max_value=len(lane_info),
+                format="%d"
+            ), 
+            speed_col: st.column_config.ProgressColumn(
+                speed_col, 
+                help='Metre Per Second',
+                min_value=float(lane_info[speed_col].min()) - 0.1, 
+                max_value=float(lane_info[speed_col].max()),
+                format="%.1f"
+            ), 
+            dist_col: st.column_config.ProgressColumn(
+                dist_col, 
+                min_value=int(lane_info[dist_col].min()) - 1, 
+                max_value=int(lane_info[dist_col].max()),
+                format="%d"
+            ), 
+            rate_col: st.column_config.ProgressColumn(
+                rate_col, 
+                min_value=int(lane_info[rate_col].min()) - 1, 
+                max_value=int(lane_info[rate_col].max()),
+                format="%d"
+            ), 
+            fields.split: st.column_config.TimeColumn(
+                fields.split, 
+                format="m:ss"
+            ), 
+        }, 
+        use_container_width=True
+    )
+
 # def plot_livedata(live_boat_data):
 #     boat_data = live_boat_data.stack().reset_index(-1).sort_values("distanceTravelled")
 #     boat_data['split'] = 500 / boat_data.metrePerSecond

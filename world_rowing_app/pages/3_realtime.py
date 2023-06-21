@@ -51,7 +51,7 @@ def main(params=None):
             replay_step = st.number_input(
                 "replay step", 1, 100, state.get("replay_step", 10))
             realtime_sleep = st.number_input(
-                "poll", 0., 10., 3.
+                "poll", 0., 10., state.get("poll", 3.), step=0.5
             )
             fig_height = st.number_input(
                 "plot size", 10, 2_000, 1000
@@ -136,19 +136,81 @@ def main(params=None):
             intermediates = live_race.intermediates
 
             with show_intermediates:
-                cols = st.columns(3)
+                cols = st.columns(2)
                 with cols[0]:
-                    st.metric("Distance", f"{live_race.distance:.0f} m")
+                    if live_race.lane_info is not None:
+                        plots.show_lane_info(live_race.lane_info)
+                        # speed_col = fields.lane_currentPoint_raceBoatTracker_metrePerSecond
+                        # dist_col = fields.lane_currentPoint_raceBoatTracker_distanceTravelled
+                        # pos_col = fields.lane_currentPoint_raceBoatTracker_currentPosition
+                        # rate_col = fields.lane_currentPoint_raceBoatTracker_strokeRate
+                        # lane_info = live_race.lane_info[[
+                        #     fields.lane_Lane, 
+                        #     # pos_col,
+                        #     dist_col, 
+                        #     fields.lane_currentPoint_raceBoatTracker_strokeRate, 
+                        #     speed_col, 
+                        # ]].sort_values(fields.lane_Lane).copy()
+                        # lane_info[fields.split] = pd.to_timedelta(
+                        #     500 / lane_info[speed_col], unit='s',
+                        # ) + pd.Timestamp(0)
+                        # # lane_info[dist_col] = lane_info[dist_col].astype(float)
+                        # st.dataframe(
+                        #     lane_info,
+                        #     column_config = {
+                        #         pos_col: st.column_config.ProgressColumn(
+                        #             pos_col, 
+                        #             min_value=0, 
+                        #             max_value=len(lane_info),
+                        #             format="%d"
+                        #         ), 
+                        #         speed_col: st.column_config.ProgressColumn(
+                        #             speed_col, 
+                        #             help='Metre Per Second',
+                        #             min_value=float(live_race.lane_info[speed_col].min()) - 0.1, 
+                        #             max_value=float(live_race.lane_info[speed_col].max()),
+                        #             format="%.1f"
+                        #         ), 
+                        #         dist_col: st.column_config.ProgressColumn(
+                        #             dist_col, 
+                        #             min_value=int(live_race.lane_info[dist_col].min()) - 1, 
+                        #             max_value=int(live_race.lane_info[dist_col].max()),
+                        #             format="%.0d"
+                        #         ), 
+                        #         rate_col: st.column_config.ProgressColumn(
+                        #             rate_col, 
+                        #             min_value=int(live_race.lane_info[rate_col].min()) - 1, 
+                        #             max_value=int(live_race.lane_info[rate_col].max()),
+                        #             format="%.0d"
+                        #         ), 
+                        #         fields.split: st.column_config.TimeColumn(
+                        #             fields.split, 
+                        #             # min_value=(lane_info[fields.split].min()), 
+                        #             # max_value=(lane_info[fields.split].max()),
+                        #             format="m:ss"
+                        #         ), 
+                        #     }, 
+                        #     use_container_width=True
+                        # )
 
                 if intermediates is not None and not intermediates.empty:
                     with cols[1]:
-                        st.dataframe(
-                            intermediates[fields.intermediates_Rank]
+                        inter_pos = intermediates[fields.intermediates_Rank]
+                        row = pd.DataFrame(
+                            [inter_pos.columns], 
+                            index=[fields.intermediates_ResultTime],
+                            columns=inter_pos.columns, 
                         )
-                    with cols[2]:
-                        st.dataframe(fields.to_streamlit_dataframe(
+                        inter_time = fields.to_streamlit_dataframe(
                             intermediates[fields.intermediates_ResultTime]
-                        ))
+                        )
+                        inters = pd.concat([inter_pos, row, inter_time], axis=0)     
+                        inters.index.name = fields.intermediates_Rank
+                        st.dataframe(
+                            inters,
+                            use_container_width=True
+                        )
+                        # st.dataframe(, use_container_width=True)
 
            
             if plot_data is not None:
@@ -163,6 +225,10 @@ def main(params=None):
                     category_orders={
                         "live": facets,
                     },
+                    # color_discrete_map=dict(zip(
+                    #     live_race.lane_info[fields.lane_Lane].sort_values().index, 
+                    #     px.colors.DEFAULT_PLOTLY_COLORS
+                    # )),
                     hover_data=facet_format,
                 )
                 for facet, row in facet_rows.items():
