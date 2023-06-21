@@ -1,6 +1,7 @@
 
 import logging
 import datetime
+import time 
 
 import streamlit as st
 import pandas as pd
@@ -10,6 +11,7 @@ from rowing.app import state, inputs, threads
 
 logger = logging.getLogger(__name__)
 
+get_live_race_data = st.cache_resource(live.LiveRaceData)
 
 @st.cache_data(persist=True)
 def get_competitions(**kwargs):
@@ -183,12 +185,6 @@ def select_competition(current=True):
             index = int(competitions.started.values.nonzero()[0][-1])
 
         competition = inputs.select_dataframe(competitions, "competition")
-        # sel_competition = st.selectbox(
-        #     "select competition to load",
-        #     competitions,
-        #     index=index
-        # )
-        # competition = competitions[competitions.competition == sel_competition].iloc[0]
 
     competition.loc[fields.WBTCompetitionType] = api.COMPETITION_TYPES[
         competition[fields.competition_competitionType]
@@ -289,6 +285,48 @@ def select_race(races):
     return race.iloc[0]
 
 
+def select_live_race(replay=False):
+    if replay:
+        races = select_races(filters=True, select_all=True)
+        race = inputs.select_dataframe(races, fields.Race)
+    else:
+        races = api.get_live_races()
+        if races.empty:
+            next_races = api.get_next_races(5)
+            if not next_races.empty:
+                st.write("next races:")
+                st.dataframe(fields.to_streamlit_dataframe(next_races))
+
+                cols = st.columns(2)
+                if cols[0].checkbox("refresh until next race"):
+                    with cols[1]:
+                        countdown = st.empty()
+                        for t in range(10, -1, -1):
+                            countdown.metric("Refresh in", f"{t} s")
+                            time.sleep(1)
+                        st.experimental_rerun()
+                if st.button("refresh"):
+                    st.experimental_rerun()
+
+            st.write(
+                "no live race could be loaded, "
+                "check replay in sidebar to see race replay")
+            st.stop()
+
+        race = inputs.select_dataframe(races, fields.Race)
+        if race is None:
+            st.write("no live race could be loaded")
+            if st.checkbox("refresh until next"):
+                time.sleep(10)
+                st.experimental_rerun()
+
+            if st.button("refresh"):
+                st.experimental_rerun()
+            st.stop()
+
+    return race
+
+
 RESULT_COLS = [
     fields.PGMT,
     fields.raceBoatIntermediates_ResultTime,
@@ -305,8 +343,6 @@ RESULT_COLS = [
     fields.Distance,
     fields.race_Date,
 ]
-
-
 def select_results(race_results, key='race_results', **kwargs):
     filtered = inputs.filter_dataframe(
         race_results[RESULT_COLS].sort_values("PGMT", ascending=False),

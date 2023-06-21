@@ -104,7 +104,7 @@ def main(params=None):
 
     with st.spinner("Generating livetracker plot"):
         plot_data, facet_axes, facet_format = args = \
-            plots.melt_livetracker_data(live_data, 100)
+            plots.melt_livetracker_times(live_data, 100)
         fig = plots.make_livetracker_plot(
             facets, *args,
         )
