@@ -16,6 +16,7 @@ from . import utils
 
 
 BoatClass = 'Boat Class'
+BoatType = 'Boat Type'
 Category = 'Category'
 Competition = 'competition'
 CompetitionType = 'Competition Type'
@@ -169,6 +170,7 @@ field_names = {
     'GMT': 'GMT',
     'boatClass': 'Boat Class',
     'BoatClass': 'Boat Class',
+    'BoatType': 'Boat Type',
     'boatClass_id': 'boatClass_id',
     'crew': 'Crew',
     'raceBoats': 'Boat',

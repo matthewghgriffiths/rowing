@@ -26,10 +26,10 @@ but is not endorsed or supported by World Rowing.
 
 ## Pages
 
-### 1. [GMTs](/GMTs)
+### [1. GMTs](/GMTs)
 Allows loading, filtering and visualisation of results and PGMTs from a FISA competition.
 
-### 2. [livetracker](/livetracker)
+### [2. Livetracker](/livetracker)
 Allows loading, filtering and visualisation of livetracker data from a FISA competition.
 
 The livetracker data does not come with any time information, 
@@ -42,8 +42,13 @@ which is the distance behind (or ahead) from a boat going at an even
 percentage gold medal pace. The percentage of this pace can be set in the app,
 and defaults to 100%
 
-### 3. [realtime](/realtime)
+### [3. Realtime](/realtime)
 Allows the folling of the livetracker data from a race in realtime.
+
+## Notes
+
+If data isn't loading correctly you may need to clear the cache, 
+which you can do in the settings.
 
 The source code for this app can be found on 
 [github.com/matthewghgriffiths/rowing](https://github.com/matthewghgriffiths/rowing)

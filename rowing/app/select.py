@@ -18,7 +18,7 @@ def get_competitions(**kwargs):
     return api.get_competitions(**kwargs)
 
 
-@st.cache_data(persist=True, ttl=600)
+@st.cache_data(persist=False, ttl=600)
 def get_races(competition_id):
     logger.debug("get_races(%s)", competition_id)
     return api.get_races(competition_id=competition_id).sort_values(
@@ -32,7 +32,7 @@ def get_events(competition_id):
     return api.get_events(competition_id=competition_id)
 
 
-@st.cache_data(persist=True, ttl=600)
+@st.cache_data(persist=False, ttl=600)
 def get_results(competition_id):
     logger.debug("get_results(%s)", competition_id)
     return api.get_intermediate_results(competition_id=competition_id)
@@ -55,7 +55,7 @@ def get_competition_boat_classes(competition_id):
     return event_boat_classes
 
 
-@st.cache_data(persist=True, ttl=24 * 3600)
+@st.cache_data(persist=False, ttl=24 * 3600)
 def get_cbts(boat_classes=None):
     cbts = api.get_competition_best_times()
     if boat_classes is None:
@@ -69,7 +69,7 @@ def load_livetracker(race_id, cached=True):
     return live.load_livetracker(race_id, cached=cached)
 
 
-@st.cache_data(persist=True)
+@st.cache_data(persist=False, ttl=24 * 3600)
 def get_races_livedata(races, max_workers=10):
     logger.debug("get_races_livedata(race_ids[%d])", len(races))
     live_data, intermediates, lane_info = live.get_races_livetracks(
@@ -231,8 +231,6 @@ def filter_races(
     ]
     phases = races[fields.race_raceStatus].unique() if a_finals.size else ['Final A']
 
-    print(phases)
-
     kwargs.setdefault(fields.Phase, phases)
     kwargs.setdefault(
         fields.Gender, ['Men', 'Women', 'Mixed'])
@@ -260,18 +258,23 @@ def filter_races(
 
 
 def select_races(
-        competition_id=None, **kwargs
+        competition_id=None, 
+        competition_container=None, 
+        races_container=None,
+        **kwargs, 
 ):
-    logger.debug("select_races(%r, filters=%s)",
-                 competition_id, kwargs.get("filters"))
-    with st.expander("Select competition", state.get("expander.filter_competition", False)):
+    logger.debug(
+        "select_races(%r, filters=%s)", competition_id, kwargs.get("filters"))
+    # with st.expander("Select competition", state.get("expander.filter_competition", False)):
+    with competition_container or st.container():
         if competition_id is None:
             competition = select_competition()
             competition_id = competition.competition_id
 
     races = get_races(competition_id)
 
-    with st.expander("Filter races", state.get("expander.filter_races", False)):
+    # with st.expander("Filter races", state.get("expander.filter_races", False)):
+    with races_container or st.container():
         races = filter_races(races, **kwargs)
 
     return races
@@ -285,10 +288,12 @@ def select_race(races):
     return race.iloc[0]
 
 
-def select_live_race(replay=False):
+def select_live_race(replay=False, **kwargs):
     if replay:
-        races = select_races(filters=True, select_all=True)
-        race = inputs.select_dataframe(races, fields.Race)
+        races = select_races(filters=True, select_all=True, **kwargs)
+        with kwargs.get("select_race") or st.container():
+            print(kwargs.keys())
+            race = inputs.select_dataframe(races, fields.Race)
     else:
         races = api.get_live_races()
         if races.empty:

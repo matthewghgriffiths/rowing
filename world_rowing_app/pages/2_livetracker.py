@@ -35,8 +35,8 @@ def main(params=None):
     with st.sidebar:
         download = st.checkbox("automatically load livetracker data", True)
         with st.expander("Settings"):
-            fig_height = st.number_input("plot size", 10, 2_000, 1000)
-            fig_autosize = st.checkbox("autosize plot")
+            fig_params = plots.select_figure_params()
+
             threads = st.number_input(
                 "number of threads to use", min_value=1, max_value=20,
                 value=state.get("threads", 6),
@@ -49,9 +49,15 @@ def main(params=None):
             if clear:
                 st.cache_data.clear()
 
-    st.subheader("Select livetracker data")
+    # st.subheader("Select livetracker data")
+    with st.expander("Select livetracker data"):
+        select_competition, filter_races, select_gmts, filter_live = st.tabs([
+            "Select Competition", "Filter Races", "Select GMTS", "Filter livetracker data"
+        ])
 
     races = select.select_races(
+        competition_container=select_competition, 
+        races_container=filter_races,
         filters=True, select_all=False, select_first=True,
         default=[
             # fields.Phase,
@@ -74,7 +80,7 @@ def main(params=None):
         st.experimental_rerun()
 
     competition_id = races[fields.race_event_competitionId].iloc[0]
-    with st.expander("Select GMTs"):
+    with select_gmts:
         gmts = select.set_competition_gmts(competition_id)
         races = races.set_index("race_id").join(
             gmts.rename(fields.GMT), on=fields.boatClass)
@@ -89,7 +95,7 @@ def main(params=None):
         live_data, intermediates, lane_info = select.get_races_livedata(
             races, max_workers=threads)
 
-    with st.expander("Filter livetracker data"):
+    with filter_live:
         live_data = select.filter_livetracker(live_data)
 
     st.subheader("Show livetracker")
@@ -103,18 +109,9 @@ def main(params=None):
     ]
 
     with st.spinner("Generating livetracker plot"):
-        plot_data, facet_axes, facet_format = args = \
-            plots.melt_livetracker_times(live_data, 100)
-        fig = plots.make_livetracker_plot(
-            facets, *args,
-        )
-        
-        fig.update_annotations(text="")
-        if fig_autosize:
-            fig.update_layout(autosize=True)
-        else:
-            fig.update_layout(height=fig_height)
-
+        args = plots.melt_livetracker_times(live_data, 100)
+        fig = plots.make_livetracker_plot(facets, *args)
+        fig = plots.update_figure(fig, **fig_params)
         st.plotly_chart(fig, use_container_width=True)
 
     state.reset_button()

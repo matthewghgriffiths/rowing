@@ -42,7 +42,12 @@ def main(params=None):
             if clear:
                 st.cache_data.clear()
 
-    with st.expander("Select competition"):
+    with st.expander("Select Results"):
+        select_competitions, set_gmts, filter_results = st.tabs([
+            "Select competition", "Set GMTs", "Filter Results"
+        ])
+
+    with select_competitions:
         competition = select.select_competition()
         competition_id = competition.competition_id
         competition_type = competition.WBTCompetitionType
@@ -51,10 +56,10 @@ def main(params=None):
             f"loading Results for {competition.competition}, type: {competition_type}"
         )
 
-    with st.expander("Set GMTs"):
+    with set_gmts:
         gmts = select.set_competition_gmts(competition_id, competition_type)
 
-    with st.expander("Filter Results"):
+    with filter_results:
         results = select.select_competition_results(
             competition_id, gmts,
             default=[
@@ -97,15 +102,6 @@ def main(params=None):
         fields.ResultTime: {"tickformat": "%-M:%S"},
         fields.PGMT: {"tickformat": ",.0%"}
     }
-    # hover_data = {
-    #     'race_Date': True,
-    #     'raceBoatIntermediates_ResultTime': "|%-M:%S.%L",
-    #     'PGMT': ":.1%",
-    #     'event': True,
-    #     'raceBoats': True,
-    #     'raceBoatIntermediates_Rank': True,
-    #     'raceBoats_Lane': True
-    # }
     fig = px.scatter(**plot_inputs)
     fig.update_xaxes(**facets_axes.get(plot_inputs['x'], {}))
     fig.update_yaxes(**facets_axes.get(plot_inputs['y'], {}))

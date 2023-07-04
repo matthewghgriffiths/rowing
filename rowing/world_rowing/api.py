@@ -379,12 +379,25 @@ def parse_race(race):
 
 
 def parse_races(races):
-    race_codes = parse_race_codes(races.race_RscCode)
-    boat_classes = races[
-        'race_event_boatClassId'
-    ].replace(BOATCLASSES).rename(fields.race_boatClass)
-    races[fields.Day] = races[fields.race_Date].dt.date
-    races = pd.concat([races, race_codes, boat_classes], axis=1)
+    result_status = races[[fields.race_raceStatus]]
+
+    races = races.drop(columns=[fields.race_raceStatus])
+    races[fields.race_raceStatus] = result_status.bfill().iloc[:, -1]
+
+    parsed = [races]
+    if "race_RscCode" in races.columns:
+        parsed.append(parse_race_codes(races.race_RscCode))
+        
+    if fields.race_event_boatClassId in races.columns:
+        boat_classes = races[
+            fields.race_event_boatClassId
+        ].replace(BOATCLASSES).rename(fields.race_boatClass)
+        parsed.append(boat_classes)
+    
+    if fields.race_Date in races.columns:
+        races[fields.Day] = races[fields.race_Date].dt.date
+
+    races = pd.concat(parsed, axis=1)
     return races
 
 
@@ -392,19 +405,26 @@ INCLUDE_RACE = (
     "event.competition,raceStatus,racePhase,"
     "raceBoats.raceBoatIntermediates.distance,event"
 )
+INCLUDE_RACE_ATHLETES = (
+    INCLUDE_RACE 
+    + ",raceBoats.raceBoatAthletes,raceBoats.raceBoatAthletes.person"
+)
 
 
-def get_races(competition_id=None, cached=True):
+def get_races(competition_id=None, cached=True, athletes=False):
     competition_id = competition_id or get_most_recent_competition().competition_id
     races = get_worldrowing_records(
         "race",
         cached=cached,
         filter=(("event.competitionId", competition_id),),
         sort=(("eventId", "asc"), ("Date", "asc")),
-        include=INCLUDE_RACE,
+        include=INCLUDE_RACE_ATHLETES if athletes else INCLUDE_RACE,
     )
+    if races.empty:
+        return races 
+    
     return parse_races(races)
-
+    
 
 def get_race(race_id, **kwargs):
     kwargs.setdefault(

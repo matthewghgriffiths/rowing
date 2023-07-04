@@ -61,9 +61,21 @@ def main(params=None):
             if clear:
                 st.cache_data.clear()
 
-    race = select.select_live_race(replay)
-    st.write(race)
+    kwargs = {}
+    race_expander = st.expander("Select race", True)
+    if replay:
+        with race_expander:
+            kwargs['select_race'], kwargs['races_container'], kwargs["competition_container"] = st.tabs([
+                "Select Race", "Filter Races", "Select Competition", 
+            ])
 
+    with race_expander:
+        race = select.select_live_race(replay, **kwargs)
+        st.subheader("Loading race: ")
+        st.write(race)
+
+    st.subheader("Livetracker")
+    
     live_race = select.get_live_race_data(
         race.race_id,
         realtime_sleep=realtime_sleep,
