@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-from ..world_rowing import fields
+from rowing.world_rowing import fields
 
 FORMATS = {
     "default": {
@@ -68,11 +68,12 @@ def melt_livetracker(
     plot_data = fields.to_plotly_dataframe(plot_data.dropna(subset=["value"]))
     
     facet_format, facet_axes, facet_data = facet_properties(
-        plot_data, race_distance=2000, filter_distance=100, 
+        plot_data, race_distance=race_distance, filter_distance=filter_distance, 
         format={fields.split: "|%-M:%S.%L"},
     )
 
     return plot_data, facet_rows, facet_axes, facet_format
+
 
 def select_figure_params():
     fig_height = st.number_input(
