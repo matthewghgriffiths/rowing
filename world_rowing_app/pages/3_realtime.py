@@ -56,9 +56,6 @@ def main(params=None):
             replay_start = st.number_input(
                 "replay step", 0, 1000, state.get("replay_start", 0))
             
-            st.write(dir(plots))
-            print(plots)
-            print(dir(plots))
             fig_params = plots.select_figure_params()
             clear = st.button("clear cache")
             if clear:
