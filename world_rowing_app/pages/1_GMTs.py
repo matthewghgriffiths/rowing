@@ -37,10 +37,7 @@ def main(params=None):
         with st.expander("Settings"):
             fig_height = st.number_input("plot size", 10, 2_000, 1000)
             fig_autosize = st.checkbox("autosize plot")
-
-            clear = st.button("clear cache")
-            if clear:
-                st.cache_data.clear()
+            inputs.clear_cache()
 
     with st.expander("Select Results"):
         select_competitions, set_gmts, filter_results = st.tabs([
