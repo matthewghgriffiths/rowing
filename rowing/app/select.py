@@ -2,6 +2,7 @@
 import logging
 import datetime
 import time 
+from functools import partial, wraps
 
 import streamlit as st
 import pandas as pd
@@ -13,9 +14,28 @@ logger = logging.getLogger(__name__)
 
 get_live_race_data = st.cache_resource(live.LiveRaceData)
 
+USE_CACHE = True
+def cache_data(func=None, **kwargs):
+    if func:
+        cached_func = st.cache_data(func, **kwargs)
+
+        @wraps(func)
+        def new_func(*args, **kwargs):
+            if USE_CACHE:
+                logger.debug("using cache for %s", func)
+                return cached_func(*args, **kwargs)
+            else:
+                logger.debug("not using cache for %s", func)
+                return func(*args, **kwargs)
+            
+        return new_func
+    else:
+        return partial(cache_data, **kwargs)
+
 @st.cache_data(persist=True)
 def get_competitions(**kwargs):
     return api.get_competitions(**kwargs)
+
 
 
 @st.cache_data(persist=False, ttl=600)
@@ -24,7 +44,6 @@ def get_races(competition_id):
     return api.get_races(competition_id=competition_id).sort_values(
         fields.race_Date, ascending=False
     )
-
 
 @st.cache_data(persist=True)
 def get_events(competition_id):

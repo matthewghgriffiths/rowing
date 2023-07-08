@@ -968,3 +968,9 @@ def get_competition_pgmts(competition_id=None, finals_only=False):
     results.Time = results.Time.dt.total_seconds().apply(format_totalseconds)
     results.WBT = results.WBT.dt.total_seconds().apply(format_totalseconds)
     return results.sort_values("PGMT", ascending=False).reset_index(drop=True)
+
+
+def clear_cache():
+    cached_request_worldrowing_json.cache_clear()
+    load_competition_best_times.cache_clear()
+    get_competition_best_times.cache_clear()

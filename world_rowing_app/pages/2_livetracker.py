@@ -45,9 +45,9 @@ def main(params=None):
             threads = int(threads)
             state.set("threads", threads)
 
-            clear = st.button("clear cache")
-            if clear:
-                st.cache_data.clear()
+            inputs.clear_cache()
+
+            
 
     # st.subheader("Select livetracker data")
     with st.expander("Select livetracker data"):
