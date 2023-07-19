@@ -251,11 +251,11 @@ def filter_races(
         fields.Category, ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3'])
     kwargs.setdefault(
         fields.race_raceStatus, ["Official", "Unofficial"])
-    kwargs.setdefault(
-        "default", [fields.Gender, fields.Category, fields.race_raceStatus])
-    kwargs.setdefault(
-        fields.race_boatClass, "*"
-    )
+    # kwargs.setdefault(
+    #     "default", [fields.Gender, fields.Category, fields.race_raceStatus])
+    # kwargs.setdefault(
+    #     fields.race_boatClass, "*"
+    # )
     races = inputs.filter_dataframe(
         races,
         options=RACE_COL,
