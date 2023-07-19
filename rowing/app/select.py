@@ -125,6 +125,11 @@ COMPETITION_COL = [
 
 def select_competition(current=True):
     logger.debug("select_competition(current=%s)", current)
+    st.write(
+        """
+        The most recent FISA competition will be loaded by default, 
+        'select other competition' will allow you to choose older competitions. 
+        """)
     current = inputs.modal_button(
         "select other competition",
         "Use current competition",
@@ -300,35 +305,47 @@ def select_race(races):
     race = races.loc[races[fields.Race] == sel_race]
     return race.iloc[0]
 
+def wait_for_next_race(n=5):
+    next_races = api.get_next_races(n)
+    if not next_races.empty:
+        st.write("next races:")
+        st.dataframe(fields.to_streamlit_dataframe(next_races))
+
+        cols = st.columns(2)
+        if cols[0].checkbox("refresh until next race"):
+            with cols[1]:
+                countdown = st.empty()
+                for t in range(10, -1, -1):
+                    countdown.metric("Refresh in", f"{t} s")
+                    time.sleep(1)
+                st.experimental_rerun()
+        if st.button("refresh"):
+            st.experimental_rerun()
+
+    st.write(
+        "no live race could be loaded, "
+        "check replay in sidebar to see race replay")
+
 
 def select_live_race(replay=False, **kwargs):
     if replay:
-        races = select_races(filters=True, select_all=True, **kwargs)
+        races = select_races(
+            filters=True, 
+            select_all=True, 
+            default=[fields.race_raceStatus],
+            **kwargs
+        )
         with kwargs.get("select_race") or st.container():
+            if races.empty:
+                st.write("no live races could be loaded")
+                st.stop()
+
             print(kwargs.keys())
             race = inputs.select_dataframe(races, fields.Race)
     else:
         races = api.get_live_races()
         if races.empty:
-            next_races = api.get_next_races(5)
-            if not next_races.empty:
-                st.write("next races:")
-                st.dataframe(fields.to_streamlit_dataframe(next_races))
-
-                cols = st.columns(2)
-                if cols[0].checkbox("refresh until next race"):
-                    with cols[1]:
-                        countdown = st.empty()
-                        for t in range(10, -1, -1):
-                            countdown.metric("Refresh in", f"{t} s")
-                            time.sleep(1)
-                        st.experimental_rerun()
-                if st.button("refresh"):
-                    st.experimental_rerun()
-
-            st.write(
-                "no live race could be loaded, "
-                "check replay in sidebar to see race replay")
+            wait_for_next_race(n=5)
             st.stop()
 
         race = inputs.select_dataframe(races, fields.Race)
@@ -448,6 +465,13 @@ def set_gmts(cbts, *competition_types):
 
 def set_competition_gmts(competition_id, competition_type=None):
     comp_boat_classes = get_competition_boat_classes(competition_id)
+    st.write(
+        """
+        You can filter the best times by competition type or boat class
+
+        You can upload your own best times for boat classes, or download them
+        """
+    )
     cbts = select_best_times(comp_boat_classes, competition_type)
 
     if cbts.empty:
@@ -461,6 +485,17 @@ def set_competition_gmts(competition_id, competition_type=None):
 def select_competition_results(
     competition_id, gmts, stop_if_empty=True, **kwargs
 ):
+    st.write(
+        """
+        Filter which race results to show.
+
+        By default it selects only results the 2000m travelled, 
+        it is possible to show the results for different intermediates
+        distances as well. 
+
+        It is also possible to filter by day, position, event and other criteria. 
+        """
+    )
     races = get_races(competition_id)
     events = get_events(competition_id)
     results = api.extract_results(races)

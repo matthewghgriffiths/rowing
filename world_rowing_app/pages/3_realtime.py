@@ -41,6 +41,14 @@ st.set_page_config(
 def main(params=None):
     state.update(params or {})
     st.title("World Rowing Realtime Livetracker")
+    st.write(
+        """
+        Allows the following of the livetracker data from a race in realtime.
+
+        If there are no live races currently on, then you can check _replay_ in the sidebar
+        to see replays of historical races. 
+        """
+    )
 
     state.reset_button()
 
@@ -94,7 +102,10 @@ def main(params=None):
     ))
     for fig, *_ in pbar:
         pbar.set_postfix(distance=live_race.distance)
-        completed.progress(live_race.distance / live_race.race_distance)
+        completed.progress(
+            live_race.distance / live_race.race_distance, 
+            f"Distance completed: {live_race.distance}m/{live_race.race_distance}m"
+        )
 
         with show_intermediates:
             plots.show_lane_intermediates(live_race.lane_info, live_race.intermediates)
@@ -106,6 +117,7 @@ def main(params=None):
         else:
             st.write("no live data could be loaded")
 
+    select.wait_for_next_race(n=5)
     state.update_query_params()
     return state.get_state()
 

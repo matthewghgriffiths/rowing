@@ -32,6 +32,11 @@ def main(params=None):
     state.update(params or {})
 
     st.title("PGMTs")
+    st.write(
+        """
+        Allows loading, filtering and visualisation of results and PGMTs from a FISA competition.
+        """
+    )
 
     with st.sidebar:
         with st.expander("Settings"):

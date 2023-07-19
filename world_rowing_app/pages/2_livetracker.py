@@ -32,6 +32,27 @@ def main(params=None):
 
     st.title("World Rowing livetracker")
 
+    st.write(
+        """
+        Allows loading, filtering and visualisation of livetracker data from a FISA competition.
+
+        The livetracker data does not come with any time information, 
+        except for the intermediate times, so the app estimates the race time 
+        for each time for each timepoint to match as closely as possible the intermediate
+        and final times.
+
+        From these estimated times the app can calculate distance from PGMT, 
+        which is the distance behind (or ahead) from a boat going at an even 
+        percentage gold medal pace. 
+        The percentage of this pace can be set in the app, and defaults to 100%. 
+        It can be useful to set this PGMT of the pace boat lower to better visualise the race
+        profile when the conditions are slower.
+        
+        Use the 'Select livetracker data' to select which competition and races you want to view. 
+        You can select multiple races to view from the same competition at the same time.
+        """
+    )
+
     with st.sidebar:
         download = st.checkbox("automatically load livetracker data", True)
         with st.expander("Settings"):
@@ -51,6 +72,17 @@ def main(params=None):
 
     # st.subheader("Select livetracker data")
     with st.expander("Select livetracker data"):
+        st.write(
+            """
+            Select which competition and races to visualise race profiles for.
+
+            The most recent FISA competition will be loaded by default, 
+            'select other competition' will allow you to choose older competitions. 
+
+            To filter races, select which criteria to filter the races on using 'Filter Dataframe on', 
+            for example, Event, Phase, Day or Boat Class. 
+            """     
+        )
         select_competition, filter_races, select_gmts, filter_live = st.tabs([
             "Select Competition", "Filter Races", "Select GMTS", "Filter livetracker data"
         ])
