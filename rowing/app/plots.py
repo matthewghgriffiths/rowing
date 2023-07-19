@@ -38,7 +38,7 @@ def melt_livetracker(
     facets = [
         fields.live_raceBoatTracker_distanceFromLeader,
         fields.split,
-        fields.live_raceBoatTracker_metrePerSecond,
+        # fields.live_raceBoatTracker_metrePerSecond,
         fields.live_raceBoatTracker_strokeRate,
     ]          
     facet_rows = {facet: len(facets) - i for i, facet in enumerate(facets)}
@@ -286,14 +286,14 @@ def show_intermediates(intermediates):
     inter_pos = intermediates[fields.intermediates_Rank]
     row = pd.DataFrame(
         [inter_pos.columns], 
-        index=[fields.intermediates_ResultTime],
+        index=[fields.Time],
         columns=inter_pos.columns, 
     )
     inter_time = fields.to_streamlit_dataframe(
         intermediates[fields.intermediates_ResultTime]
     )
     inters = pd.concat([inter_pos, row, inter_time], axis=0)     
-    inters.index.name = fields.intermediates_Rank
+    inters.index.name = 'Rank'
     st.dataframe(
         inters, use_container_width=True
     )

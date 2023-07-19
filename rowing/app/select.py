@@ -196,12 +196,6 @@ def select_competition(current=True):
             st.stop()
 
         competition_id = state.get("CompetitionId")
-        if competition_id in competitions.index:
-            name = competitions[fields.Competition][competition_id]
-            index = int((competitions[fields.Competition]
-                        == name).values.nonzero()[0][0])
-        else:
-            index = int(competitions.started.values.nonzero()[0][-1])
 
         competition = inputs.select_dataframe(competitions, "competition")
 
@@ -265,7 +259,7 @@ def filter_races(
     races = inputs.filter_dataframe(
         races,
         options=RACE_COL,
-        categories=[fields.Phase, fields.race_event],
+        categories={fields.Phase, fields.race_event, fields.boatClass},
         filters=filters,
         select_all=select_all,
         select_first=select_first,
@@ -511,10 +505,11 @@ def filter_livetracker(live_data):
     live_data = inputs.filter_dataframe(
         live_data, key='live_data',
         options=LIVE_COLS,
-        default=[fields.lane_Rank],
+        # default=[fields.lane_Rank],
         select=False,
         categories={
             fields.Event, 
+            fields.boatClass,
         },
         **{
             fields.lane_Rank: pd.Series(

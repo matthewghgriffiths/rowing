@@ -52,6 +52,4 @@ which you can do in the settings.
 
 The source code for this app can be found on 
 [github.com/matthewghgriffiths/rowing](https://github.com/matthewghgriffiths/rowing)
-
-License: [MIT](https://github.com/matthewghgriffiths/rowing/blob/main/LICENSE)
 """)
