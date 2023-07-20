@@ -18,7 +18,7 @@ if LIBPATH not in realpaths:
     print("adding", LIBPATH)
 
 from rowing.world_rowing import api, utils, fields
-from rowing.app import state, inputs, select
+from rowing.app import state, inputs, select, plots
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,7 @@ def main(params=None):
 
     with st.sidebar:
         with st.expander("Settings"):
-            fig_height = st.number_input("plot size", 10, 2_000, 1000)
-            fig_autosize = st.checkbox("autosize plot")
+            fig_params = plots.select_figure_params()
             inputs.clear_cache()
 
     with st.expander("Select Results"):
@@ -105,12 +104,10 @@ def main(params=None):
         fields.PGMT: {"tickformat": ",.0%"}
     }
     fig = px.scatter(**plot_inputs)
-    fig.update_xaxes(**facets_axes.get(plot_inputs['x'], {}))
-    fig.update_yaxes(**facets_axes.get(plot_inputs['y'], {}))
-    if fig_autosize:
-        fig.update_layout(autosize=True)
-    else:
-        fig.update_layout(height=fig_height)
+    fig_params['xaxes'] = facets_axes.get(plot_inputs['x'], {})
+    fig_params['yaxes'] = facets_axes.get(plot_inputs['y'], {})
+    fig_params['layout'].pop("legend")
+    fig = plots.update_figure(fig, **fig_params)
 
     st.plotly_chart(fig, use_container_width=True)
 

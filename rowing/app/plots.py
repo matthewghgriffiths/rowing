@@ -92,9 +92,9 @@ def select_figure_params():
         x=1
     )
     if fig_autosize:
-        layout = {"autosize": True}
+        layout["autosize"]= True
     else:
-        layout = {"height": fig_height}
+        layout["height"] = fig_height
 
     return params
 
@@ -108,9 +108,9 @@ def update_figure(
     if layout:
         fig.update_layout(**layout)
     if xaxes:
-        fig.update_layout(**xaxes)
+        fig.update_xaxes(**xaxes)
     if yaxes:
-        fig.update_layout(**yaxes)
+        fig.update_yaxes(**yaxes)
     if annotations:
         fig.update_annotations(**annotations)
     
