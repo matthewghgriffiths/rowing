@@ -90,6 +90,7 @@ def main(params=None):
 
     results[fields.raceBoatIntermediates_ResultTime] = \
         results[fields.raceBoatIntermediates_ResultTime] + pd.Timestamp(0)
+    results[fields.GMT] = results[fields.GMT] + pd.Timestamp(0)
 
     plot_inputs = inputs.set_plotly_inputs(
         results.reset_index(),
@@ -102,6 +103,11 @@ def main(params=None):
         fields.race_Date: {"matches": None},
         fields.ResultTime: {"tickformat": "%-M:%S"},
         fields.PGMT: {"tickformat": ",.0%"}
+    }
+    plot_inputs['hover_data'] = {
+        fields.raceBoatIntermediates_Rank: True, 
+        fields.raceBoatIntermediates_ResultTime: "|%-M:%S.%L",
+        fields.GMT: "|%-M:%S.%L",
     }
     fig = px.scatter(**plot_inputs)
     fig_params['xaxes'] = facets_axes.get(plot_inputs['x'], {})

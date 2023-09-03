@@ -340,7 +340,6 @@ def select_live_race(replay=False, **kwargs):
                 st.write("no live races could be loaded")
                 st.stop()
 
-            print(kwargs.keys())
             race = inputs.select_dataframe(races, fields.Race)
     else:
         races = api.get_live_races()
@@ -500,8 +499,6 @@ def select_competition_results(
     events = get_events(competition_id)
     results = api.extract_results(races)
     boat_classes = get_boat_classes()
-
-    print(races.shape, events.shape, results.shape)
 
     merged_results = api.merge_competition_results(
         results, races, events, boat_classes, gmts)
