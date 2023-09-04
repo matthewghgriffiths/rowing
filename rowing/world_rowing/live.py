@@ -169,7 +169,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
                 (d - distances) / speed * m0
             )[m0.any(axis=1)].max()
         ).groupby(m0.idxmax()).mean()
-        int_times.update(d_times)
+        int_times.update(d_times[np.isfinite(d_times)])
 
     start_err = (times - int_times).mean()
     times = shift_down(times, start_err)
@@ -188,8 +188,14 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
         live_time_data[(fields.avg_speed, c)] = (
             c_data[fields.live_raceBoatTracker_distanceTravelled] / c_data.index
         )
+        live_time_data[fields.avg_speed, c] = live_time_data[
+            fields.avg_speed, c].replace(np.inf, np.nan)
+        speed = live_time_data[
+            fields.live_raceBoatTracker_metrePerSecond, c].replace(0, np.nan)
+        avg_speed = live_time_data[
+            fields.avg_speed, c].replace(0, np.nan)
         live_time_data[(fields.split, c)] = pd.to_timedelta(
-            500 / live_time_data[fields.live_raceBoatTracker_metrePerSecond][c], unit='s', errors='coerce')
+            500 / speed.replace(0, np.nan), unit='s', errors='coerce')
         live_time_data[(fields.avg_split, c)] = pd.to_timedelta(
             500. / live_time_data[fields.avg_speed, c], unit='s', errors='coerce')
 
