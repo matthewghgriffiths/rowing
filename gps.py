@@ -39,6 +39,22 @@ if not gpx_data:
 
 with st.expander("Show map"):
     fig = go.Figure()
+    
+    landmarks = splits.load_landmarks()
+    fig.add_trace(go.Scattermapbox(
+        lon = landmarks.longitude, 
+        lat = landmarks.latitude,
+        # hoverinfo = landmark_locs.index,
+        mode = 'markers+text',
+        name = 'Landmarks',
+        text = landmarks.index, 
+        marker={
+            'size': 10, 
+            # 'symbol': landmark_locs.index,
+        },
+        textposition='bottom right',
+    ))
+
     for name, data in gpx_data.items():
         fig.add_trace(go.Scattermapbox(
             lon = data.longitude, 
@@ -46,6 +62,7 @@ with st.expander("Show map"):
             mode = 'lines',
             name = name, 
         ))
+
     cols = st.columns([5, 2])
     with cols[0]:
         map_style = st.selectbox(
