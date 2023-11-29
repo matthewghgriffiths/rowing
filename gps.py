@@ -4,10 +4,6 @@ import logging
 
 import numpy as np 
 import pandas as pd 
-# from scipy import signal 
-
-import matplotlib.pyplot as plt 
-import seaborn as sns
 
 from tqdm.auto import tqdm
 
@@ -20,7 +16,6 @@ st.set_page_config(
     page_title="GPS",
     layout='wide'
 )
-
 """
 # GPS data processing
 """
