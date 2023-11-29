@@ -6,13 +6,16 @@ import logging
 import numpy as np
 import pandas as pd 
 
-from rowing.analysis import files, splits, geodesy
+import plotly.graph_objects as go
+
+from rowing.analysis import files, splits, app
 from rowing import utils
 
 logger = logging.getLogger(__name__)
 
+
 st.set_page_config(
-    page_title="GPX",
+    page_title="Rowing GPX",
     layout='wide'
 )
 """
@@ -23,20 +26,9 @@ uploaded_files = st.file_uploader(
     "Upload GPX files", accept_multiple_files=True
 )
 
-def parse_gpx(file):
-    return files.parse_gpx_data(files.gpxpy.parse(file))
-
-def download_csv(file_name, df, label=":inbox_tray: Download data as csv", **kwargs):
-    st.download_button(
-        label=label, 
-        file_name=file_name,
-        data=df.to_csv().encode("utf-8"), 
-        mime="text/csv",
-        **kwargs, 
-    )
 
 gpx_data, errors = utils.map_concurrent(
-    parse_gpx, 
+    app.parse_gpx, 
     {file.name.rsplit(".", 1)[0]: file for file in uploaded_files}, 
     singleton=True
 )
@@ -45,14 +37,47 @@ if not gpx_data:
     st.write("No data uploaded")
     st.stop()
 
-
-
-
-
-with st.spinner("Processing Crossing Times"):
-    crossing_times, errors = utils.map_concurrent(
-        splits.find_all_crossing_times, gpx_data, singleton=True
+with st.expander("Show map"):
+    fig = go.Figure()
+    for name, data in gpx_data.items():
+        fig.add_trace(go.Scattermapbox(
+            lon = data.longitude, 
+            lat = data.latitude,
+            mode = 'lines',
+            name = name, 
+        ))
+    cols = st.columns([5, 2])
+    with cols[0]:
+        map_style = st.selectbox(
+            "map style", 
+            ["open-street-map", "carto-positron", "carto-darkmatter"]
+        )
+    with cols[1]:
+        height = st.number_input("Set figure height", 100, 2000, 600)
+    fig.update_layout(
+        mapbox = {
+            'style': map_style,
+            # 'style': 'carto-positron',
+            'center': {
+                'lon': data.longitude.mean(), 
+                'lat': data.latitude.mean(), 
+            },
+            'zoom': 10
+        },
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-.02,
+            xanchor="right",
+            x=1
+        ),
+        height=height, 
     )
+    st.plotly_chart(
+        fig, use_container_width=True
+    )
+with st.spinner("Processing Crossing Times"):
+    crossing_times = app.get_crossing_times(gpx_data)
     all_crossing_times = pd.concat(crossing_times, names=['file'])
 
 
@@ -71,7 +96,7 @@ with st.expander("All Crossing times"):
         }
     )
     
-    download_csv("all-crossings.csv", show_times)
+    app.download_csv("all-crossings.csv", show_times)
 
 with st.expander("Individual Crossing Times"):
     tabs = st.tabs(crossing_times)
@@ -90,7 +115,8 @@ with st.expander("Individual Crossing Times"):
                     )
                 }
             )
-            download_csv(f"{name}-crossings.csv", show_crossings)
+            app.download_csv(f"{name}-crossings.csv", show_crossings)
+
 
 
 with st.expander("Piece selecter"):
@@ -106,16 +132,20 @@ with st.expander("Piece selecter"):
     sel_times = all_crossing_times[
         all_crossing_times.dt.date == select_date
     ]
-    landmarks = sel_times.index.levels[3]
+    landmarks, ind = np.unique(
+        sel_times.index.get_level_values(3), return_index=True)
+    landmarks = landmarks[np.argsort(ind)]
     with cols[1]:
         start_landmark = st.selectbox(
             "select start landmark", 
             landmarks, 
+            index=0, 
         )
     with cols[2]:
         finish_landmark = st.selectbox(
             "select finish landmark", 
             landmarks, 
+            index=landmarks.size-1, 
         )
 
     start_times = sel_times.xs(start_landmark, level=3).droplevel(-1)
@@ -137,7 +167,7 @@ with st.expander("Piece selecter"):
     }, axis=1)
     piece_data.index = pd.MultiIndex.from_frame(
         start_times.loc[legs].rename("Start Time").reset_index()[
-            ["Start Time", "file", "location", "leg"]
+            ["Start Time", "file", "leg", "location"]
         ]
     )
     piece_data = piece_data.sort_index(level=0)
@@ -190,10 +220,10 @@ with st.expander("Piece selecter"):
     with tabs[4]:
         st.dataframe(piece_data['Time'])
 
+
+
 with st.spinner("Processing split timings"):
-    location_timings, errors = utils.map_concurrent(
-        splits.get_location_timings, gpx_data, singleton=True
-    )
+    location_timings = app.get_location_timings(gpx_data)
 
 with st.expander("Landmark timings"):
     tabs = st.tabs(location_timings)
@@ -206,25 +236,18 @@ with st.expander("Landmark timings"):
             ).replace("00:00:00.00", "").T
 
             st.dataframe(upload_timings)
-
-            st.download_button(
-                label="Download data as CSV", 
-                file_name=f"{name}-timings.csv",
-                data=upload_timings.to_csv().encode("utf-8"), 
-                mime="text/csv",
+            app.download_csv(
+                f"{name}-timings.csv",
+                upload_timings,
             )
 
 with st.spinner("Processing fastest times"):
-    best_times, errors = utils.map_concurrent(
-        splits.find_all_best_times, 
-        gpx_data, singleton=True, 
-    )
+    best_times = app.get_fastest_times(gpx_data)
 
 with st.expander("Fastest times"):
     tabs = st.tabs(best_times)
     for tab, (name, times) in zip(tabs, best_times.items()):
         show_times = times + pd.Timestamp(0)
-        print(times.dtypes)
         with tab:
             st.dataframe(
                 show_times, 
@@ -237,7 +260,7 @@ with st.expander("Fastest times"):
                     )
                 }
             )
-            download_csv(
+            app.download_csv(
                 f"{name}-fastest.csv", 
                 times.applymap(
                     utils.format_timedelta, hours=True
