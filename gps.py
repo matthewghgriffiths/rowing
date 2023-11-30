@@ -271,10 +271,11 @@ with st.expander("Piece selecter"):
         )
     sel_times = all_crossing_times[
         all_crossing_times.dt.date == select_date
-    ]
+    ].sort_index(level=(0, 4))
     landmarks, ind = np.unique(
         sel_times.index.get_level_values(3), return_index=True)
     landmarks = landmarks[np.argsort(ind)]
+    print(sel_times)
     with cols[1]:
         start_landmark = st.selectbox(
             "select start landmark", 
@@ -295,74 +296,77 @@ with st.expander("Piece selecter"):
         "Time left": finish_times - sel_times,
         "Time": sel_times, 
     }, axis=1)
-    piece_data = times[
+    valid_times = (
         times.notna().all(axis=1)
         & (times['Time left'].dt.total_seconds() >= 0)
         & (times["Elapsed time"].dt.total_seconds() >= 0)
-    ].reset_index("distance").unstack()
-    legs = piece_data.index
-
-    avg_distance = piece_data.distance.mean().sort_values()
-
-    legs = piece_data.index
-    startfinish = pd.concat({
-        "Start time": start_times.loc[legs], 
-        "Finish Time": finish_times.loc[legs]
-    }, axis=1)
-    piece_data.index = pd.MultiIndex.from_frame(
-        start_times.loc[legs].rename("Start Time").reset_index()[
-            ["Start Time", "file", "location", "leg"]
-        ]
     )
-    piece_data = piece_data.sort_index(level=0)
-    legs = piece_data.index.droplevel(0)
+    if not valid_times.any():
+        st.write("No valid pieces could be found")
+    else:
+        piece_data = times[valid_times].reset_index("distance").unstack()
+        legs = piece_data.index
 
-    piece_distances = (
-        piece_data.distance 
-        - piece_data.distance[start_landmark].values[:, None]
-    )[avg_distance.index]
-    piece_time = piece_data['Elapsed time'][avg_distance.index]
-    avg_split = (piece_time * 0.5 / piece_distances).fillna(pd.Timedelta(0))
-    interval_split = (
-        piece_time.diff(axis=1) * 0.5 / piece_distances.diff(axis=1)
-    ).fillna(pd.Timedelta(0))
-    
-    st.dataframe(
-        startfinish
-    )
-    tabs = st.tabs([
-        "Elapsed Time", 
-        "Distance Travelled", 
-        "Average Split", 
-        "Interval Split", 
-        "Timestamp"
-    ])
-    with tabs[0]:
-        st.dataframe(
-            piece_time.applymap(
-                utils.format_timedelta, #hours=True
-            )
+        avg_distance = piece_data.distance.mean().sort_values()
+        legs = piece_data.index
+        startfinish = pd.concat({
+            "Start time": start_times.loc[legs], 
+            "Finish Time": finish_times.loc[legs]
+        }, axis=1)
+        piece_data.index = pd.MultiIndex.from_frame(
+            start_times.loc[legs].rename("Start Time").reset_index()[
+                ["Start Time", "file", "location", "leg"]
+            ]
         )
-    with tabs[1]:
-        st.dataframe(
-            piece_distances
-        )
+        piece_data = piece_data.sort_index(level=0)
+        legs = piece_data.index.droplevel(0)
 
-    with tabs[2]:
+        piece_distances = (
+            piece_data.distance 
+            - piece_data.distance[start_landmark].values[:, None]
+        )[avg_distance.index]
+        piece_time = piece_data['Elapsed time'][avg_distance.index]
+        avg_split = (piece_time * 0.5 / piece_distances).fillna(pd.Timedelta(0))
+        interval_split = (
+            piece_time.diff(axis=1) * 0.5 / piece_distances.diff(axis=1)
+        ).fillna(pd.Timedelta(0))
+        
         st.dataframe(
-            interval_split.applymap(
-                utils.format_timedelta, #hours=True
-            )
+            startfinish
         )
+        tabs = st.tabs([
+            "Elapsed Time", 
+            "Distance Travelled", 
+            "Average Split", 
+            "Interval Split", 
+            "Timestamp"
+        ])
+        with tabs[0]:
+            st.dataframe(
+                piece_time.applymap(
+                    utils.format_timedelta, #hours=True
+                )
+            )
+        with tabs[1]:
+            st.dataframe(
+                piece_distances
+            )
 
-    with tabs[3]:
-        st.dataframe(
-            avg_split.applymap(
-                utils.format_timedelta, #hours=True
+        with tabs[2]:
+            st.dataframe(
+                interval_split.applymap(
+                    utils.format_timedelta, #hours=True
+                )
             )
-        )
-    with tabs[4]:
-        st.dataframe(piece_data['Time'])
+
+        with tabs[3]:
+            st.dataframe(
+                avg_split.applymap(
+                    utils.format_timedelta, #hours=True
+                )
+            )
+        with tabs[4]:
+            st.dataframe(piece_data['Time'])
 
 
 
