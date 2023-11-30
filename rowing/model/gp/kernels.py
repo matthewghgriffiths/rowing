@@ -158,9 +158,9 @@ class IntegralSEKernel(AbstractKernel):
         return k
 
 
-def se_kernel(X1, X2, s=1.):
+def se_kernel(X1, X2, s=1., axis=-1):
     d12 = (X1 - X2) / s
-    return jnp.exp(-jnp.square(d12).sum(-1) / 2)
+    return jnp.exp(-jnp.square(d12).sum(axis) / 2)
 
 
 def nint_se_kernel(t0, t1, t2, s=1., with_err=False):

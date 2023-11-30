@@ -356,8 +356,8 @@ def parse_records(endpoints, records):
 
     for col in records.columns:
         if "Date" in col:
-            dates = pd.to_datetime(records[col])
-            if dates.notna().all():
+            dates = pd.to_datetime(records[col], errors='coerce')
+            if dates.notna().any():
                 records[col] = dates
 
     prefix = ".".join(endpoints)

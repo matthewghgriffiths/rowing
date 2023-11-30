@@ -204,9 +204,11 @@ def select_competition(current=True):
 
         competition = inputs.select_dataframe(competitions, "competition")
 
-    competition.loc[fields.WBTCompetitionType] = api.COMPETITION_TYPES[
+    
+    competition.loc[fields.WBTCompetitionType] = api.COMPETITION_TYPES.get(
+        competition[fields.competition_competitionType],
         competition[fields.competition_competitionType]
-    ]
+    )
     # competition.index.name = 'CompetitionId'
     st.write(competition.loc[COMPETITION_COL + [fields.WBTCompetitionType]])
     return competition
