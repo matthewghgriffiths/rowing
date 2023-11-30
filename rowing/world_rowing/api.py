@@ -476,7 +476,7 @@ def extract_results(races):
     return race_intermediates
 
 
-def get_competitions(year=None, fisa=True, has_results=True, cached=True, **kwargs):
+def get_competitions(year=None, fisa=True, has_results=True, flat_water=True, cached=True, **kwargs):
 
     kwargs['filter'] = tuple(dict(kwargs.get('filter', ())).items())
     if year is not False:
@@ -497,6 +497,11 @@ def get_competitions(year=None, fisa=True, has_results=True, cached=True, **kwar
         competitions[fields.competition_competitionType].replace(
         COMPETITION_TYPES
     )
+    if flat_water:
+        is_flat_water = competitions[
+            fields.competition_competitionType
+        ].isin(COMPETITION_TYPES)
+        competitions = competitions[is_flat_water]
 
     return competitions
 

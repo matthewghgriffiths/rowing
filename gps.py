@@ -113,7 +113,7 @@ with st.expander("Landmarks"):
         ))
 
         for i, landmark in set_landmarks.iterrows():
-            arrow = geodesy.make_arrow_base(landmark, 0.3, 0.1, 20)
+            arrow = geodesy.make_arrow_base(landmark, 0.25, 0.1, 20)
 
             fig.add_trace(go.Scattermapbox(
                 lon = arrow.longitude, 
