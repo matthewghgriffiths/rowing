@@ -57,6 +57,7 @@ with st.expander("Landmarks"):
             hide_index=True, 
             num_rows="dynamic"
         )
+        locations = set_landmarks.set_index(["location", "landmark"])
         app.download_csv(
             "landmarks.csv", 
             set_landmarks, 
@@ -152,7 +153,7 @@ with st.expander("Landmarks"):
 gpx_data, errors = utils.map_concurrent(
     app.parse_gpx, 
     {file.name.rsplit(".", 1)[0]: file for file in uploaded_files}, 
-    singleton=True
+    singleton=True, 
 )
 
 if not gpx_data:
@@ -178,16 +179,15 @@ with st.expander("Show map"):
             mode = 'lines',
             name = name, 
         ))
-    landmarks = splits.load_landmarks()
     fig.add_trace(go.Scattermapbox(
-        lon = landmarks.longitude, 
-        lat = landmarks.latitude,
+        lon = locations.longitude, 
+        lat = locations.latitude,
         # hoverinfo = landmark_locs.index,
         mode = 'markers+text',
         name = 'Landmarks',
-        text = landmarks.index, 
+        text = locations.index.get_level_values("landmark"), 
         marker={
-            'size': 10, 
+            'size': 20, 
             # 'symbol': "airfield", 
             # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
         },
@@ -217,7 +217,7 @@ with st.expander("Show map"):
     )
 
 with st.spinner("Processing Crossing Times"):
-    crossing_times = app.get_crossing_times(gpx_data)
+    crossing_times = app.get_crossing_times(gpx_data, locations=locations)
     all_crossing_times = pd.concat(crossing_times, names=['file'])
 
 
@@ -301,13 +301,17 @@ with st.expander("Piece selecter"):
         & (times["Elapsed time"].dt.total_seconds() >= 0)
     ].reset_index("distance").unstack()
     legs = piece_data.index
+
+    avg_distance = piece_data.distance.mean().sort_values()
+
+    legs = piece_data.index
     startfinish = pd.concat({
         "Start time": start_times.loc[legs], 
         "Finish Time": finish_times.loc[legs]
     }, axis=1)
     piece_data.index = pd.MultiIndex.from_frame(
         start_times.loc[legs].rename("Start Time").reset_index()[
-            ["Start Time", "file", "leg", "location"]
+            ["Start Time", "file", "location", "leg"]
         ]
     )
     piece_data = piece_data.sort_index(level=0)
@@ -316,8 +320,8 @@ with st.expander("Piece selecter"):
     piece_distances = (
         piece_data.distance 
         - piece_data.distance[start_landmark].values[:, None]
-    )
-    piece_time = piece_data['Elapsed time']
+    )[avg_distance.index]
+    piece_time = piece_data['Elapsed time'][avg_distance.index]
     avg_split = (piece_time * 0.5 / piece_distances).fillna(pd.Timedelta(0))
     interval_split = (
         piece_time.diff(axis=1) * 0.5 / piece_distances.diff(axis=1)
@@ -363,18 +367,21 @@ with st.expander("Piece selecter"):
 
 
 with st.spinner("Processing split timings"):
-    location_timings = app.get_location_timings(gpx_data)
+    location_timings = app.get_location_timings(gpx_data, locations=locations)
 
 with st.expander("Landmark timings"):
     tabs = st.tabs(location_timings)
     for tab, (name, timings) in zip(tabs, location_timings.items()):
         with tab:
-            timings.index.names = "", 'leg', 'landmark', 'distance'
-            timings.columns.names = "", 'leg', 'landmark', 'distance'
-            upload_timings = timings.applymap(
+            upload_timings = timings.droplevel(
+                "location"
+            ).droplevel("location", axis=1).rename_axis(
+                ["", 'leg', 'landmark', 'distance']
+            ).rename_axis(
+                ["", 'leg', 'landmark', 'distance'], axis=1
+            ).applymap(
                 utils.format_timedelta, hours=True
             ).replace("00:00:00.00", "").T
-
             st.dataframe(upload_timings)
             app.download_csv(
                 f"{name}-timings.csv",
@@ -417,9 +424,13 @@ with st.spinner("Generating excel file"):
             )
 
         for name, timings in location_timings.items():
-            timings.index.names = "", 'leg', 'landmark', 'distance'
-            timings.columns.names = "", 'leg', 'landmark', 'distance'
-            upload_timings = timings.applymap(
+            upload_timings = timings.droplevel(
+                "location"
+            ).droplevel("location", axis=1).rename_axis(
+                ["", 'leg', 'landmark', 'distance']
+            ).rename_axis(
+                ["", 'leg', 'landmark', 'distance'], axis=1
+            ).applymap(
                 utils.format_timedelta, hours=True
             ).replace("00:00:00.00", "").T
 
