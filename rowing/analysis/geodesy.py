@@ -15,6 +15,9 @@ class LatLon(NamedTuple):
 
     def to_rad(self):
         return RadCoords(*map(np.deg2rad, self))
+    
+    def set_bearing(self, bearing):
+        return LatLonBear(*self, bearing)
 
 
 class LatLonBear(NamedTuple):
@@ -24,6 +27,9 @@ class LatLonBear(NamedTuple):
 
     def to_rad(self):
         return RadBearing(*map(np.deg2rad, self))
+    
+    def set_bearing(self, bearing):
+        return self._replace(bearing=bearing)
 
 
 class RadCoords(NamedTuple):
@@ -32,6 +38,9 @@ class RadCoords(NamedTuple):
 
     def to_latlon(self):
         return LatLon(*map(np.rad2deg, self))
+    
+    def set_theta(self, theta):
+        return RadBearing(*self, theta)
 
 
 class RadBearing(NamedTuple):
@@ -41,6 +50,9 @@ class RadBearing(NamedTuple):
 
     def to_latlon(self):
         return LatLonBear(*map(np.rad2deg, self))
+    
+    def set_theta(self, theta):
+        return self._replace(theta=theta)
 
 
 _Coords = (
@@ -192,3 +204,46 @@ def follow_bearing(pos1, d):
         np.cos(d)-np.sin(phi)*np.sin(phi2)
     )
     return RadCoords(phi2, lam2)
+
+def make_arrow(pos, arrowlength=0.3, arrowhead=0.1, arrowangle=20):
+    start = get_rad_bearing(pos).to_latlon()
+    tip = follow_bearing(start, arrowlength).to_latlon()
+    p2 = follow_bearing(
+        tip.set_bearing(start.bearing + 180 + arrowangle), 
+        arrowhead
+    ).to_latlon()
+    p3 = follow_bearing(
+        tip.set_bearing(start.bearing + 180 - arrowangle), 
+        arrowhead
+    ).to_latlon()
+    # points = [tip, start, tip, p2, p3, tip]
+    points = [p2, tip, start, tip, p3, p2]
+    return LatLon(
+        np.array([p.latitude for p in points]), 
+        np.array([p.longitude for p in points])
+    )
+
+def make_arrow_base(pos, arrowlength=0.3, arrowhead=0.1, arrowangle=20, base_width=0.15):
+    start = get_rad_bearing(pos).to_latlon()
+    tip = follow_bearing(start, arrowlength).to_latlon()
+    p2 = follow_bearing(
+        tip.set_bearing(start.bearing + 180 + arrowangle), 
+        arrowhead
+    ).to_latlon()
+    p3 = follow_bearing(
+        tip.set_bearing(start.bearing + 180 - arrowangle), 
+        arrowhead
+    ).to_latlon()
+    b1 = follow_bearing(
+        start.set_bearing(start.bearing + 90), base_width
+    ).to_latlon()
+    b2 = follow_bearing(
+        start.set_bearing(start.bearing - 90), base_width
+    ).to_latlon()
+    # points = [tip, start, tip, p2, p3, tip]
+    points = [p2, tip, start, b1, b2, start, tip, p3, p2]
+    return LatLon(
+        np.array([p.latitude for p in points]), 
+        np.array([p.longitude for p in points])
+    )
+

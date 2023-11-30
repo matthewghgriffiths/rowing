@@ -96,6 +96,20 @@ def find_all_crossing_data(positions, locations=None, thresh=0.15, cols=None):
 
     return crossing_data
 
+def calc_timings(loc_times):
+    times = loc_times.values
+    loc_timings = pd.DataFrame(
+        times[:, None] - times[None, :],
+        index=loc_times.index,
+        columns=loc_times.index
+    )
+    distances = np.array(loc_times.index.get_level_values('distance'), float)
+    dist_diffs = 2 * (distances[:, None] - distances[None, :])
+    dist_diffs[np.tril_indices(len(distances))] = 1
+
+    loc_timings /= dist_diffs
+
+    return pd.concat({'splits': pd.concat({'times': loc_timings})}, axis=1)
 
 def get_location_timings(positions, locations=None, thresh=0.15):
     locations = load_landmarks() if locations is None else locations
@@ -109,8 +123,8 @@ def get_location_timings(positions, locations=None, thresh=0.15):
         index=loc_times.index,
         columns=loc_times.index
     )
-    distances = loc_times.index.get_level_values('distance')
-    dist_diffs = 2 * (distances.values[:, None] - distances.values[None, :])
+    distances = np.array(loc_times.index.get_level_values('distance'), float)
+    dist_diffs = 2 * (distances[:, None] - distances[None, :])
     dist_diffs[np.tril_indices(len(distances))] = 1
 
     loc_timings /= dist_diffs

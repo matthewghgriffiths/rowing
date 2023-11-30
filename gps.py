@@ -8,7 +8,7 @@ import pandas as pd
 
 import plotly.graph_objects as go
 
-from rowing.analysis import files, splits, app
+from rowing.analysis import geodesy, splits, app
 from rowing import utils
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,128 @@ uploaded_files = st.file_uploader(
     "Upload GPX files", accept_multiple_files=True
 )
 
+with st.expander("Landmarks"):
+    tab1, tab2 = st.tabs([
+        "Edit Landmarks", "Upload Landmarks", #"Map of Landmarks"
+    ])
+    landmarks = splits.load_location_landmarks().reset_index()
+    with tab2:
+        uploaded = st.file_uploader(
+            "Upload landmarks csv", 
+            accept_multiple_files=False
+        )
+        if uploaded:
+            uploaded_landmarks = pd.read_csv(uploaded)
+            st.write("Uploaded Landmarks")
+            st.dataframe(uploaded_landmarks, hide_index=True)
+            landmarks = pd.concat(
+                [uploaded_landmarks, landmarks]
+            ).drop_duplicates()
+
+
+    with tab1:
+        locations = landmarks.location.unique()
+        sel_locations = st.multiselect(
+            "filter", locations, default=locations
+        )
+        set_landmarks = st.data_editor(
+            landmarks[
+                landmarks.location.isin(sel_locations)
+            ], 
+            hide_index=True, 
+            num_rows="dynamic"
+        )
+        app.download_csv(
+            "landmarks.csv", 
+            set_landmarks, 
+            ':inbox_tray: download set landmarks as csv', 
+            csv_kws=dict(index=False), 
+        )
+        
+    with tab2:
+        app.download_csv(
+            "landmarks.csv", 
+            set_landmarks, 
+            ':inbox_tray: download landmarks as csv', 
+            csv_kws=dict(index=False), 
+        )
+
+    # with tab3: 
+    if True:
+        st.subheader("Map of Landmarks")       
+        cols = st.columns([5, 2])
+        with cols[0]:
+            map_style = st.selectbox(
+                "map style", 
+                ["open-street-map", "carto-positron", "carto-darkmatter"],
+                key='landmark map style'
+
+            )
+        with cols[1]:
+            height = st.number_input(
+                "Set figure height", 100, 2000, 600,
+                key='landmark map height'
+            )
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scattermapbox(
+            lon = set_landmarks.longitude, 
+            lat = set_landmarks.latitude,
+            # customdata = set_landmarks,
+            mode = 'markers+text',
+            name = 'Landmarks',
+            text = set_landmarks.landmark, 
+            cluster=dict(
+                enabled=True, 
+                maxzoom=5, 
+                step=1, 
+                size=20, 
+            ),
+            marker={
+                'size': 5, 
+                # 'symbol': "airfield", 
+                # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
+            },
+            textposition='bottom right',
+        ))
+
+        for i, landmark in set_landmarks.iterrows():
+            arrow = geodesy.make_arrow_base(landmark, 0.3, 0.1, 20)
+
+            fig.add_trace(go.Scattermapbox(
+                lon = arrow.longitude, 
+                lat = arrow.latitude,
+                # hoverinfo = landmark_locs.index,
+                mode = 'lines',
+                name = landmark.landmark,
+                fill = 'toself', 
+                hovertext = f"bearing={landmark.bearing:.1f}",
+                line = dict(
+                    width=3, 
+                ),
+                # text = list(set_landmarks.landmark), 
+                # marker={
+                #     'size': 5, 
+                #     # 'symbol': landmark_locs.index,
+                # },
+                textposition='bottom right',
+            ))
+
+        
+        fig.update_layout(
+            mapbox = {
+                'style': map_style,
+                'center': {
+                    'lon': set_landmarks.longitude.mean(), 
+                    'lat': set_landmarks.latitude.mean(), 
+                },
+                'zoom': 5
+            },
+            showlegend=False,
+            height=height, 
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 gpx_data, errors = utils.map_concurrent(
     app.parse_gpx, 
@@ -38,8 +160,24 @@ if not gpx_data:
     st.stop()
 
 with st.expander("Show map"):
+    cols = st.columns([5, 2])
+    with cols[0]:
+        map_style = st.selectbox(
+            "map style", 
+            ["open-street-map", "carto-positron", "carto-darkmatter"]
+        )
+    with cols[1]:
+        height = st.number_input("Set figure height", 100, 2000, 600)
+
+
     fig = go.Figure()
-    
+    for name, data in gpx_data.items():
+        fig.add_trace(go.Scattermapbox(
+            lon = data.longitude, 
+            lat = data.latitude,
+            mode = 'lines',
+            name = name, 
+        ))
     landmarks = splits.load_landmarks()
     fig.add_trace(go.Scattermapbox(
         lon = landmarks.longitude, 
@@ -50,31 +188,15 @@ with st.expander("Show map"):
         text = landmarks.index, 
         marker={
             'size': 10, 
-            # 'symbol': landmark_locs.index,
+            # 'symbol': "airfield", 
+            # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
         },
         textposition='bottom right',
     ))
 
-    for name, data in gpx_data.items():
-        fig.add_trace(go.Scattermapbox(
-            lon = data.longitude, 
-            lat = data.latitude,
-            mode = 'lines',
-            name = name, 
-        ))
-
-    cols = st.columns([5, 2])
-    with cols[0]:
-        map_style = st.selectbox(
-            "map style", 
-            ["open-street-map", "carto-positron", "carto-darkmatter"]
-        )
-    with cols[1]:
-        height = st.number_input("Set figure height", 100, 2000, 600)
     fig.update_layout(
         mapbox = {
             'style': map_style,
-            # 'style': 'carto-positron',
             'center': {
                 'lon': data.longitude.mean(), 
                 'lat': data.latitude.mean(), 
@@ -93,6 +215,7 @@ with st.expander("Show map"):
     st.plotly_chart(
         fig, use_container_width=True
     )
+
 with st.spinner("Processing Crossing Times"):
     crossing_times = app.get_crossing_times(gpx_data)
     all_crossing_times = pd.concat(crossing_times, names=['file'])

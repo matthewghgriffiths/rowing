@@ -10,11 +10,13 @@ from rowing import utils
 def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
 
-def download_csv(file_name, df, label=":inbox_tray: Download data as csv", **kwargs):
+def download_csv(
+        file_name, df, label=":inbox_tray: Download data as csv", csv_kws=None, **kwargs
+    ):
     st.download_button(
         label=label, 
         file_name=file_name,
-        data=df.to_csv().encode("utf-8"), 
+        data=df.to_csv(**(csv_kws or {})).encode("utf-8"), 
         mime="text/csv",
         **kwargs, 
     )

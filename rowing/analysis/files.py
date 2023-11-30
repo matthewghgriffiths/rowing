@@ -40,19 +40,23 @@ def parse_gpx_data(gpx_data):
                 'distanceDelta', 'distance', 'bearing_r', 'bearing'
             ])
 
+
+    return process_latlontime(positions)
+
+def process_latlontime(positions):
+    first = positions.index[0]
     last = positions.index[-1]
-    positions['timeElapsed'] = positions.time - positions.time[0]
+    positions['timeElapsed'] = positions.time - positions.time[first]
     positions['distanceDelta'] = geodesy.haversine_km(
         positions, positions.shift(-1))
-    positions.loc[last, 'distanceDelta'] = 0
-    positions['distance'] = np.cumsum(positions.distanceDelta)
+    positions.loc[last, 'distanceDelta'] = 0.
+    positions['distance'] = positions.distanceDelta.cumsum()
     positions['bearing_r'] = geodesy.rad_bearing(
         positions, positions.shift(-1))
-    positions.loc[0, 'bearing_r'] = positions.bearing_r[1]
+    positions.loc[first, 'bearing_r'] = positions.bearing_r[positions.index[1]]
     positions['bearing'] = np.rad2deg(positions.bearing_r)
 
     return positions
-
 
 def read_fit_zipfile(zip_file):
     with zipfile.ZipFile(zip_file, 'r') as zipf:
