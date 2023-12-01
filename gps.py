@@ -27,128 +27,8 @@ uploaded_files = st.file_uploader(
 )
 
 with st.expander("Landmarks"):
-    tab1, tab2 = st.tabs([
-        "Edit Landmarks", "Upload Landmarks", #"Map of Landmarks"
-    ])
-    landmarks = splits.load_location_landmarks().reset_index()
-    with tab2:
-        uploaded = st.file_uploader(
-            "Upload landmarks csv", 
-            accept_multiple_files=False
-        )
-        if uploaded:
-            uploaded_landmarks = pd.read_csv(uploaded)
-            st.write("Uploaded Landmarks")
-            st.dataframe(uploaded_landmarks, hide_index=True)
-            landmarks = pd.concat(
-                [uploaded_landmarks, landmarks]
-            ).drop_duplicates()
-
-
-    with tab1:
-        locations = landmarks.location.unique()
-        sel_locations = st.multiselect(
-            "filter", locations, default=locations
-        )
-        set_landmarks = st.data_editor(
-            landmarks[
-                landmarks.location.isin(sel_locations)
-            ], 
-            hide_index=True, 
-            num_rows="dynamic"
-        )
-        locations = set_landmarks.set_index(["location", "landmark"])
-        app.download_csv(
-            "landmarks.csv", 
-            set_landmarks, 
-            ':inbox_tray: download set landmarks as csv', 
-            csv_kws=dict(index=False), 
-        )
-        
-    with tab2:
-        app.download_csv(
-            "landmarks.csv", 
-            set_landmarks, 
-            ':inbox_tray: download landmarks as csv', 
-            csv_kws=dict(index=False), 
-        )
-
-    # with tab3: 
-    if True:
-        st.subheader("Map of Landmarks")       
-        cols = st.columns([5, 2])
-        with cols[0]:
-            map_style = st.selectbox(
-                "map style", 
-                ["open-street-map", "carto-positron", "carto-darkmatter"],
-                key='landmark map style'
-
-            )
-        with cols[1]:
-            height = st.number_input(
-                "Set figure height", 100, 2000, 600,
-                key='landmark map height'
-            )
-        
-        fig = go.Figure()
-        
-        fig.add_trace(go.Scattermapbox(
-            lon = set_landmarks.longitude, 
-            lat = set_landmarks.latitude,
-            # customdata = set_landmarks,
-            mode = 'markers+text',
-            name = 'Landmarks',
-            text = set_landmarks.landmark, 
-            cluster=dict(
-                enabled=True, 
-                maxzoom=5, 
-                step=1, 
-                size=20, 
-            ),
-            marker={
-                'size': 5, 
-                # 'symbol': "airfield", 
-                # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
-            },
-            textposition='bottom right',
-        ))
-
-        for i, landmark in set_landmarks.iterrows():
-            arrow = geodesy.make_arrow_base(landmark, 0.25, 0.1, 20)
-
-            fig.add_trace(go.Scattermapbox(
-                lon = arrow.longitude, 
-                lat = arrow.latitude,
-                # hoverinfo = landmark_locs.index,
-                mode = 'lines',
-                name = landmark.landmark,
-                fill = 'toself', 
-                hovertext = f"bearing={landmark.bearing:.1f}",
-                line = dict(
-                    width=3, 
-                ),
-                # text = list(set_landmarks.landmark), 
-                # marker={
-                #     'size': 5, 
-                #     # 'symbol': landmark_locs.index,
-                # },
-                textposition='bottom right',
-            ))
-
-        
-        fig.update_layout(
-            mapbox = {
-                'style': map_style,
-                'center': {
-                    'lon': set_landmarks.longitude.mean(), 
-                    'lat': set_landmarks.latitude.mean(), 
-                },
-                'zoom': 5
-            },
-            showlegend=False,
-            height=height, 
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    set_landmarks = app.set_landmarks()
+    locations = set_landmarks.set_index(["location", "landmark"])
 
 gpx_data, errors = utils.map_concurrent(
     app.parse_gpx, 
@@ -161,60 +41,7 @@ if not gpx_data:
     st.stop()
 
 with st.expander("Show map"):
-    cols = st.columns([5, 2])
-    with cols[0]:
-        map_style = st.selectbox(
-            "map style", 
-            ["open-street-map", "carto-positron", "carto-darkmatter"]
-        )
-    with cols[1]:
-        height = st.number_input("Set figure height", 100, 2000, 600)
-
-
-    fig = go.Figure()
-    for name, data in gpx_data.items():
-        fig.add_trace(go.Scattermapbox(
-            lon = data.longitude, 
-            lat = data.latitude,
-            mode = 'lines',
-            name = name, 
-        ))
-    fig.add_trace(go.Scattermapbox(
-        lon = locations.longitude, 
-        lat = locations.latitude,
-        # hoverinfo = landmark_locs.index,
-        mode = 'markers+text',
-        name = 'Landmarks',
-        text = locations.index.get_level_values("landmark"), 
-        marker={
-            'size': 20, 
-            # 'symbol': "airfield", 
-            # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
-        },
-        textposition='bottom right',
-    ))
-
-    fig.update_layout(
-        mapbox = {
-            'style': map_style,
-            'center': {
-                'lon': data.longitude.mean(), 
-                'lat': data.latitude.mean(), 
-            },
-            'zoom': 10
-        },
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-.02,
-            xanchor="right",
-            x=1
-        ),
-        height=height, 
-    )
-    st.plotly_chart(
-        fig, use_container_width=True
-    )
+    app.draw_gps_data(gpx_data, locations)
 
 with st.spinner("Processing Crossing Times"):
     crossing_times = app.get_crossing_times(gpx_data, locations=locations)
@@ -235,8 +62,8 @@ with st.expander("All Crossing times"):
             )
         }
     )
-    
     app.download_csv("all-crossings.csv", show_times)
+
 
 with st.expander("Individual Crossing Times"):
     tabs = st.tabs(crossing_times)
@@ -258,117 +85,12 @@ with st.expander("Individual Crossing Times"):
             app.download_csv(f"{name}-crossings.csv", show_crossings)
 
 
-
 with st.expander("Piece selecter"):
-    piece_dates = np.sort(all_crossing_times.dt.date.unique())
-
-    cols = st.columns(3)
-    with cols[0]:
-        select_date = st.selectbox(
-            "select piece date", 
-            piece_dates, 
-            index=piece_dates.size - 1, 
-        )
-    sel_times = all_crossing_times[
-        all_crossing_times.dt.date == select_date
-    ].sort_index(level=(0, 4))
-    landmarks, ind = np.unique(
-        sel_times.index.get_level_values(3), return_index=True)
-    landmarks = landmarks[np.argsort(ind)]
-    print(sel_times)
-    with cols[1]:
-        start_landmark = st.selectbox(
-            "select start landmark", 
-            landmarks, 
-            index=0, 
-        )
-    with cols[2]:
-        finish_landmark = st.selectbox(
-            "select finish landmark", 
-            landmarks, 
-            index=landmarks.size-1, 
-        )
-
-    start_times = sel_times.xs(start_landmark, level=3).droplevel(-1)
-    finish_times = sel_times.xs(finish_landmark, level=3).droplevel(-1)
-    times = pd.concat({
-        "Elapsed time": sel_times - start_times,
-        "Time left": finish_times - sel_times,
-        "Time": sel_times, 
-    }, axis=1)
-    valid_times = (
-        times.notna().all(axis=1)
-        & (times['Time left'].dt.total_seconds() >= 0)
-        & (times["Elapsed time"].dt.total_seconds() >= 0)
-    )
-    if not valid_times.any():
+    piece_data = app.select_pieces(all_crossing_times)
+    if piece_data is None:
         st.write("No valid pieces could be found")
     else:
-        piece_data = times[valid_times].reset_index("distance").unstack()
-        legs = piece_data.index
-
-        avg_distance = piece_data.distance.mean().sort_values()
-        legs = piece_data.index
-        startfinish = pd.concat({
-            "Start time": start_times.loc[legs], 
-            "Finish Time": finish_times.loc[legs]
-        }, axis=1)
-        piece_data.index = pd.MultiIndex.from_frame(
-            start_times.loc[legs].rename("Start Time").reset_index()[
-                ["Start Time", "file", "location", "leg"]
-            ]
-        )
-        piece_data = piece_data.sort_index(level=0)
-        legs = piece_data.index.droplevel(0)
-
-        piece_distances = (
-            piece_data.distance 
-            - piece_data.distance[start_landmark].values[:, None]
-        )[avg_distance.index]
-        piece_time = piece_data['Elapsed time'][avg_distance.index]
-        avg_split = (piece_time * 0.5 / piece_distances).fillna(pd.Timedelta(0))
-        interval_split = (
-            piece_time.diff(axis=1) * 0.5 / piece_distances.diff(axis=1)
-        ).fillna(pd.Timedelta(0))
-        
-        st.dataframe(
-            startfinish
-        )
-        tabs = st.tabs([
-            "Elapsed Time", 
-            "Distance Travelled", 
-            "Average Split", 
-            "Interval Split", 
-            "Timestamp"
-        ])
-        with tabs[0]:
-            st.dataframe(
-                piece_time.applymap(
-                    utils.format_timedelta, #hours=True
-                )
-            )
-        with tabs[1]:
-            st.dataframe(
-                piece_distances
-            )
-
-        with tabs[2]:
-            st.dataframe(
-                interval_split.applymap(
-                    utils.format_timedelta, #hours=True
-                )
-            )
-
-        with tabs[3]:
-            st.dataframe(
-                avg_split.applymap(
-                    utils.format_timedelta, #hours=True
-                )
-            )
-        with tabs[4]:
-            st.dataframe(piece_data['Time'])
-
-
+        app.show_piece_data(piece_data)
 
 with st.spinner("Processing split timings"):
     location_timings = app.get_location_timings(gpx_data, locations=locations)
@@ -437,7 +159,6 @@ with st.spinner("Generating excel file"):
             ).applymap(
                 utils.format_timedelta, hours=True
             ).replace("00:00:00.00", "").T
-
             upload_timings.to_excel(
                 xlf, f"{name}-timings"
             )
