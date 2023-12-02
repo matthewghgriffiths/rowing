@@ -6,18 +6,20 @@ import pandas as pd
 from rowing.analysis import files, splits, geodesy 
 
 
-def parse_powerline_text_data(raw_text_data):
+def parse_powerline_text_data(raw_text_data, sep='\t'):
     parts = raw_text_data.split("=====")
     split_data = {}
     for part in parts:
-        if part:
-            k, raw_text = part.split("\n", 1)
-            key = k.replace("\t", "").strip()
+        split = part.split("\n", 1)
+        if len(split) == 2:
+            k, raw_text = split
+            key = k.replace("\t", "").replace(sep, "").strip()
             if 'eriodic' in key:
                 split_data[key] = pd.read_table(
                     io.StringIO(raw_text), 
                     header=[0, 1], 
-                    low_memory=False
+                    low_memory=False,
+                    sep=sep
                 ).rename(columns={"Unnamed: 0_level_1": ""})
             elif 'Rig' in key:
                 split_data[key] = pd.read_table(
@@ -52,6 +54,9 @@ def parse_powerline_excel(data):
             key_data = key_data.iloc[1:].convert_dtypes()
             key_data.columns = key_columns
             
+        for c, vals in key_data.items():
+            if pd.api.types.is_numeric_dtype(vals.dtype):
+                key_data[c] = vals.astype(float)
         split_data[key] = key_data
 
     return parse_powerline_data(split_data)

@@ -14,7 +14,6 @@ from rowing import utils
 logger = logging.getLogger(__name__)
 
 
-
 st.set_page_config(
     page_title="Peach Telemetry Analysis",
     layout='wide'
@@ -25,19 +24,41 @@ st.set_page_config(
 
 with st.expander("Upload Telemetry Data"):
     tabs = st.tabs([
-        "Upload csvs", "Upload xlsx", 
+        "Upload text", "Upload xlsx", 
     ])
     telemetry_data = {}
     with tabs[0]:
         uploaded_files = st.file_uploader(
-            "Upload All Data Export from PowerLine", 
+            "Upload All Data Export from PowerLine (tab separated)", 
             accept_multiple_files=True
         )
+        st.write("Text should should be formatted like below (no commas!)")
+        st.code(""" 
+            =====	File Info
+            Serial #	Session	Filename	Start Time	TZBIAS	Location	Summary	Comments
+            0000	156	<DATAPATH>\row000123-0000123D.peach-data	Sun, 01 Jan 2023 00:00:00	3600			
+            =====	GPS Info
+            Lat	Lon	UTC	PeachTime
+            00.0000000000	00.0000000000	01 Jan 2023 00:00:00 (UTC)	00000
+            =====	Crew Info
+            ...
+            """, None)
         for file in uploaded_files:
             telemetry_data[
                 file.name.rsplit(".", 1)[0]
             ] = telemetry.parse_powerline_text_data(
                 file.read().decode("utf-8"))
+    with tabs[1]:
+        uploaded_files = st.file_uploader(
+            "Upload Data Export from PowerLine", 
+            accept_multiple_files=True
+        )
+        for file in uploaded_files:
+            k = file.name.rsplit(".", 1)[0]
+            with st.spinner(f"Processing {k}"):
+                data = pd.read_excel(file, header=None)
+                telemetry_data[k] = telemetry.parse_powerline_excel(data)
+
 
     gps_data = {
         k: split_data['positions'] for k, split_data in telemetry_data.items()
