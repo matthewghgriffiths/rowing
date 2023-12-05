@@ -1,5 +1,6 @@
 import streamlit as st
 import io 
+from functools import partial
 
 import logging 
 
@@ -143,3 +144,27 @@ with st.expander("Piece selecter"):
 
         app.show_piece_data(piece_data)
 
+
+with st.spinner("Generating excel file"):
+    xldata = io.BytesIO()
+    with pd.ExcelWriter(xldata) as xlf:
+        for name, data in piece_data.items():
+            save_data = data.copy()
+            for c, vals in data.items():
+                if pd.api.types.is_datetime64_any_dtype(vals.dtype):
+                    save_data[c] = vals.dt.tz_localize(None)
+                elif pd.api.types.is_timedelta64_dtype(vals.dtype):
+                    save_data[c] = vals.map(
+                        partial(utils.format_timedelta, hours=True)
+                    )
+
+            print(name)
+            save_data.to_excel(xlf, name.replace("/", " per "))
+
+    xldata.seek(0)
+    st.download_button(
+        ":inbox_tray: Download telemetry_piece_data.xlsx", 
+        xldata,
+        # type='primary', 
+        file_name="telemetry_piece_data.xlsx",  
+    )
