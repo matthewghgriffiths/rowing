@@ -1,9 +1,9 @@
 
 from math import prod
 from functools import partial
-from typing import Dict, List, Tuple, Optional, Generator
+from typing import Dict, List, Tuple, Optional, Generator, NamedTuple
 
-import numpy
+import numpy as np
 
 import jax
 import jax.numpy as jnp
@@ -12,29 +12,7 @@ from jax._src.flatten_util import ravel_pytree
 import haiku as hk
 
 from ...utils import map_concurrent
-
-vdot = jax.vmap(jnp.dot)
-
-
-def get_pos_def(n, dof=None, log_diag=0., name="pos_def"):
-    diag = jnp.exp(hk.get_parameter(
-        f"{name}_diag", shape=(n,), dtype="f", init=lambda s, d: jnp.full(s, log_diag, d)
-    ))
-    P = jnp.diag(diag)
-    if dof:
-        W = hk.get_parameter(
-            f"{name}_W", shape=(n, dof), dtype='f', init=jnp.zeros
-        )
-        return W.dot(W.T) + P
-    else:
-        return P
-
-
-def solve_triangular(A, b, **kwargs):
-    return jax.vmap(
-        lambda b: jsp.linalg.solve_triangular(A, b, **kwargs), 0,
-    )(b.reshape(b.shape[0], -1).T).T.reshape(b.shape)
-
+from .linalg import vdot, get_pos_def, solve_triangular
 
 def transform(func):
     return hk.without_apply_rng(hk.transform(func))
@@ -48,6 +26,88 @@ def init_apply(func, *args, **kwargs):
 
 def apply(func, *args, **kwargs):
     return init_apply(func, *args, **kwargs)[0]
+
+
+def init_full(fill_value):
+    def full(shape, dtype):
+        return jnp.full(shape, fill_value, dtype)
+    
+    return full 
+
+
+class GPSystem(NamedTuple):
+    a: jax.Array
+    Ly: jax.Array
+    L: jax.Array
+    y: jax.Array
+
+    @classmethod
+    def from_cholesky(cls, L, y):
+        Ly = solve_triangular(L, y, lower=True, trans=0)
+        a = solve_triangular(L, Ly, lower=True, trans=1)#
+        return cls(a, Ly, L, y)
+    
+    @classmethod
+    def from_gram(cls, K, y):
+        L = jnp.linalg.cholesky(K)
+        return cls.from_cholesky(L, y)
+    
+    def log_marginal(self, constant=1):
+        L = self.L 
+        Ly = self.Ly 
+        log_like = constant * (
+            - jnp.dot(Ly, Ly)/2 
+            - jnp.log(L.diagonal()).sum()
+        )
+        return log_like 
+    
+    def loss(self):
+        return self.log_marginal(-1)
+    
+    def inv_K(self):
+        L, y = self.L, self.y
+        invK = solve_triangular(
+            L, 
+            solve_triangular(
+                L, jnp.eye(len(y)), 
+                lower=True, trans=0
+            ),
+            lower=True, trans=1
+        )
+        return invK
+    
+    def leave_one_out(self):
+        y = self.y
+        a = self.a 
+        invK = self.inv_K()
+        iKii = invK.diagonal()
+        y_loo = y - a / iKii 
+        return y_loo 
+    
+    def predict(self, K):
+        return K @ self.a 
+    
+    def var(self, Kvar, K):
+        L = self.L
+        LdivK = solve_triangular(
+            L, K.T, lower=True, trans=0
+        )
+        if jnp.ndim(Kvar) == 2:
+            Kvar = Kvar.diagonal()
+        
+        y_var = Kvar - jnp.square(LdivK).sum(0)
+        return y_var 
+    
+    def covar(self, Kcov, K):
+        L = self.L
+        LdivK = solve_triangular(
+            L, K.T, lower=True, trans=0
+        )
+        return Kcov - LdivK.T @ LdivK 
+
+        
+
+
 
 
 def _2d(x):
@@ -64,7 +124,7 @@ def to_2d(*args):
 
 
 class MatrixProduct:
-    def __init__(self, subscripts: str, *operands: numpy.ndarray):
+    def __init__(self, subscripts: str, *operands: np.ndarray):
         self.operands = operands
         inputs, *out = subscripts.split("->", 1)
         self.indices = inputs.split(",")
@@ -85,7 +145,7 @@ class MatrixProduct:
     def size(self) -> int:
         return prod(self.shape)
 
-    def einsum(self, subscripts: str, *args: numpy.ndarray, **kwargs) -> numpy.ndarray:
+    def einsum(self, subscripts: str, *args: np.ndarray, **kwargs) -> np.ndarray:
         subscript, operands = self.norm_subscripts(subscripts, *args)
         return jnp.einsum(subscript, *operands, **kwargs)
 
@@ -93,7 +153,7 @@ class MatrixProduct:
         replace = dict(zip(self.subscripts, mat_subscript))
         return ["".join(replace[i] for i in ind) for ind in self.indices]
 
-    def norm_subscripts(self, subscripts: str, *args: numpy.ndarray):
+    def norm_subscripts(self, subscripts: str, *args: np.ndarray):
         inputs, *out = subscripts.split("->", 1)
         operands = (self,) + args
         operand_subs = inputs.split(",")
@@ -113,7 +173,7 @@ class MatrixProduct:
         sub = ",".join(self.indices) + "->" + self.subscripts
         return f"{cls.__name__}({sub!r}, shape={self.shape})"
 
-    def sum(self, axis=None) -> numpy.ndarray:
+    def sum(self, axis=None) -> np.ndarray:
         if isinstance(axis, int):
             axis = (axis,)
 
@@ -130,7 +190,7 @@ class MatrixProduct:
         return self.einsum(subscripts + "->" + out)
 
     @property
-    def values(self) -> numpy.ndarray:
+    def values(self) -> np.ndarray:
         return self.einsum(self.subscripts + "->" + self.subscripts)
 
     def __getitem__(self, index) -> "MatrixProduct":
@@ -162,7 +222,7 @@ class MatrixProduct:
         ax1: str = axis1 or subs[-2]
         ax2: str = axis2 or subs[-1]
 
-        def diagonals() -> Generator[Tuple[numpy.ndarray, str], None, None]:
+        def diagonals() -> Generator[Tuple[np.ndarray, str], None, None]:
             for M, sub in zip(self.operands, self.expand_subscript(subs)):
                 if ax2 in sub:
                     if ax1 in sub:
@@ -273,7 +333,7 @@ class OptTransform:
 
     @staticmethod
     def ravel(params):
-        return numpy.array(ravel_pytree(params)[0], float)
+        return np.array(ravel_pytree(params)[0], float)
 
     def minimize(self, params, jac=True, method='L-BFGS-B', **kwargs):
         from scipy import optimize
