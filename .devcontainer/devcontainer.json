@@ -6,7 +6,10 @@
     "codespaces": {
       "openFiles": [
         "README.md",
-        "world_rowing_app/home.py"
+        "app/world_rowing/home.py",
+        "app/world_rowing/pages/1_GMTs.py",
+        "app/world_rowing/pages/2_livetracker.py",
+        "app/world_rowing/pages/3_realtime.py",
       ]
     },
     "vscode": {
@@ -19,7 +22,7 @@
   },
   "updateContentCommand": "[ -f packages.txt ] && sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y <packages.txt; [ -f requirements.txt ] && pip3 install --user -r requirements.txt; pip3 install --user streamlit; echo '✅ Packages installed and Requirements met'",
   "postAttachCommand": {
-    "server": "streamlit run world_rowing_app/home.py --server.enableCORS false --server.enableXsrfProtection false"
+    "server": "streamlit run app/world_rowing/home.py --server.enableCORS false --server.enableXsrfProtection false"
   },
   "portsAttributes": {
     "8501": {
