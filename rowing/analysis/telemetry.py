@@ -5,8 +5,13 @@ import pandas as pd
 
 from rowing.analysis import files, splits, geodesy 
 
+def Unnamed(col):
+    if str(col).startswith("Unnamed: "):
+        return ''
+    else:
+        return col
 
-def parse_powerline_text_data(raw_text_data, sep='\t'):
+def parse_powerline_text_data(raw_text_data, sep='\t', use_names=True):
     parts = raw_text_data.split("=====")
     split_data = {}
     for part in parts:
@@ -20,23 +25,25 @@ def parse_powerline_text_data(raw_text_data, sep='\t'):
                     header=[0, 1], 
                     low_memory=False,
                     sep=sep
-                ).rename(columns={"Unnamed: 0_level_1": ""})
+                ).rename(columns=Unnamed)#.dropna(axis=1, how='all')
             elif 'Rig' in key:
                 split_data[key] = pd.read_table(
                     io.StringIO(raw_text), 
                     header=None, skiprows=[0, 1], 
                     names=['Position', 'Side'],
-                    low_memory=False
-                ).rename(columns={"Unnamed: 0_level_1": ""})
-            else:
+                    low_memory=False, 
+                    sep=sep, 
+                ).rename(columns=Unnamed)#.dropna(axis=1, how='all')
+            elif raw_text:
                 split_data[key] = pd.read_table(
                     io.StringIO(raw_text), 
-                    low_memory=False
-                ).rename(columns={"Unnamed: 0_level_1": ""})
+                    low_memory=False,
+                    sep=sep, 
+                ).rename(columns=Unnamed)#.dropna(axis=1, how='all')
     
-    return parse_powerline_data(split_data)
+    return parse_powerline_data(split_data, use_names=use_names)
 
-def parse_powerline_excel(data):
+def parse_powerline_excel(data, use_names=True):
     data_groups = data[data[0] == "====="]
     data_keys = data_groups[1] + data_groups[2].fillna("")
     split_data = {}
@@ -59,12 +66,16 @@ def parse_powerline_excel(data):
                 key_data[c] = vals.astype(float)
         split_data[key] = key_data
 
-    return parse_powerline_data(split_data)
+    return parse_powerline_data(split_data, use_names=use_names)
 
-def parse_powerline_data(split_data):
+def parse_powerline_data(split_data, use_names=True):
+    crew_data = split_data['Crew Info']
     gps_data = split_data["Aperiodic0x8013"]
     power_data = split_data["Aperiodic0x800A"]
     gps_info = split_data['GPS Info'].iloc[0]
+
+    split_data['Crew List'] = crew_list = crew_data.set_index("Position").Name
+    crew_list[crew_list.isna()] = crew_list.index[crew_list.isna()]
 
     start_time = pd.to_datetime(
         gps_info.UTC, 
@@ -94,6 +105,8 @@ def parse_powerline_data(split_data):
         pd.to_timedelta(power.Time + t_shift, unit='milli') + start_date
     )
     split_data['positions'] = positions
-    split_data['power'] = power 
+    if use_names:
+        power = power.rename(columns=crew_list.to_dict(), level=1)
+    split_data['power'] = power
 
     return split_data 

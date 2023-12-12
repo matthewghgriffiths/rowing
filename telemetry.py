@@ -26,12 +26,13 @@ st.set_page_config(
 """
 
 @st.cache_data
-def parse_excel(file):
+def parse_excel(file, use_names=True):
     data = pd.read_excel(file, header=None)
-    return telemetry.parse_powerline_excel(data)
+    return telemetry.parse_powerline_excel(data, use_names=use_names)
 
 
 with st.expander("Upload Telemetry Data"):
+    use_names = st.checkbox("Use crew list", True)
     tabs = st.tabs([
         "Upload text", "Upload xlsx", "Upload csv", 
     ])
@@ -42,7 +43,7 @@ with st.expander("Upload Telemetry Data"):
             accept_multiple_files=True
         )
         st.write("Text should should be formatted like below (no commas!)")
-        st.code(""" 
+        st.code(r""" 
             =====	File Info
             Serial #	Session	Filename	Start Time	TZBIAS	Location	Summary	Comments
             0000	156	<DATAPATH>\row000123-0000123D.peach-data	Sun, 01 Jan 2023 00:00:00	3600			
@@ -52,11 +53,23 @@ with st.expander("Upload Telemetry Data"):
             =====	Crew Info
             ...
             """, None)
-        for file in uploaded_files:
-            telemetry_data[
-                file.name.rsplit(".", 1)[0]
-            ] = telemetry.parse_powerline_text_data(
-                file.read().decode("utf-8"))
+        uploaded_data = {
+            file.name.rsplit(".", 1)[0]: file.read().decode("utf-8")
+            for file in uploaded_files
+        }
+        data, errs = utils.map_concurrent(
+            telemetry.parse_powerline_text_data, 
+            uploaded_data, 
+            singleton=True, 
+            use_names=use_names,
+        )
+        telemetry_data.update(data)
+        # for file in uploaded_files:
+        #     telemetry_data[
+        #         file.name.rsplit(".", 1)[0]
+        #     ] = telemetry.parse_powerline_text_data(
+        #         file.read().decode("utf-8"), use_names=use_names
+        #     )
     with tabs[2]:
         uploaded_files = st.file_uploader(
             "Upload All Data Export from PowerLine (comma separated)", 
@@ -64,29 +77,51 @@ with st.expander("Upload Telemetry Data"):
         )
         st.write("Text should should be formatted like below (no commas!)")
         st.code(""" 
-            =====	File Info
-            Serial #	Session	Filename	Start Time	TZBIAS	Location	Summary	Comments
-            0000	156	<DATAPATH>\row000123-0000123D.peach-data	Sun, 01 Jan 2023 00:00:00	3600			
-            =====	GPS Info
-            Lat	Lon	UTC	PeachTime
-            00.0000000000	00.0000000000	01 Jan 2023 00:00:00 (UTC)	00000
-            =====	Crew Info
+            =====,File Info,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+            Serial #,Session,Filename,Start Time,TZBIAS,Location,Summary,Comments,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+            0000,000,<DATAPATH>\row000123-0000123D.peach-data,"Sun, 01 Jan 2023 00:00:00",0,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+            =====,GPS Info,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+            Lat,Lon,UTC,PeachTime,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+            00.00000000,00.00000000,Sun 01 Jan 2023 00:00:00 (UTC),00000,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
             ...
             """, None)
-        for file in uploaded_files:
-            telemetry_data[
-                file.name.rsplit(".", 1)[0]
-            ] = telemetry.parse_powerline_text_data(
-                file.read().decode("utf-8"), sep=',')
+        uploaded_data = {
+            file.name.rsplit(".", 1)[0]: file.read().decode("utf-8")
+            for file in uploaded_files
+        }
+        data, errs = utils.map_concurrent(
+            telemetry.parse_powerline_text_data, 
+            uploaded_data, 
+            singleton=True, 
+            use_names=use_names,
+            sep=',', 
+        )
+        telemetry_data.update(data)
+        # for file in uploaded_files:
+        #     telemetry_data[
+        #         file.name.rsplit(".", 1)[0]
+        #     ] = telemetry.parse_powerline_text_data(
+        #         file.read().decode("utf-8"), sep=',', use_names=use_names)
     with tabs[1]:
         uploaded_files = st.file_uploader(
             "Upload Data Export from PowerLine", 
             accept_multiple_files=True
         )
-        for file in uploaded_files:
-            k = file.name.rsplit(".", 1)[0]
-            with st.spinner(f"Processing {k}"):
-                telemetry_data[k] = parse_excel(file)
+        uploaded_data = {
+            file.name.rsplit(".", 1)[0]: file
+            for file in uploaded_files
+        }
+        data, errs = utils.map_concurrent(
+            parse_excel, 
+            uploaded_data, 
+            singleton=True, 
+            use_names=use_names,
+        )
+        telemetry_data.update(data)
+        # for file in uploaded_files:
+        #     k = file.name.rsplit(".", 1)[0]
+        #     with st.spinner(f"Processing {k}"):
+        #         telemetry_data[k] = parse_excel(file, use_names=use_names)
 
 
     gps_data = {
@@ -197,173 +232,88 @@ with st.expander("Plot data"):
             'Work PC Q3', 
             'Work PC Q4'
     ]
-    window = st.number_input(
-        "Select averaging window (s)",
-        value=0, 
-        min_value=0, 
-        step=5, 
-        # placeholder='', 
-        # format="%d s",
-        # step="0:00:10"
-    )
+    if piece_data:
+        window = st.number_input(
+            "Select window to average over (s), set to 0 to remove smoothing",
+            value=10, 
+            min_value=0, 
+            step=5, 
+            # placeholder='', 
+            # format="%d s",
+            # step="0:00:10"
+        )
 
-    telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
-    
-    # for name, power in telemetry_data.items():
-    for piece, piece_times in piece_data['Timestamp'].iterrows():
-        name = piece[1]
-        power = telemetry_data[name]['power']
-        if window:
-            time_power = power.set_index("Time").sort_index()
-            avg_power = time_power.rolling(
-                pd.Timedelta(seconds=window)
-            ).mean()
-            power = avg_power.reset_index()
+        telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
+        
+        # for name, power in telemetry_data.items():
+        for piece, piece_times in piece_data['Timestamp'].iterrows():
+            name = piece[1]
+            power = telemetry_data[name]['power']
+            if window:
+                time_power = power.set_index("Time").sort_index()
+                avg_power = time_power.rolling(
+                    pd.Timedelta(seconds=window)
+                ).mean()
+                power = avg_power.reset_index()
 
 
-        crossings = crossing_times[name]
-        # piece_times = piece_data['Timestamp'].xs(name, level=1).iloc[0]
-        start_time = piece_times.min()
-        finish_time = piece_times.max()
-        piece_power = power[
-            power.Time.between(start_time, finish_time)
-        ]
-        piece_power.columns.names = 'Measurement', 'Position'
+            crossings = crossing_times[name]
+            # piece_times = piece_data['Timestamp'].xs(name, level=1).iloc[0]
+            start_time = piece_times.min()
+            finish_time = piece_times.max()
+            piece_power = power[
+                power.Time.between(start_time, finish_time)
+            ]
+            piece_power.columns.names = 'Measurement', 'Position'
 
-        epoch_times = (
-            (piece_times - start_time) #+ pd.Timestamp(0)
-        ).dt.total_seconds()
+            epoch_times = (
+                (piece_times - start_time) #+ pd.Timestamp(0)
+            ).dt.total_seconds()
+            for col, tab in telem_tabs.items():
+                with tab:
+                    # st.subheader(name)
+                    plot_data = piece_power.stack(1)[
+                        ['Time', col]
+                    ]
+                    plot_data['Time'] = plot_data['Time'].ffill()
+                    plot_data['Elapsed'] = (
+                        (plot_data['Time'] - start_time) + pd.Timestamp(0)
+                    )
+                    plot_data = plot_data.dropna().reset_index()
+
+                    fig = px.line(
+                        plot_data, 
+                        x='Elapsed', 
+                        y=col, 
+                        color='Position',
+                        title=name, 
+                    )
+                    for landmark, epoch in epoch_times.items():
+                        fig.add_vline(
+                            x=int((epoch - 3600) * 1000), 
+                            annotation_text=landmark, 
+                            annotation=dict(
+                                textangle=-90
+                            )
+                        )
+                    fig.update_xaxes(
+                        tickformat="%M:%S",
+                        dtick=60*1000, 
+                        showgrid=True, 
+                        griddash='solid', 
+                    )
+                    fig.update_traces(visible=True)
+                    st.plotly_chart(fig, use_container_width=True)
+
         for col, tab in telem_tabs.items():
             with tab:
-                # st.subheader(name)
-                plot_data = piece_power.stack(1)[
-                    ['Time', col]
-                ]
-                plot_data['Time'] = plot_data['Time'].ffill()
-                plot_data['Elapsed'] = (
-                    (plot_data['Time'] - start_time) + pd.Timestamp(0)
-                )
-                plot_data = plot_data.dropna().reset_index()
-
-                fig = px.line(
-                    plot_data, 
-                    x='Elapsed', 
-                    y=col, 
-                    color='Position',
-                    title=name, 
-                )
-                for landmark, epoch in epoch_times.items():
-                    fig.add_vline(
-                        x=int((epoch - 3600) * 1000), 
-                        annotation_text=landmark, 
-                        annotation=dict(
-                            textangle=-90
-                        )
-                    )
-                fig.update_xaxes(
-                    tickformat="%M:%S",
-                    dtick=60*1000, 
-                    showgrid=True, 
-                    griddash='solid', 
-                )
-                fig.update_traces(visible=True)
-                st.plotly_chart(fig, use_container_width=True)
-
-    for col, tab in telem_tabs.items():
-        with tab:
-            st.subheader("Interval Averages")
-            interval_stats = piece_data[f"Interval {col}"]
-            st.write(interval_stats)
-
-    # tabs = dict(zip(
-    #     telemetry_data.keys(), 
-    #     st.tabs(telemetry_data.keys())
-    # ))
-    # for name, tab in tabs.items():
-    #     with tab:
-    #         # st.write(name)
-    #         power = telemetry_data[name]['power']
-    #         crossings = crossing_times[name]
-    #         piece_times = piece_data['Timestamp'].xs(name, level=1).iloc[0]
-    #         start_time = piece_times.iloc[0]
-    #         finish_time = piece_times.iloc[-1]
-    #         piece_power = power[
-    #             power.Time.between(start_time, finish_time)
-    #         ]
-    #         piece_power.columns.names = 'Measurement', 'Position'
-
-    #         print(piece_power.columns.levels[0])
-    #         tab_names = [
-    #             "SwivelPower"
-    #         ]
-    #         tab_names = [
-    #                 'Angle 0.7 F', 
-    #                 'Angle Max F', 
-    #                 'Average Power', 
-    #                 'AvgBoatSpeed',
-    #                 'CatchSlip', 
-    #                 'Dist/Stroke', 
-    #                 'Drive Start T', 
-    #                 'Drive Time',
-    #                 'FinishSlip', 
-    #                 'Max Force PC', 
-    #                 'MaxAngle', 
-    #                 'MinAngle', 
-    #                 'Rating',
-    #                 'Recovery Time', 
-    #                 'Rower Swivel Power', 
-    #                 'StrokeNumber', 
-    #                 'SwivelPower',
-    #                 # 'Time', 
-    #                 'Work PC Q1', 
-    #                 'Work PC Q2',
-    #                 'Work PC Q3', 
-    #                 'Work PC Q4'
-    #         ]
-    #         telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
-
-    #         epoch_times = (
-    #             (piece_times - start_time) #+ pd.Timestamp(0)
-    #         ).dt.total_seconds()
-
-    #         for col, tab in telem_tabs.items():
-    #             with tab:
-    #             # with telem_tabs['SwivelPower']:
-    #                 plot_data = piece_power.stack(1)[
-    #                     ['Time', col]
-    #                 ]#.dropna(axis=0)
-    #                 plot_data['Time'] = plot_data['Time'].ffill()
-    #                 plot_data['Elapsed'] = (
-    #                     (plot_data['Time'] - start_time) + pd.Timestamp(0)
-    #                 )
-    #                 plot_data = plot_data.dropna().reset_index()
-
-    #                 fig = px.line(
-    #                     plot_data, 
-    #                     x='Elapsed', 
-    #                     y=col, 
-    #                     color='Position',
-    #                 )
-    #                 for landmark, epoch in epoch_times.items():
-    #                     fig.add_vline(
-    #                         x=int((epoch - 3600) * 1000), 
-    #                         annotation_text=landmark, 
-    #                         annotation=dict(
-    #                             textangle=-90
-    #                         )
-    #                     )
-    #                 fig.update_xaxes(
-    #                     tickformat="%M:%S",
-    #                     dtick=60*1000, 
-    #                     showgrid=True, 
-    #                     griddash='solid', 
-    #                 )
-    #                 fig.update_traces(visible=True)
-    #                 st.plotly_chart(fig, use_container_width=True)
-                    
-    #                 if piece_data is not None:
-    #                     interval_stats = piece_data[f"Interval {col}"]
-    #                     st.write(interval_stats.xs(name, level=0))
+                st.subheader("Interval Averages")
+                interval_stats = piece_data[f"Interval {col}"]
+                st.write(interval_stats)
+        
+                st.subheader("Piece Averages")
+                interval_stats = piece_data[f"Average {col}"]
+                st.write(interval_stats)
 
 with st.spinner("Generating excel file"):
     xldata = io.BytesIO()

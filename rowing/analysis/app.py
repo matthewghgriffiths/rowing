@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 
 from rowing.analysis import splits, files, geodesy
 from rowing import utils
+from rowing.app import threads 
 
 
 @st.cache_data
@@ -61,7 +62,7 @@ def select_pieces(all_crossing_times):
         select_dates = st.multiselect(
             "select piece dates", 
             piece_dates,
-            piece_dates[-1:],
+            piece_dates,
         )
         select_dates = pd.to_datetime(select_dates).date
 
