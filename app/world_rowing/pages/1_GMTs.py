@@ -11,7 +11,7 @@ import plotly.express as px
 import pandas as pd
 
 DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent.parent)
+LIBPATH = str(DIRPATH.parent.parent.parent)
 realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
