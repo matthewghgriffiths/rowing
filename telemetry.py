@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd 
 
 import plotly.graph_objects as go
+import plotly.express as px
+
 
 from rowing.analysis import geodesy, splits, app, telemetry
 from rowing import utils
@@ -144,6 +146,94 @@ with st.expander("Piece selecter"):
 
         app.show_piece_data(piece_data)
 
+with st.expander("Plot data"):
+    tabs = dict(zip(
+        telemetry_data.keys(), st.tabs(telemetry_data.keys())
+    ))
+    for name, tab in tabs.items():
+        with tab:
+            # st.write(name)
+            power = telemetry_data[name]['power']
+            crossings = crossing_times[name]
+            piece_times = piece_data['Timestamp'].xs(name, level=1).iloc[0]
+            start_time = piece_times.iloc[0]
+            finish_time = piece_times.iloc[-1]
+            piece_power = power[
+                power.Time.between(start_time, finish_time)
+            ]
+            piece_power.columns.names = 'Measurement', 'Position'
+
+            print(piece_power.columns.levels[0])
+            tab_names = [
+                "SwivelPower"
+            ]
+            tab_names = [
+                    'Angle 0.7 F', 
+                    'Angle Max F', 
+                    'Average Power', 
+                    'AvgBoatSpeed',
+                    'CatchSlip', 
+                    'Dist/Stroke', 
+                    'Drive Start T', 
+                    'Drive Time',
+                    'FinishSlip', 
+                    'Max Force PC', 
+                    'MaxAngle', 
+                    'MinAngle', 
+                    'Rating',
+                    'Recovery Time', 
+                    'Rower Swivel Power', 
+                    'StrokeNumber', 
+                    'SwivelPower',
+                    # 'Time', 
+                    'Work PC Q1', 
+                    'Work PC Q2',
+                    'Work PC Q3', 
+                    'Work PC Q4'
+            ]
+            telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
+
+            epoch_times = (
+                (piece_times - start_time) #+ pd.Timestamp(0)
+            ).dt.total_seconds()
+
+            for col, tab in telem_tabs.items():
+                with tab:
+                # with telem_tabs['SwivelPower']:
+                    plot_data = piece_power.stack(1)[
+                        ['Time', col]
+                    ]#.dropna(axis=0)
+                    plot_data['Time'] = plot_data['Time'].ffill()
+                    plot_data['Elapsed'] = (
+                        (plot_data['Time'] - start_time) + pd.Timestamp(0)
+                    )
+                    plot_data = plot_data.dropna().reset_index()
+
+                    fig = px.line(
+                        plot_data, 
+                        x='Elapsed', 
+                        y=col, 
+                        color='Position',
+                        # visible=True, 
+                    )
+
+                    for landmark, epoch in epoch_times.items():
+                        fig.add_vline(
+                            x=int((epoch - 3600) * 1000), 
+                            annotation_text=landmark, 
+                            annotation=dict(
+                                textangle=-90
+                            )
+                        )
+                    fig.update_xaxes(
+                        tickformat="%M:%S",
+                        dtick=60*1000, 
+                        showgrid=True, 
+                        griddash='solid', 
+                    )
+                    fig.update_traces(visible=True)
+
+                    st.plotly_chart(fig, use_container_width=True)
 
 with st.spinner("Generating excel file"):
     xldata = io.BytesIO()
@@ -158,7 +248,7 @@ with st.spinner("Generating excel file"):
                         partial(utils.format_timedelta, hours=True)
                     )
 
-            print(name)
+            # print(name)
             save_data.to_excel(xlf, name.replace("/", " per "))
 
     xldata.seek(0)

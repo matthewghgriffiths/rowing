@@ -8,6 +8,7 @@ import haiku as hk
 
 vdot = jax.vmap(jnp.dot)
 
+
 def get_pos_def(n, dof=None, log_diag=0., name="pos_def"):
     diag = jnp.exp(hk.get_parameter(
         f"{name}_diag", shape=(n,), dtype="f", init=lambda s, d: jnp.full(s, log_diag, d)
@@ -26,6 +27,9 @@ def solve_triangular(A: jax.Array, b: jax.Array, **kwargs):
     return jax.vmap(
         lambda b: jsp.linalg.solve_triangular(A, b, **kwargs), 0,
     )(b.reshape(b.shape[0], -1).T).T.reshape(b.shape)
+
+
+block_transpose = jax.vmap(jnp.transpose)
 
 
 @partial(jax.jit, static_argnames=['k', 'trans'])
@@ -50,6 +54,7 @@ def set_block_diag(A, D, k=0, trans=0):
 
     return A 
 
+
 def block_tridiagonal(D, D1, upper=True):
     A = jsp.linalg.block_diag(*D)
     return set_block_diag(
@@ -69,7 +74,7 @@ def block_diag(A, blocksize=None, k=0):
             ])
         else:
             return jnp.array([
-                A[i0 + kblock:i0 + blocksize + kblock, i0:i0 + blocksize]
+                A[i0 - kblock:i0 + blocksize - kblock, i0:i0 + blocksize]
                 for i0 in range(0, n + k * blocksize , blocksize)
             ])
     else:
@@ -84,9 +89,8 @@ def block_diag(A, blocksize=None, k=0):
         return set_block_diag(jnp.zeros((n, n)), A, k=k)
             
 
-
 @partial(jax.jit, static_argnames=('lower', 'trans'))
-def solve_block_tridiagonal(
+def solve_block_triangular_bidiagonal(
     D: jax.Array, D1: jax.Array, y: jax.Array, lower=False, trans=0
 ):
     forward = not lower 
@@ -132,6 +136,53 @@ def solve_block_tridiagonal(
         
     return X.reshape(y.shape)
 
+
+@partial(jax.jit, static_argnames=('lower', 'trans'))
+def solve_block_triangular_tridiagonal(
+    D: jax.Array, D1: jax.Array, D2: jax.Array, y: jax.Array, 
+    lower=False, trans=0
+):
+    def _scan(carry, xs):
+        xp0, xp1 = carry 
+        y2, DL22, DL21, DL20 = xs 
+        xp2 = jsp.linalg.solve_triangular(
+            DL22, y2 - DL21 @ xp1 - DL20 @ xp0, 
+            lower=lower, trans=trans
+        )
+        return (xp1, xp2), xp2 
+    
+    if trans == 0 or trans == 'N':
+        forward = lower
+    else:
+        forward = not lower
+        D1 = block_transpose(D1)
+        D2 = block_transpose(D2)
+        if trans == 2 or trans == "C":
+            D1 = jnp.conjugate(D1)
+            D2 = jnp.conjugate(D2)
+
+    Y = jnp.reshape(y, jnp.shape(D)[:-1] + jnp.shape(y)[1:])
+    if forward:
+        xp0 = jsp.linalg.solve_triangular(D[0], Y[0], lower=lower, trans=trans)
+        xp1 = jsp.linalg.solve_triangular(
+            D[1], Y[1] - D1[0] @ xp0, lower=lower, trans=trans)
+        _, x2 = jax.lax.scan(
+            _scan, (xp0, xp1), (Y[2:], D[2:], D1[1:], D2)
+        )
+        X = jnp.concatenate([xp0[None], xp1[None], x2])
+    else:
+        xp0 = jsp.linalg.solve_triangular(D[-1], Y[-1], lower=lower, trans=trans)
+        xp1 = jsp.linalg.solve_triangular(
+            D[-2], Y[-2] - D1[-1] @ xp0, lower=lower, trans=trans)
+        _, x2 = jax.lax.scan(
+            _scan, (xp0, xp1), (Y[:-2], D[:-2], D1[:-1], D2),
+            reverse=True
+        )
+        X = jnp.concatenate([x2, xp1[None], xp0[None]])
+        
+    return X.reshape(y.shape)
+
+
 @jax.jit
 def cholesky_block_tridiagonal(D: jax.Array, D1: jax.Array):
     def _blockbidiagscan(L0, xs):
@@ -146,3 +197,31 @@ def cholesky_block_tridiagonal(D: jax.Array, D1: jax.Array):
     )
     DL = jnp.concatenate([L0[None], DL], axis=0)
     return DL, DL1
+
+
+@jax.jit
+def cholesky_block_pentadiagaonal(
+    D: jax.Array, D1: jax.Array, D2: jax.Array
+):
+    L00 = jnp.linalg.cholesky(D[0])
+    L01 = jsp.linalg.solve_triangular(L00, D1[0], lower=True, trans=0).T
+    L11 = jnp.linalg.cholesky(D[1] - L01 @ L01.T)
+
+    def _blocktridiagscan(carry, xs):
+        L00, L11, L01 = carry 
+        D02, D11, D20 = xs 
+
+        L02 = jsp.linalg.solve_triangular(
+            L00, D20, lower=True, trans=0).T
+        L12 = jsp.linalg.solve_triangular(
+            L11, D11 - L01 @ L02.T, lower=True, trans=0).T
+        L22 = jnp.linalg.cholesky(
+            D02 - L02 @ L02.T - L12 @ L12.T)
+        return (L11, L22, L12), (L22, L12, L02)
+
+    _, (dL, dL1, DL2) = jax.lax.scan(
+        _blocktridiagscan, (L00, L11, L01), (D[2:], D1[1:], D2)
+    )
+    DL = jnp.concatenate([L00[None], L11[None], dL], axis=0)
+    DL1 = jnp.concatenate([L01[None], dL1], axis=0)
+    return DL, DL1, DL2

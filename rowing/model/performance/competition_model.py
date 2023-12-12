@@ -161,42 +161,42 @@ class CompetitionModel(NamedTuple):
         return self.gp_system().loss()
 
 
-def predict_feature(params, data, field, system=None):
-    a, Ly, L, y = gp_system(params, data) if system is None else system
-    var = np.exp(params['~'][field])
-    feature = data['features'][field]
-    return (a @ feature) * var
+# def predict_feature(params, data, field, system=None):
+#     a, Ly, L, y = gp_system(params, data) if system is None else system
+#     var = np.exp(params['~'][field])
+#     feature = data['features'][field]
+#     return (a @ feature) * var
 
 
-def predict_race_pgmts(params, data, system=None):
-    a, Ly, L, y = gp_system(params, data) if system is None else system
-    K_race_times, K_athlete_times, K_boatclass = gp_utils.transform(
-        get_kernels
-    ).apply(params, data)
-    return (K_race_times + K_boatclass) @ a
+# def predict_race_pgmts(params, data, system=None):
+#     a, Ly, L, y = gp_system(params, data) if system is None else system
+#     K_race_times, K_athlete_times, K_boatclass = gp_utils.transform(
+#         get_kernels
+#     ).apply(params, data)
+#     return (K_race_times + K_boatclass) @ a
 
 
-def predict_athlete_scores(params, data, pred_years, system=None):
-    a, Ly, L, y = gp_system(params, data) if system is None else system
+# def predict_athlete_scores(params, data, pred_years, system=None):
+#     a, Ly, L, y = gp_system(params, data) if system is None else system
 
-    features = data['features']
-    athlete_weights = features[field_athlete]
-    athlete_W = features[field_athlete].values
+#     features = data['features']
+#     athlete_weights = features[field_athlete]
+#     athlete_W = features[field_athlete].values
     
-    K_athlete_pred = gp_utils.transform(
-        lambda: get_athlete_kernel().K(
-            pred_years - data['year0'], data['years'] - data['year0'])
-    ).apply(params)
+#     K_athlete_pred = gp_utils.transform(
+#         lambda: get_athlete_kernel().K(
+#             pred_years - data['year0'], data['years'] - data['year0'])
+#     ).apply(params)
 
-    y_athlete_preds = pd.DataFrame(
-        (K_athlete_pred[:, None, :] * athlete_W.T[None, ...]) @ a, 
-        index=pred_years, 
-        columns=athlete_weights.columns
-    )
+#     y_athlete_preds = pd.DataFrame(
+#         (K_athlete_pred[:, None, :] * athlete_W.T[None, ...]) @ a, 
+#         index=pred_years, 
+#         columns=athlete_weights.columns
+#     )
 
-    athletes = data['athlete_results'].groupby("athletes_personId").last()
-    return athletes.join(
-        y_athlete_preds.T,
-        on=field_athlete, 
-        how='inner'
-    )
+#     athletes = data['athlete_results'].groupby("athletes_personId").last()
+#     return athletes.join(
+#         y_athlete_preds.T,
+#         on=field_athlete, 
+#         how='inner'
+#     )
