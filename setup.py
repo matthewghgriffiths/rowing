@@ -42,7 +42,7 @@ setup(
         ],
         "GPX": ['gpxpy>=1.5.0', 'fitparse>=1.2.0'],
     },
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     package_data={
         'rowing': [
             'data/*.csv.gz',

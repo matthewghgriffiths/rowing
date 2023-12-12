@@ -27,7 +27,7 @@ st.set_page_config(
 
 with st.expander("Upload Telemetry Data"):
     tabs = st.tabs([
-        "Upload text", "Upload xlsx", 
+        "Upload text", "Upload xlsx", "Upload csv", 
     ])
     telemetry_data = {}
     with tabs[0]:
@@ -51,6 +51,27 @@ with st.expander("Upload Telemetry Data"):
                 file.name.rsplit(".", 1)[0]
             ] = telemetry.parse_powerline_text_data(
                 file.read().decode("utf-8"))
+    with tabs[2]:
+        uploaded_files = st.file_uploader(
+            "Upload All Data Export from PowerLine (comma separated)", 
+            accept_multiple_files=True
+        )
+        st.write("Text should should be formatted like below (no commas!)")
+        st.code(""" 
+            =====	File Info
+            Serial #	Session	Filename	Start Time	TZBIAS	Location	Summary	Comments
+            0000	156	<DATAPATH>\row000123-0000123D.peach-data	Sun, 01 Jan 2023 00:00:00	3600			
+            =====	GPS Info
+            Lat	Lon	UTC	PeachTime
+            00.0000000000	00.0000000000	01 Jan 2023 00:00:00 (UTC)	00000
+            =====	Crew Info
+            ...
+            """, None)
+        for file in uploaded_files:
+            telemetry_data[
+                file.name.rsplit(".", 1)[0]
+            ] = telemetry.parse_powerline_text_data(
+                file.read().decode("utf-8"), sep=',')
     with tabs[1]:
         uploaded_files = st.file_uploader(
             "Upload Data Export from PowerLine", 
@@ -148,7 +169,8 @@ with st.expander("Piece selecter"):
 
 with st.expander("Plot data"):
     tabs = dict(zip(
-        telemetry_data.keys(), st.tabs(telemetry_data.keys())
+        telemetry_data.keys(), 
+        st.tabs(telemetry_data.keys())
     ))
     for name, tab in tabs.items():
         with tab:
@@ -214,9 +236,7 @@ with st.expander("Plot data"):
                         x='Elapsed', 
                         y=col, 
                         color='Position',
-                        # visible=True, 
                     )
-
                     for landmark, epoch in epoch_times.items():
                         fig.add_vline(
                             x=int((epoch - 3600) * 1000), 
@@ -232,8 +252,11 @@ with st.expander("Plot data"):
                         griddash='solid', 
                     )
                     fig.update_traces(visible=True)
-
                     st.plotly_chart(fig, use_container_width=True)
+                    
+                    if piece_data is not None:
+                        interval_stats = piece_data[f"Interval {col}"]
+                        st.write(interval_stats.xs(name, level=0))
 
 with st.spinner("Generating excel file"):
     xldata = io.BytesIO()
