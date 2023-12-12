@@ -1,6 +1,9 @@
 import streamlit as st
 import io 
 from functools import partial
+from pathlib import Path 
+import os
+import sys
 
 import logging 
 
@@ -10,6 +13,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
+DIRPATH = Path(__file__).resolve().parent
+LIBPATH = str(DIRPATH.parent)
+realpaths = [os.path.realpath(p) for p in sys.path]
+if LIBPATH not in realpaths:
+    sys.path.append(LIBPATH)
 
 from rowing.analysis import geodesy, splits, app, telemetry
 from rowing import utils

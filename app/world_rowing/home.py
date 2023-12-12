@@ -7,7 +7,7 @@ import os
 from pathlib import Path 
 
 DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent)
+LIBPATH = str(DIRPATH.parent.parent)
 realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
