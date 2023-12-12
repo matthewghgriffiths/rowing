@@ -20,7 +20,7 @@ LOG_LEVELS = {
     "debug": logging.DEBUG
 }
 
-def get_working_directory(folder="world_rowing_app", start_dir=DIR):
+def get_working_directory(folder="app/world_rowing", start_dir=DIR):
     start_dir = Path(start_dir)
     for i in range(4):
         print(f"{start_dir=}")
@@ -31,7 +31,7 @@ def get_working_directory(folder="world_rowing_app", start_dir=DIR):
         
         start_dir = start_dir.parent 
 
-    raise FileNotFoundError("could not find 'world_rowing_app/main.py")
+    raise FileNotFoundError("could not find 'app/world_rowing/main.py")
 
 @click.command()
 @click.option("--dir", show_default=True, default=str(DIR), help="folder to search for app")
