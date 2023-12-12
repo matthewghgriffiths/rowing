@@ -16,7 +16,6 @@ LIBPATH = str(DIRPATH.parent)
 realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
-    print(LIBPATH)
 
 from rowing.analysis import geodesy, splits, app
 from rowing import utils

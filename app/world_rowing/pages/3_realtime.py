@@ -23,7 +23,6 @@ LIBPATH = str(DIRPATH.parent.parent.parent)
 realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
-    print("adding", LIBPATH)
 
 from rowing.world_rowing import api, live, utils, fields
 from rowing.app import select, inputs, state, plots
