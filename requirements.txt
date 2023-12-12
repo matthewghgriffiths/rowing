@@ -12,5 +12,6 @@ pyarrow>=7.0.0
 pyqt5>=5.0.0
 streamlit>=1.22.0
 plotly>=5.14.1
-jax
-jaxlib
+jax==0.4.21
+jaxlib==0.4.21
+dm-haiku==0.0.11
