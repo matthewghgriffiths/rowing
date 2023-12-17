@@ -31,6 +31,7 @@ _LOCATION_DATA = {
     'ely': _DATA_PATH / 'ely_locations.tsv',
     'cav': _DATA_PATH / 'cav_locations.tsv',
     'tideway': _DATA_PATH / 'tideway_locations.tsv',
+    'henley': _DATA_PATH / 'henley_locations.tsv',
 }
 
 
