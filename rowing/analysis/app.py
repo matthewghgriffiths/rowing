@@ -125,10 +125,10 @@ def select_pieces(all_crossing_times):
     sel_times = all_crossing_times[
         all_crossing_times.dt.date.isin(select_dates)
     ].sort_index(level=(0, 4))
-
-    landmarks, ind = np.unique(
-        sel_times.index.get_level_values(3), return_index=True)
-    landmarks = landmarks[np.argsort(ind)]
+    landmark_distance = sel_times.reset_index(
+        'distance'
+    ).distance.unstack('landmark').dropna(axis=1).mean(0).sort_values()
+    landmarks = landmark_distance.index 
     with cols[1]:
         start_landmark = st.selectbox(
             "select start landmark", 
