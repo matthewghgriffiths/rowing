@@ -127,19 +127,29 @@ def select_pieces(all_crossing_times):
     ].sort_index(level=(0, 4))
     landmark_distance = sel_times.reset_index(
         'distance'
-    ).distance.unstack('landmark').dropna(axis=1).mean(0).sort_values()
-    landmarks = landmark_distance.index 
+    ).distance
+    landmarks = landmark_distance.groupby(
+        level=3).mean().sort_values().index
+    landmark_dist = landmark_distance.unstack(
+        'landmark').dropna(axis=1).mean(0).sort_values()
+    # landmarks = landmark_distance.index
+
+    start, end = map(
+        int, landmarks.get_indexer(
+            [landmark_dist.index[0], landmark_dist.index[-1]]
+        )
+    )
     with cols[1]:
         start_landmark = st.selectbox(
             "select start landmark", 
             landmarks, 
-            index=0, 
+            index=start, 
         )
     with cols[2]:
         finish_landmark = st.selectbox(
             "select finish landmark", 
             landmarks, 
-            index=landmarks.size-1, 
+            index=end, 
         )
 
     piece_data = splits.get_piece_times(sel_times, start_landmark, finish_landmark)
