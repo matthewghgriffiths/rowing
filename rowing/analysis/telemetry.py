@@ -5,6 +5,33 @@ import pandas as pd
 
 from rowing.analysis import files, splits, geodesy 
 
+FIELDS = [
+    'Angle 0.7 F', 
+    'Angle Max F', 
+    'Average Power', 
+    'AvgBoatSpeed',
+    'CatchSlip', 
+    'Dist/Stroke', 
+    'Drive Start T', 
+    'Drive Time',
+    'FinishSlip', 
+    'Max Force PC', 
+    'MaxAngle', 
+    'MinAngle', 
+    'Length', 
+    'Effective', 
+    'Rating',
+    'Recovery Time', 
+    'Rower Swivel Power', 
+    'StrokeNumber', 
+    'SwivelPower',
+    # 'Time', 
+    'Work PC Q1', 
+    'Work PC Q2',
+    'Work PC Q3', 
+    'Work PC Q4'
+]
+
 def Unnamed(col):
     if str(col).startswith("Unnamed: "):
         return ''

@@ -95,7 +95,7 @@ with st.expander("Individual Crossing Times"):
 
 
 with st.expander("Piece selecter"):
-    piece_data = app.select_pieces(all_crossing_times)
+    piece_data, start_landmark, finish_landmark = app.select_pieces(all_crossing_times)
     if piece_data is None:
         st.write("No valid pieces could be found")
     else:

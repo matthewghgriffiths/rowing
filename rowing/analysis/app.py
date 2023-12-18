@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
-from rowing.analysis import splits, files, geodesy
+from rowing.analysis import splits, files, geodesy, telemetry
 from rowing import utils
 from rowing.app import threads 
 
@@ -17,6 +17,7 @@ from rowing.app import threads
 @st.cache_data
 def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
+
 
 def download_csv(
         file_name, df, label=":inbox_tray: Download data as csv", csv_kws=None, **kwargs
@@ -30,10 +31,56 @@ def download_csv(
     )
 
 @st.cache_data
-def get_crossing_times(gpx_data, locations=None):
+def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
+    uploaded_data = {
+        file.name.rsplit(".", 1)[0]: file.read().decode("utf-8")
+        for file in uploaded_files
+    }
+    data, errs = utils.map_concurrent(
+        telemetry.parse_powerline_text_data, 
+        uploaded_data, 
+        singleton=True, 
+        use_names=use_names,
+        sep=sep
+    )
+    if errs:
+        logging.error(errs)
+    
+    return data
+
+
+@st.cache_data
+def parse_excel(file, use_names=True):
+    data = pd.read_excel(file, header=None)
+    return telemetry.parse_powerline_excel(data, use_names=use_names)
+
+
+@st.cache_data
+def parse_telemetry_excel(uploaded_files, use_names=True):
+    uploaded_data = {
+        file.name.rsplit(".", 1)[0]: file.read().decode("utf-8")
+        for file in uploaded_files
+    }
+    data, errs = utils.map_concurrent(
+        parse_excel, 
+        uploaded_data, 
+        singleton=True, 
+        use_names=use_names,
+    )
+    if errs:
+        logging.error(errs)
+    
+    return data
+
+
+@st.cache_data
+def get_crossing_times(gpx_data, locations=None, thresh=0.5):
     crossing_times, errors = utils.map_concurrent(
         splits.find_all_crossing_times, 
-        gpx_data, singleton=True, locations=locations
+        gpx_data, 
+        singleton=True, 
+        locations=locations,
+        thresh=thresh, 
     )
     if errors:
         logging.error(errors)
@@ -51,6 +98,7 @@ def get_location_timings(gpx_data, locations=None, thresh=0.5):
         logging.error(errors)
     return location_timings
 
+
 @st.cache_data
 def get_fastest_times(gpx_data):
     best_times, errors = utils.map_concurrent(
@@ -60,6 +108,7 @@ def get_fastest_times(gpx_data):
     if errors:
         logging.error(errors)
     return best_times
+
 
 def select_pieces(all_crossing_times):
     piece_dates = np.sort(all_crossing_times.dt.date.unique())
@@ -93,7 +142,8 @@ def select_pieces(all_crossing_times):
             index=landmarks.size-1, 
         )
 
-    return splits.get_piece_times(sel_times, start_landmark, finish_landmark)
+    piece_data = splits.get_piece_times(sel_times, start_landmark, finish_landmark)
+    return piece_data, start_landmark, finish_landmark
 
 def show_piece_data(piece_data):
     tabs = st.tabs(list(piece_data))
@@ -211,7 +261,7 @@ def set_landmarks(landmarks=None, title=True):
             )
         with cols[1]:
             height = st.number_input(
-                "Set figure height", 100, 2000, 600,
+                "Set figure height", 100, 3000, 600, step=50, 
                 key='landmark map height'
             )
         
@@ -288,6 +338,7 @@ def draw_gps_data(gps_data, locations):
         height = st.number_input("Set figure height", 100, 2000, 600)
 
     fig = go.Figure()
+    data = locations
     for name, data in gps_data.items():
         fig.add_trace(go.Scattermapbox(
             lon = data.longitude, 
@@ -332,7 +383,7 @@ def draw_gps_data(gps_data, locations):
     )
 
 @st.cache_data
-def make_telemetry_figures(telemetry_data, piece_data, window=0, tab_names=None):
+def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=None):
     if tab_names is None:
         tab_names = [
             'Angle 0.7 F', 
@@ -433,24 +484,18 @@ def make_telemetry_figures(telemetry_data, piece_data, window=0, tab_names=None)
     return telemetry_figures
 
 @st.cache_data
-def figures_to_zipfile(figures, file_type):
+def figures_to_zipfile(figures, file_type, **kwargs):
     zipdata = io.BytesIO()
     with zipfile.ZipFile(zipdata, 'w') as zipf:
         for name, fig in figures.items():
             if file_type == 'html':
-                with io.StringIO() as buffer:
-                    fig.write_html(buffer)
-                    buffer.seek(0)
-                    zipf.writestr(
-                        f"{name}.{file_type}", buffer.read()
-                    )
+                fig_data = fig.to_html(**kwargs)
             else:
-                with io.BytesIO() as buffer:
-                    fig.write_image(buffer, format=file_type)
-                    buffer.seek(0)
-                    zipf.writestr(
-                        f"{name}.{file_type}", buffer.read()
-                    )
+                fig_data = fig.to_image(format=file_type, **kwargs)
+
+            zipf.writestr(
+                f"{name}.{file_type}", fig_data
+            )
 
     zipdata.seek(0)
     return zipdata
