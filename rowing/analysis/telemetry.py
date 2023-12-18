@@ -104,6 +104,18 @@ def parse_powerline_data(split_data, use_names=True):
     power.Time = pd.to_datetime(
         pd.to_timedelta(power.Time + t_shift, unit='milli') + start_date
     )
+    stroke_length = power.MaxAngle - power.MinAngle
+    effect = stroke_length - power.CatchSlip - power.FinishSlip
+    power = pd.concat([
+        power, pd.concat({
+            "Length": stroke_length, 
+            "Effective": effect, 
+        }, axis=1)
+    ], axis=1)
+    # print(power.head(5))
+    # print(power.columns.levels[0])
+    # print(stroke_length)
+
     split_data['positions'] = positions
     if use_names:
         power = power.rename(columns=crew_list.to_dict(), level=1)

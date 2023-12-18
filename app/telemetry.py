@@ -229,6 +229,8 @@ with st.expander("Plot data"):
             'Max Force PC', 
             'MaxAngle', 
             'MinAngle', 
+            'Length', 
+            'Effective', 
             'Rating',
             'Recovery Time', 
             'Rower Swivel Power', 

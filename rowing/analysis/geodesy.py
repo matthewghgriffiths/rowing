@@ -8,6 +8,22 @@ from typing import NamedTuple
 import numpy as np
 from numpy import sin, cos, arctan2, sqrt, pi, radians
 
+_AVG_EARTH_RADIUS_KM = 6371.0088
+
+
+def haversine(pos1, pos2):
+    return _haversine(get_rad_coords(pos1), get_rad_coords(pos2))
+
+
+def haversine_km(pos1, pos2):
+    theta = haversine(pos1, pos2)
+    return theta * _AVG_EARTH_RADIUS_KM
+
+
+def bearing(pos1, pos2):
+    rad = rad_bearing(pos1, pos2)
+    return (rad*180/pi + 360) % 360
+
 
 class LatLon(NamedTuple):
     latitude: float
@@ -18,6 +34,16 @@ class LatLon(NamedTuple):
     
     def set_bearing(self, bearing):
         return LatLonBear(*self, bearing)
+    
+    bearing = bearing 
+    haversine = haversine 
+    haversine_km = haversine_km 
+
+    def follow(self, distance, bearing):
+        return self.set_bearing(bearing).follow(distance)
+    
+    def orientate(self, pos):
+        return self.set_bearing(self.bearing(pos))
 
 
 class LatLonBear(NamedTuple):
@@ -30,7 +56,13 @@ class LatLonBear(NamedTuple):
     
     def set_bearing(self, bearing):
         return self._replace(bearing=bearing)
-
+    
+    def follow(self, distance, bearing=None):
+        if bearing is None:
+            return follow_bearing(self, distance).to_latlon()
+        return self.set_bearing(bearing)
+        
+    
 
 class RadCoords(NamedTuple):
     phi: float
@@ -77,7 +109,6 @@ class Vector(NamedTuple):
     cross = cross  # type: ignore
 
 
-_AVG_EARTH_RADIUS_KM = 6371.0088
 
 
 def get_rad_coords(pos):
@@ -142,14 +173,6 @@ def _haversine(rad1, rad2):
     return 2 * arctan2(sqrt(a), sqrt(1 - a))
 
 
-def haversine(pos1, pos2):
-    return _haversine(get_rad_coords(pos1), get_rad_coords(pos2))
-
-
-def haversine_km(pos1, pos2):
-    theta = haversine(pos1, pos2)
-    return theta * _AVG_EARTH_RADIUS_KM
-
 
 def cdist_haversine(pos1, pos2):
     from scipy.spatial.distance import cdist
@@ -172,10 +195,6 @@ def rad_bearing(pos1, pos2):
     x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(lam2 - lam1)
     return arctan2(y, x)
 
-
-def bearing(pos1, pos2):
-    rad = rad_bearing(pos1, pos2)
-    return (rad*180/pi + 360) % 360
 
 
 def estimate_bearing(positions, pos, tol=0.01):
@@ -203,7 +222,8 @@ def follow_bearing(pos1, d):
         np.sin(theta)*np.sin(d)*np.cos(phi),
         np.cos(d)-np.sin(phi)*np.sin(phi2)
     )
-    return RadCoords(phi2, lam2)
+    return RadBearing(phi2, lam2, theta)
+
 
 def make_arrow(pos, arrowlength=0.3, arrowhead=0.1, arrowangle=20):
     start = get_rad_bearing(pos).to_latlon()
@@ -222,6 +242,7 @@ def make_arrow(pos, arrowlength=0.3, arrowhead=0.1, arrowangle=20):
         np.array([p.latitude for p in points]), 
         np.array([p.longitude for p in points])
     )
+
 
 def make_arrow_base(pos, arrowlength=0.3, arrowhead=0.1, arrowangle=20, base_width=0.15):
     start = get_rad_bearing(pos).to_latlon()

@@ -20,8 +20,8 @@ def run_streamlit(main, params):
     try:
         main(params)
     except (
-            st.runtime.scriptrunner.StopException,
-            st.runtime.scriptrunner.RerunException,
+        st.runtime.scriptrunner.StopException,
+        st.runtime.scriptrunner.RerunException,
     ):
         pass
 

@@ -1,4 +1,5 @@
 
+from typing import NamedTuple
 from functools import partial 
 
 import jax
@@ -28,6 +29,35 @@ def solve_triangular(A: jax.Array, b: jax.Array, **kwargs):
         lambda b: jsp.linalg.solve_triangular(A, b, **kwargs), 0,
     )(b.reshape(b.shape[0], -1).T).T.reshape(b.shape)
 
+
+
+partial(jax.jit, static_argnames=('min_eig',))
+def closest_cholesky(A, min_eig=0.):
+    l, V = jnp.linalg.eigh(A)
+    min_eig = jax.lax.select(
+        min_eig < 0, 
+        jnp.where(l > 0, l, l.max()).min(), 
+        min_eig
+        # jnp.asarray(min_eig, dtype=l.dtype)
+    )
+
+    _, R = jnp.linalg.qr(
+        (V * jnp.sqrt(jnp.clip(l, min_eig, None))).T
+    )
+    L = R.T * jnp.sign(R.diagonal())
+    return L 
+
+
+partial(jax.jit, static_argnames=('min_eig',))
+def cholesky(A, min_eig=0):
+    L = jnp.linalg.cholesky(A)
+    isposdef = jnp.isfinite(L[0, 0])
+    return jax.lax.cond(
+        isposdef, 
+        lambda A: L, 
+        lambda A: closest_cholesky(A, min_eig=jnp.float_(min_eig)), 
+        A
+    )
 
 block_transpose = jax.vmap(jnp.transpose)
 
@@ -87,6 +117,7 @@ def block_diag(A, blocksize=None, k=0):
         nblocks = m0 + abs(k) 
         n = nblocks * blocksize
         return set_block_diag(jnp.zeros((n, n)), A, k=k)
+    
             
 
 @partial(jax.jit, static_argnames=('lower', 'trans'))
@@ -183,15 +214,16 @@ def solve_block_triangular_tridiagonal(
     return X.reshape(y.shape)
 
 
-@jax.jit
-def cholesky_block_tridiagonal(D: jax.Array, D1: jax.Array):
+
+partial(jax.jit, static_argnames=('min_eig',))
+def cholesky_block_tridiagonal(D: jax.Array, D1: jax.Array, min_eig=-1.):
     def _blockbidiagscan(L0, xs):
         D11, D01 = xs 
         L01 = jsp.linalg.solve_triangular(L0, D01, lower=True, trans=0).T
-        L11 = jnp.linalg.cholesky(D11 - L01 @ L01.T)
+        L11 = cholesky(D11 - L01 @ L01.T, min_eig=min_eig)
         return L11, (L11, L01)
     
-    L0 = jnp.linalg.cholesky(D[0])
+    L0 = cholesky(D[0], min_eig=min_eig)
     _, (DL, DL1) = jax.lax.scan(
         _blockbidiagscan, L0, (D[1:], D1)
     )
@@ -199,13 +231,14 @@ def cholesky_block_tridiagonal(D: jax.Array, D1: jax.Array):
     return DL, DL1
 
 
-@jax.jit
+
+partial(jax.jit, static_argnames=('min_eig',))
 def cholesky_block_pentadiagaonal(
-    D: jax.Array, D1: jax.Array, D2: jax.Array
+    D: jax.Array, D1: jax.Array, D2: jax.Array, min_eig=-1.
 ):
-    L00 = jnp.linalg.cholesky(D[0])
+    L00 = cholesky(D[0], min_eig=min_eig)
     L01 = jsp.linalg.solve_triangular(L00, D1[0], lower=True, trans=0).T
-    L11 = jnp.linalg.cholesky(D[1] - L01 @ L01.T)
+    L11 = cholesky(D[1] - L01 @ L01.T, min_eig=min_eig)
 
     def _blocktridiagscan(carry, xs):
         L00, L11, L01 = carry 
@@ -215,8 +248,8 @@ def cholesky_block_pentadiagaonal(
             L00, D20, lower=True, trans=0).T
         L12 = jsp.linalg.solve_triangular(
             L11, D11 - L01 @ L02.T, lower=True, trans=0).T
-        L22 = jnp.linalg.cholesky(
-            D02 - L02 @ L02.T - L12 @ L12.T)
+        L22 = cholesky(
+            D02 - L02 @ L02.T - L12 @ L12.T, min_eig=min_eig)
         return (L11, L22, L12), (L22, L12, L02)
 
     _, (dL, dL1, DL2) = jax.lax.scan(
@@ -225,3 +258,47 @@ def cholesky_block_pentadiagaonal(
     DL = jnp.concatenate([L00[None], L11[None], dL], axis=0)
     DL1 = jnp.concatenate([L01[None], dL1], axis=0)
     return DL, DL1, DL2
+
+
+
+class BlockTriangularBidiagonal(NamedTuple):
+    D: jax.Array 
+    D1: jax.Array 
+
+    def solve(self, y, trans=0):
+        return solve_block_triangular_bidiagonal(
+            *self, y, lower=True, trans=trans
+        )
+    
+
+class BlockTriangularTridiagonal(NamedTuple):
+    D: jax.Array 
+    D1: jax.Array 
+    D2: jax.Array
+    
+    def solve(self, y, trans=0):
+        return solve_block_triangular_tridiagonal(
+            *self, y, lower=True, trans=trans
+        )
+
+
+class SymmetricBlockTridiagonal(NamedTuple):
+    D: jax.Array 
+    D1: jax.Array 
+    
+    def cholesky(self, min_eig=-1.):
+        return BlockTriangularBidiagonal(
+            *cholesky_block_tridiagaonal(*self, min_eig=min_eig)
+        )
+
+
+class SymmetricBlockPentadiagonal(NamedTuple):
+    D: jax.Array 
+    D1: jax.Array 
+    D2: jax.Array
+
+    def cholesky(self, min_eig=-1.):
+        return BlockTriangularTridiagonal(
+            *cholesky_block_pentadiagaonal(*self, min_eig=min_eig)
+        )
+
