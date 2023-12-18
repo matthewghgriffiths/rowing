@@ -288,7 +288,7 @@ class SymmetricBlockTridiagonal(NamedTuple):
     
     def cholesky(self, min_eig=-1.):
         return BlockTriangularBidiagonal(
-            *cholesky_block_tridiagaonal(*self, min_eig=min_eig)
+            *cholesky_block_tridiagonal(*self, min_eig=min_eig)
         )
 
 

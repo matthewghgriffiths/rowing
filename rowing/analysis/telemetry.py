@@ -112,9 +112,6 @@ def parse_powerline_data(split_data, use_names=True):
             "Effective": effect, 
         }, axis=1)
     ], axis=1)
-    # print(power.head(5))
-    # print(power.columns.levels[0])
-    # print(stroke_length)
 
     split_data['positions'] = positions
     if use_names:

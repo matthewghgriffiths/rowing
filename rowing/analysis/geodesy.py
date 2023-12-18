@@ -35,7 +35,7 @@ class LatLon(NamedTuple):
     def set_bearing(self, bearing):
         return LatLonBear(*self, bearing)
     
-    bearing = bearing 
+    get_bearing = bearing 
     haversine = haversine 
     haversine_km = haversine_km 
 
@@ -43,7 +43,7 @@ class LatLon(NamedTuple):
         return self.set_bearing(bearing).follow(distance)
     
     def orientate(self, pos):
-        return self.set_bearing(self.bearing(pos))
+        return self.set_bearing(self.get_bearing(pos))
 
 
 class LatLonBear(NamedTuple):
@@ -62,6 +62,10 @@ class LatLonBear(NamedTuple):
             return follow_bearing(self, distance).to_latlon()
         return self.set_bearing(bearing)
         
+    orientate = LatLon.orientate
+    get_bearing = bearing 
+    haversine = haversine 
+    haversine_km = haversine_km 
     
 
 class RadCoords(NamedTuple):

@@ -4,6 +4,8 @@ from functools import partial
 from pathlib import Path 
 import os
 import sys
+import zipfile 
+import shutil
 
 import logging 
 
@@ -22,9 +24,14 @@ if LIBPATH not in realpaths:
 from rowing.analysis import geodesy, splits, app, telemetry
 from rowing import utils
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("telemetry")
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s:%(name)s:%(levelname)s:%(message)s', 
+)
 
 
+logger.info("telemetry")
 st.set_page_config(
     page_title="Peach Telemetry Analysis",
     layout='wide'
@@ -83,7 +90,7 @@ with st.expander("Upload Telemetry Data"):
             "Upload All Data Export from PowerLine (comma separated)", 
             accept_multiple_files=True
         )
-        st.write("Text should should be formatted like below (no commas!)")
+        st.write("Text should should be formatted like below")
         st.code(""" 
             =====,File Info,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
             Serial #,Session,Filename,Start Time,TZBIAS,Location,Summary,Comments,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -144,13 +151,16 @@ if not telemetry_data:
     st.write("No data uploaded")
     st.stop()
 
+logger.warning("Show map")
 with st.expander("Show map"):
     app.draw_gps_data(gps_data, locations)
 
+logger.info("Crossing Times")
 with st.spinner("Processing Crossing Times"):
     crossing_times = app.get_crossing_times(gps_data, locations=locations)
     all_crossing_times = pd.concat(crossing_times, names=['file'])
 
+logger.info("All Crossing Times")
 with st.expander("All Crossing times"):
     show_times = pd.concat({
         "date": all_crossing_times.dt.normalize(), 
@@ -167,6 +177,7 @@ with st.expander("All Crossing times"):
     )
     app.download_csv("all-crossings.csv", show_times)
     
+logger.info("Individual Crossing Times")
 with st.expander("Individual Crossing Times"):
     tabs = st.tabs(crossing_times)
     for tab, (name, crossings) in zip(tabs, crossing_times.items()):
@@ -186,7 +197,7 @@ with st.expander("Individual Crossing Times"):
             )
             app.download_csv(f"{name}-crossings.csv", show_crossings)
 
-
+logger.info("Piece selecter")
 with st.expander("Piece selecter"):
     piece_data = app.select_pieces(all_crossing_times)
     if piece_data is None:
@@ -215,108 +226,66 @@ with st.expander("Piece selecter"):
 
         app.show_piece_data(piece_data)
 
+
+tab_names = [
+    'Angle 0.7 F', 
+    'Angle Max F', 
+    'Average Power', 
+    'AvgBoatSpeed',
+    'CatchSlip', 
+    'Dist/Stroke', 
+    'Drive Start T', 
+    'Drive Time',
+    'FinishSlip', 
+    'Max Force PC', 
+    'MaxAngle', 
+    'MinAngle', 
+    'Length', 
+    'Effective', 
+    'Rating',
+    'Recovery Time', 
+    'Rower Swivel Power', 
+    'StrokeNumber', 
+    'SwivelPower',
+    # 'Time', 
+    'Work PC Q1', 
+    'Work PC Q2',
+    'Work PC Q3', 
+    'Work PC Q4'
+]
+logger.info("Plot data")
 with st.expander("Plot data"):
-    tab_names = [
-            'Angle 0.7 F', 
-            'Angle Max F', 
-            'Average Power', 
-            'AvgBoatSpeed',
-            'CatchSlip', 
-            'Dist/Stroke', 
-            'Drive Start T', 
-            'Drive Time',
-            'FinishSlip', 
-            'Max Force PC', 
-            'MaxAngle', 
-            'MinAngle', 
-            'Length', 
-            'Effective', 
-            'Rating',
-            'Recovery Time', 
-            'Rower Swivel Power', 
-            'StrokeNumber', 
-            'SwivelPower',
-            # 'Time', 
-            'Work PC Q1', 
-            'Work PC Q2',
-            'Work PC Q3', 
-            'Work PC Q4'
-    ]
     if piece_data:
-        window = st.number_input(
-            "Select window to average over (s), set to 0 to remove smoothing",
-            value=10, 
-            min_value=0, 
-            step=5, 
-            # placeholder='', 
-            # format="%d s",
-            # step="0:00:10"
-        )
-
-        telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
+        cols = st.columns(2)
+        with cols[0]:
+            window = st.number_input(
+                "Select window to average over (s), set to 0 to remove smoothing",
+                value=10, 
+                min_value=0, 
+                step=5, 
+                # placeholder='', 
+                # format="%d s",
+                # step="0:00:10"
+            )
+        with cols[1]:
+            height = st.number_input(
+                "Set figures height", 
+                100, 3000, 600
+            )
         
-        # for name, power in telemetry_data.items():
-        for piece, piece_times in piece_data['Timestamp'].iterrows():
-            name = piece[1]
-            power = telemetry_data[name]['power']
-            if window:
-                time_power = power.set_index("Time").sort_index()
-                avg_power = time_power.rolling(
-                    pd.Timedelta(seconds=window)
-                ).mean()
-                power = avg_power.reset_index()
-
-
-            crossings = crossing_times[name]
-            # piece_times = piece_data['Timestamp'].xs(name, level=1).iloc[0]
-            start_time = piece_times.min()
-            finish_time = piece_times.max()
-            piece_power = power[
-                power.Time.between(start_time, finish_time)
-            ]
-            piece_power.columns.names = 'Measurement', 'Position'
-
-            epoch_times = (
-                (piece_times - start_time) #+ pd.Timestamp(0)
-            ).dt.total_seconds()
-            for col, tab in telem_tabs.items():
-                with tab:
-                    # st.subheader(name)
-                    plot_data = piece_power.stack(1)[
-                        ['Time', col]
-                    ]
-                    plot_data['Time'] = plot_data['Time'].ffill()
-                    plot_data['Elapsed'] = (
-                        (plot_data['Time'] - start_time) + pd.Timestamp(0)
-                    )
-                    plot_data = plot_data.dropna().reset_index()
-
-                    fig = px.line(
-                        plot_data, 
-                        x='Elapsed', 
-                        y=col, 
-                        color='Position',
-                        title=name, 
-                    )
-                    for landmark, epoch in epoch_times.items():
-                        fig.add_vline(
-                            x=int((epoch - 3600) * 1000), 
-                            annotation_text=landmark, 
-                            annotation=dict(
-                                textangle=-90
-                            )
-                        )
-                    fig.update_xaxes(
-                        tickformat="%M:%S",
-                        dtick=60*1000, 
-                        showgrid=True, 
-                        griddash='solid', 
-                    )
-                    fig.update_traces(visible=True)
-                    st.plotly_chart(fig, use_container_width=True)
-
+        telemetry_figures = app.make_telemetry_figures(
+            telemetry_data, piece_data, window=window, tab_names=tab_names
+        )
+        telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
         for col, tab in telem_tabs.items():
             with tab:
+                for name in piece_data['Timestamp'].index.get_level_values(1):
+                    fig = telemetry_figures[col, name]
+                    fig.update_layout(
+                        height=height, 
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
                 st.subheader("Interval Averages")
                 interval_stats = piece_data[f"Interval {col}"]
                 st.write(interval_stats)
@@ -325,7 +294,10 @@ with st.expander("Plot data"):
                 interval_stats = piece_data[f"Average {col}"]
                 st.write(interval_stats)
 
-with st.spinner("Generating excel file"):
+
+logger.info("Download data")
+cols = st.columns(2)
+with cols[0], st.spinner("Generating excel file"):
     xldata = io.BytesIO()
     with pd.ExcelWriter(xldata) as xlf:
         for name, data in piece_data.items():
@@ -348,3 +320,24 @@ with st.spinner("Generating excel file"):
         # type='primary', 
         file_name="telemetry_piece_data.xlsx",  
     )
+
+with cols[1]:
+    download_figures = st.multiselect(
+        "Download Figures as", 
+        options=['html', 'png', 'svg', 'pdf', 'jpg', 'webp'] ,
+        default=[], 
+    )
+    for file_type in download_figures:
+        import plotly.io as pio
+        pio.templates.default = "plotly"
+        with st.spinner(f"Creating {file_type} zip file"):
+            zipdata = app.figures_to_zipfile(
+                {f"{col}/{name}": fig for (col, name), fig in telemetry_figures.items()},
+                file_type
+            )
+            st.download_button(
+                f":inbox_tray: Download telemetry_figures_{file_type}.zip", 
+                zipdata,
+                # type='primary', 
+                file_name=f"telemetry_figures_{file_type}.zip",  
+            )

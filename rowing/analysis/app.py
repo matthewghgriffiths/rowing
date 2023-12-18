@@ -1,11 +1,13 @@
 import streamlit as st
 import io 
+import zipfile
 import logging
 
 import numpy as np
 import pandas as pd 
 
 import plotly.graph_objects as go
+import plotly.express as px
 
 from rowing.analysis import splits, files, geodesy
 from rowing import utils
@@ -324,3 +326,127 @@ def draw_gps_data(gps_data, locations):
     st.plotly_chart(
         fig, use_container_width=True
     )
+
+@st.cache_data
+def make_telemetry_figures(telemetry_data, piece_data, window=0, tab_names=None):
+    if tab_names is None:
+        tab_names = [
+            'Angle 0.7 F', 
+            'Angle Max F', 
+            'Average Power', 
+            'AvgBoatSpeed',
+            'CatchSlip', 
+            'Dist/Stroke', 
+            'Drive Start T', 
+            'Drive Time',
+            'FinishSlip', 
+            'Max Force PC', 
+            'MaxAngle', 
+            'MinAngle', 
+            'Length', 
+            'Effective', 
+            'Rating',
+            'Recovery Time', 
+            'Rower Swivel Power', 
+            'StrokeNumber', 
+            'SwivelPower',
+            # 'Time', 
+            'Work PC Q1', 
+            'Work PC Q2',
+            'Work PC Q3', 
+            'Work PC Q4'
+        ]
+
+    telemetry_figures = {}
+    for piece, piece_times in piece_data['Timestamp'].iterrows():
+        name = piece[1]
+        power = telemetry_data[name]['power']
+        if window:
+            time_power = power.set_index("Time").sort_index()
+            avg_power = time_power.rolling(
+                pd.Timedelta(seconds=window)
+            ).mean()
+            power = avg_power.reset_index()
+
+        # piece_times = piece_data['Timestamp'].xs(name, level=1).iloc[0]
+        start_time = piece_times.min()
+        finish_time = piece_times.max()
+        piece_power = power[
+            power.Time.between(start_time, finish_time)
+        ]
+        piece_power.columns.names = 'Measurement', 'Position'
+
+        epoch_times = (
+            (piece_times - start_time) #+ pd.Timestamp(0)
+        ).dt.total_seconds()
+        for col in tab_names:
+            plot_data = piece_power.stack(1)[
+                ['Time', col]
+            ]
+            plot_data['Time'] = plot_data['Time'].ffill()
+            plot_data['Elapsed'] = (
+                (plot_data['Time'] - start_time) + pd.Timestamp(0)
+            ).dt.tz_localize(None)
+            plot_data = plot_data.dropna().reset_index()
+
+            fig = px.line(
+                plot_data, 
+                x='Elapsed', 
+                y=col, 
+                color='Position',
+                title=name, 
+                template="streamlit",
+                color_discrete_sequence=[
+                    "#0068c9",
+                    "#83c9ff",
+                    "#ff2b2b",
+                    "#ffabab",
+                    "#29b09d",
+                    "#7defa1",
+                    "#ff8700",
+                    "#ffd16a",
+                    "#6d3fc0",
+                    "#d5dae5",
+                ],
+            )
+            for landmark, epoch in epoch_times.items():
+                fig.add_vline(
+                    x=int((epoch - 3600) * 1000), 
+                    annotation_text=landmark, 
+                    annotation=dict(
+                        textangle=-90
+                    )
+                )
+            fig.update_xaxes(
+                tickformat="%M:%S",
+                dtick=60*1000, 
+                showgrid=True, 
+                griddash='solid', 
+            )
+            fig.update_traces(visible=True)
+            telemetry_figures[col, name] = fig
+
+    return telemetry_figures
+
+@st.cache_data
+def figures_to_zipfile(figures, file_type):
+    zipdata = io.BytesIO()
+    with zipfile.ZipFile(zipdata, 'w') as zipf:
+        for name, fig in figures.items():
+            if file_type == 'html':
+                with io.StringIO() as buffer:
+                    fig.write_html(buffer)
+                    buffer.seek(0)
+                    zipf.writestr(
+                        f"{name}.{file_type}", buffer.read()
+                    )
+            else:
+                with io.BytesIO() as buffer:
+                    fig.write_image(buffer, format=file_type)
+                    buffer.seek(0)
+                    zipf.writestr(
+                        f"{name}.{file_type}", buffer.read()
+                    )
+
+    zipdata.seek(0)
+    return zipdata
