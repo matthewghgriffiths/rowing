@@ -131,12 +131,10 @@ def select_pieces(all_crossing_times):
     landmarks = landmark_distance.groupby(
         level=3).mean().sort_values().index
     landmark_dist = landmark_distance.unstack(
-        'landmark').dropna(axis=1).mean(0).sort_values()
-    # landmarks = landmark_distance.index
-
+        'landmark').dropna(axis=1).mean(0)
     start, end = map(
         int, landmarks.get_indexer(
-            [landmark_dist.index[0], landmark_dist.index[-1]]
+            [landmark_dist.idxmin(), landmark_dist.idxmax()]
         )
     )
     with cols[1]:
