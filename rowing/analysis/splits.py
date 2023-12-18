@@ -55,7 +55,7 @@ def load_location_landmarks(loc=None):
     return pd.concat(load_place_locations(loc), names=["location", "landmark"])
 
 
-def find_all_crossing_times(positions, locations=None, thresh=0.15):
+def find_all_crossing_times(positions, locations=None, thresh=0.5):
     locations = load_location_landmarks() if locations is None else locations
 
     positions = positions.reset_index(drop=True)
@@ -78,7 +78,7 @@ def find_all_crossing_times(positions, locations=None, thresh=0.15):
     return times.set_index(['leg'] + names)[0]
 
 
-def find_all_crossing_data(positions, locations=None, thresh=0.15, cols=None):
+def find_all_crossing_data(positions, locations=None, thresh=0.5, cols=None):
     crossing_times = find_all_crossing_times(positions, locations, thresh)
     crossing_data = crossing_times.to_frame("time")
 
@@ -112,9 +112,8 @@ def calc_timings(loc_times):
 
     return pd.concat({'splits': pd.concat({'times': loc_timings})}, axis=1)
 
-def get_location_timings(positions, locations=None, thresh=0.3):
+def get_location_timings(positions, locations=None, thresh=0.5):
     locations = load_landmarks() if locations is None else locations
-
     loc_times = find_all_crossing_times(
         positions, locations, thresh=thresh
     )
@@ -133,7 +132,7 @@ def get_location_timings(positions, locations=None, thresh=0.3):
     return pd.concat({'splits': pd.concat({'times': loc_timings})}, axis=1)
 
 
-def find_crossing_times(positions, loc, thresh=0.15):
+def find_crossing_times(positions, loc, thresh=0.5):
     close_points = geodesy.haversine_km(positions, loc) < thresh
 
     close_positions = positions[close_points].copy()
@@ -159,15 +158,15 @@ def find_crossing_times(positions, loc, thresh=0.15):
         index=crossings,
         dtype=float,
     )
-
+    crossings1 = np.clip((crossings + 1), 0, positions.index[-1])
     time_deltas = (
-        positions.time[crossings + 1].values - positions.time[crossings].values
+        positions.time[crossings1].values - positions.time[crossings].values
     )
     crossing_times = (
         positions.time[crossings] + time_deltas * crossing_weights
     )
     distance_deltas = (
-        positions.distance[crossings + 1].values
+        positions.distance[crossings1].values
         - positions.distance[crossings].values
     )
     crossing_distances = (

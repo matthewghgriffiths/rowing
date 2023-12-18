@@ -32,16 +32,20 @@ def download_csv(
 @st.cache_data
 def get_crossing_times(gpx_data, locations=None):
     crossing_times, errors = utils.map_concurrent(
-        splits.find_all_crossing_times, gpx_data, singleton=True, locations=locations
+        splits.find_all_crossing_times, 
+        gpx_data, singleton=True, locations=locations
     )
     if errors:
         logging.error(errors)
     return crossing_times
 
 @st.cache_data
-def get_location_timings(gpx_data, locations=None):
+def get_location_timings(gpx_data, locations=None, thresh=0.5):
     location_timings, errors = utils.map_concurrent(
-        splits.get_location_timings, gpx_data, singleton=True, locations=locations
+        splits.get_location_timings, gpx_data, 
+        singleton=True, 
+        locations=locations, 
+        thresh=thresh, 
     )
     if errors:
         logging.error(errors)
