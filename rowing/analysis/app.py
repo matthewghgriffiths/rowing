@@ -390,6 +390,42 @@ def draw_gps_data(gps_data, locations):
         fig, use_container_width=True
     )
 
+
+@st.cache_data
+def make_stroke_profiles(telemetry_data, piece_data, nres=101):
+    profiles = {}
+    boat_profiles = {}
+    crew_profiles = {}
+    for piece, piece_times in piece_data['Timestamp'].iterrows():
+        name = piece[1]
+        profile = telemetry_data[name]['Periodic']
+        start_time = piece_times.min()
+        finish_time = piece_times.max()
+        piece_profile = profile[
+            profile.Time.dt.tz_localize(None).between(start_time, finish_time)
+        ].set_index('Time').dropna(axis=1, how='all')
+
+        profiles[name] = profile = telemetry.norm_stroke_profile(
+            piece_profile, nres)
+
+        mean_profile = profile.groupby(
+            level=1
+        ).mean().reset_index().rename(
+            {"": "Boat"}, axis=1, level=1
+        )
+        boat_profiles[name] = boat_profile = mean_profile.xs("Boat", axis=1, level=1)
+        
+        crew_profiles[name] = mean_profile[
+            mean_profile.columns.levels[0].difference(
+                boat_profile.columns)
+        ].rename_axis(
+            columns=("Measurement", "Position")
+        ).stack(1).reset_index("Position")
+
+    return profiles, boat_profiles, crew_profiles
+
+
+
 @st.cache_data
 def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=None):
     if tab_names is None:

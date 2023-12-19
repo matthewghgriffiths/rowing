@@ -101,6 +101,7 @@ def parse_powerline_data(split_data, use_names=True):
     power_data = split_data["Aperiodic0x800A"]
     gps_info = split_data['GPS Info'].iloc[0]
 
+
     split_data['Crew List'] = crew_list = crew_data.set_index("Position").Name
     crew_list[crew_list.isna()] = crew_list.index[crew_list.isna()]
 
@@ -116,6 +117,9 @@ def parse_powerline_data(split_data, use_names=True):
 
     t_shift = (gps_data['UTC Time'].Boat - gps_data.Time).max()
 
+    split_data["Periodic"]['Time'] = pd.to_datetime(pd.to_timedelta(
+        split_data['Periodic'].Time, unit='milli'
+    ) + start_time)
     
     positions = pd.concat({
         "time":  pd.to_timedelta(gps_data['UTC Time'].Boat, unit='milli') + start_date,
@@ -142,7 +146,33 @@ def parse_powerline_data(split_data, use_names=True):
 
     split_data['positions'] = positions
     if use_names:
-        power = power.rename(columns=crew_list.to_dict(), level=1)
-    split_data['power'] = power
+        split_data['power'] = power.rename(
+            columns=crew_list.to_dict(), level=1)
+        split_data["Periodic"] = split_data["Periodic"].rename(
+            columns=crew_list.to_dict(), level=1)
 
     return split_data 
+
+
+def interp_series(s, x, **kwargs):
+    return pd.Series(
+        np.interp(x, s.index, s, **kwargs), index=x
+    )
+
+
+def norm_stroke_profile(stroke_profile, n_res):
+    stroke = (
+        stroke_profile[('Normalized Time', 'Boat')].diff() < 0
+    ).cumsum()
+    return stroke_profile.set_index(
+        ('Normalized Time', 'Boat')
+    ).groupby(
+        stroke.values
+    ).apply(
+        lambda df:
+        df.apply(
+            interp_series, x=np.linspace(-50, 50, n_res)
+        )
+    ).rename_axis(
+        index=("Stroke Count", "Normalized Time")
+    )
