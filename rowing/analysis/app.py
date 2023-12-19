@@ -407,6 +407,11 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
 
         profiles[name] = profile = telemetry.norm_stroke_profile(
             piece_profile, nres)
+        
+        gate_angle = profile.GateAngle 
+        gate_angle0 = gate_angle - gate_angle.values.mean(0, keepdims=True)
+        for pos, angle0 in gate_angle0.items():
+            profile["GateAngle0", pos] = angle0
 
         mean_profile = profile.groupby(
             level=1

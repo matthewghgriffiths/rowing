@@ -243,12 +243,12 @@ with st.expander("Stroke Profiles"):
         with cols[0]:
             x = st.selectbox(
                 "Select x-axis", 
-                ['GateAngle', 'GateForceX', 'GateAngleVel']
+                ['GateAngle', 'GateForceX', 'GateAngleVel', "GateAngle0"]
             )
         with cols[1]:
             y = st.selectbox(
                 "Select y-axis", 
-                ['GateForceX', 'GateAngle', 'GateAngleVel']
+                ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0"]
             )
         with cols[2]:
             height = st.number_input(
@@ -272,21 +272,6 @@ with st.expander("Stroke Profiles"):
                 ymin - yr/10, ymax + yr/10, (ymin - yr/10, ymax + yr/10)
             )
 
-        # crew_profile = pd.concat(
-        #     crew_profiles, names=['File']
-        # ).reset_index("File")
-        # fig = px.line(
-        #     crew_profile, 
-        #     x=x, 
-        #     y=y,
-        #     color='Position', 
-        #     facet_row='File', 
-        #     title=name
-        # )
-        # fig.update_layout(
-        #     height=1000, 
-        # )
-        # st.plotly_chart(fig)
         for name, profile in crew_profiles.items():
             fig = px.line(
                 profile, 
@@ -309,13 +294,13 @@ with st.expander("Stroke Profiles"):
         with cols[0]:
             x = st.selectbox(
                 "Select x-axis", 
-                ['GateAngle', 'GateForceX', 'GateAngleVel'],
+                ['GateAngle', 'GateForceX', 'GateAngleVel', "GateAngle0"],
                 key="Select x-axis2", 
             )
         with cols[1]:
             y = st.selectbox(
                 "Select y-axis", 
-                ['GateForceX', 'GateAngle', 'GateAngleVel'],
+                ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0"],
                 key="Select y-axis2", 
             )
         with cols[2]:
@@ -376,7 +361,6 @@ with st.expander("Stroke Profiles"):
         ).set_index(
             ["Normalized Time", "File"]
         )[facets].stack().rename("value").reset_index()
-        print(boat_profile.head())
         fig = px.line(
             boat_profile, 
             x="Normalized Time", 
