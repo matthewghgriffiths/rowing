@@ -26,10 +26,10 @@ from rowing.analysis import geodesy, splits, app, telemetry
 from rowing import utils
 
 logger = logging.getLogger("telemetry")
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s:%(name)s:%(levelname)s:%(message)s', 
-)
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format='%(asctime)s:%(name)s:%(levelname)s:%(message)s', 
+# )
 
 
 logger.info("telemetry")
@@ -160,8 +160,8 @@ with st.expander("Individual Crossing Times"):
                 )
                 app.download_csv(f"{name}-crossings.csv", show_crossings)
 
-logger.info("Piece selecter")
-with st.expander("Piece selecter"):
+logger.info("Select piece start end")
+with st.expander("Select Piece start/end"):
     piece_data, start_landmark, finish_landmark = app.select_pieces(all_crossing_times)
     if piece_data is None:
         st.write("No valid pieces could be found")
@@ -189,24 +189,27 @@ with st.expander("Piece selecter"):
 
         app.show_piece_data(piece_data)
 
-logger.info("Plot data")
+logger.info("Plot piece data")
 telemetry_figures = {}
-with st.expander("Plot data"):
-    if piece_data:
+with st.expander("Plot piece data", True):
+    cols = st.columns(3)
+    with cols[0]:
+        on = st.toggle('Make plots')
+
+    if on and piece_data:
         tab_names = st.multiselect(
             "Select data fields to plot", 
             options=telemetry.FIELDS, 
             default=telemetry.FIELDS,
         )
-        cols = st.columns(2)
-        with cols[0]:
+        with cols[1]:
             window = st.number_input(
                 "Select window to average over (s), set to 0 to remove smoothing",
                 value=10, 
                 min_value=0, 
                 step=5, 
             )
-        with cols[1]:
+        with cols[2]:
             height = st.number_input(
                 "Set figures height", 
                 100, 3000, 600, step=50, 
@@ -233,147 +236,149 @@ with st.expander("Plot data"):
                     interval_stats = piece_data[f"Average {col}"]
                     st.write(interval_stats)
 
-with st.expander("Stroke Profiles"):
-    profiles, boat_profiles, crew_profiles = app.make_stroke_profiles(
-        telemetry_data, piece_data 
-    )
-    tabs = st.tabs(["Rower Profiles", "Boat Profile", "Grouped Profiles"])
-    with tabs[0]:
-        cols = st.columns(4)
-        with cols[0]:
-            x = st.selectbox(
-                "Select x-axis", 
-                ['GateAngle', 'GateForceX', 'GateAngleVel', "GateAngle0"]
-            )
-        with cols[1]:
-            y = st.selectbox(
-                "Select y-axis", 
-                ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0"]
-            )
-        with cols[2]:
-            height = st.number_input(
-                "Set figure height", 
-                key='rower profile fig height',
-                min_value=100, 
-                max_value=None, 
-                value=500, 
-                step=100, 
-            )
-        with cols[3]:
-            ymin = float(min(
-                profile[y].min() for profile in crew_profiles.values()
-            ))
-            ymax = float(max(
-                profile[y].max() for profile in crew_profiles.values()
-            ))
-            yr = float(ymax - ymin)
-            yrange = st.slider(
-                "Set y lims", 
-                ymin - yr/10, ymax + yr/10, (ymin - yr/10, ymax + yr/10)
-            )
+with st.expander("Plot Stroke Profiles", True):
+    if st.toggle('Make profile plots'):
+        profiles, boat_profiles, crew_profiles = app.make_stroke_profiles(
+            telemetry_data, piece_data 
+        )
+         
+        tabs = st.tabs(["Rower Profiles", "Boat Profile", "Grouped Profiles"])
+        with tabs[0]:
+            cols = st.columns(4)
+            with cols[0]:
+                x = st.selectbox(
+                    "Select x-axis", 
+                    ['GateAngle', 'GateForceX', 'GateAngleVel', "GateAngle0"]
+                )
+            with cols[1]:
+                y = st.selectbox(
+                    "Select y-axis", 
+                    ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0"]
+                )
+            with cols[2]:
+                height = st.number_input(
+                    "Set figure height", 
+                    key='rower profile fig height',
+                    min_value=100, 
+                    max_value=None, 
+                    value=500, 
+                    step=100, 
+                )
+            with cols[3]:
+                ymin = float(min(
+                    profile[y].min() for profile in crew_profiles.values()
+                ))
+                ymax = float(max(
+                    profile[y].max() for profile in crew_profiles.values()
+                ))
+                yr = float(ymax - ymin)
+                yrange = st.slider(
+                    "Set y lims", 
+                    ymin - yr/10, ymax + yr/10, (ymin - yr/10, ymax + yr/10)
+                )
 
-        for name, profile in crew_profiles.items():
+            for name, profile in crew_profiles.items():
+                fig = px.line(
+                    profile, 
+                    x=x, 
+                    y=y,
+                    color='Position', 
+                    title=name
+                )
+                fig.update_yaxes(
+                    range=yrange
+                )
+                fig.update_layout(
+                    height=height
+                )
+                st.plotly_chart(fig)
+                telemetry_figures[f"{x}-{y}", name] = fig
+
+        with tabs[2]:
+            cols = st.columns(3)
+            with cols[0]:
+                x = st.selectbox(
+                    "Select x-axis", 
+                    ['GateAngle', 'GateForceX', 'GateAngleVel', "GateAngle0"],
+                    key="Select x-axis2", 
+                )
+            with cols[1]:
+                y = st.selectbox(
+                    "Select y-axis", 
+                    ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0"],
+                    key="Select y-axis2", 
+                )
+            with cols[2]:
+                height = st.number_input(
+                    "Set figure height", 
+                    key='rower profile fig height2',
+                    min_value=100, 
+                    max_value=None, 
+                    value=500, 
+                    step=100, 
+                )
+            
+            crew_profile = pd.concat(
+                crew_profiles, names=['File']
+            ).reset_index("File")
+            crew_profile['Rower'] = (
+                # crew_profile.Position + "|" + crew_profile.File
+                crew_profile.File + "|" + crew_profile.Position
+            )
             fig = px.line(
-                profile, 
+                crew_profile, 
                 x=x, 
                 y=y,
-                color='Position', 
-                title=name
-            )
-            fig.update_yaxes(
-                range=yrange
+                color='Rower', 
             )
             fig.update_layout(
-                height=height
+                height=height, 
             )
-            st.plotly_chart(fig)
-            telemetry_figures[f"{x}-{y}", name] = fig
-
-    with tabs[2]:
-        cols = st.columns(3)
-        with cols[0]:
-            x = st.selectbox(
-                "Select x-axis", 
-                ['GateAngle', 'GateForceX', 'GateAngleVel', "GateAngle0"],
-                key="Select x-axis2", 
+            st.plotly_chart(fig, use_container_width=True)
+            telemetry_figures['profile', f'{x}-{y}'] = fig
+            
+            
+        with tabs[1]:
+            cols = st.columns(2)
+            with cols[0]:
+                facets = st.multiselect(
+                    "Select facets", 
+                    [
+                        'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'
+                    ], 
+                    default = [
+                        'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'
+                    ], 
+                )
+            with cols[1]:
+                height = st.number_input(
+                    "Set figure height", 
+                    min_value=100, 
+                    max_value=None, 
+                    value=len(facets) * 200, 
+                    step=100, 
+                )
+            
+            boat_profile = pd.concat(
+                boat_profiles, names=['File']
+            ).reset_index("File").rename_axis(
+                columns='Measurement'
+            ).set_index(
+                ["Normalized Time", "File"]
+            )[facets].stack().rename("value").reset_index()
+            fig = px.line(
+                boat_profile, 
+                x="Normalized Time", 
+                y="value",
+                color='File', 
+                facet_row='Measurement', 
+                # title=name
             )
-        with cols[1]:
-            y = st.selectbox(
-                "Select y-axis", 
-                ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0"],
-                key="Select y-axis2", 
-            )
-        with cols[2]:
-            height = st.number_input(
-                "Set figure height", 
-                key='rower profile fig height2',
-                min_value=100, 
-                max_value=None, 
-                value=500, 
-                step=100, 
-            )
-        
-        crew_profile = pd.concat(
-            crew_profiles, names=['File']
-        ).reset_index("File")
-        crew_profile['Rower'] = (
-            # crew_profile.Position + "|" + crew_profile.File
-            crew_profile.File + "|" + crew_profile.Position
-        )
-        fig = px.line(
-            crew_profile, 
-            x=x, 
-            y=y,
-            color='Rower', 
-        )
-        fig.update_layout(
-            height=height, 
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        telemetry_figures['profile', f'{x}-{y}'] = fig
-        
-        
-    with tabs[1]:
-        cols = st.columns(2)
-        with cols[0]:
-            facets = st.multiselect(
-                "Select facets", 
-                [
-                    'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'
-                ], 
-                default = [
-                    'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'
-                ], 
-            )
-        with cols[1]:
-            height = st.number_input(
-                "Set figure height", 
-                min_value=100, 
-                max_value=None, 
-                value=len(facets) * 200, 
-                step=100, 
-            )
-        
-        boat_profile = pd.concat(
-            boat_profiles, names=['File']
-        ).reset_index("File").rename_axis(
-            columns='Measurement'
-        ).set_index(
-            ["Normalized Time", "File"]
-        )[facets].stack().rename("value").reset_index()
-        fig = px.line(
-            boat_profile, 
-            x="Normalized Time", 
-            y="value",
-            color='File', 
-            facet_row='Measurement', 
-            # title=name
-        )
-        fig.update_yaxes(matches=None, showticklabels=True)
-        fig.update_layout(height=height)
-        st.plotly_chart(fig, use_container_width=True)
-        telemetry_figures['profile', 'boats'] = fig
-        
+            fig.update_yaxes(matches=None, showticklabels=True)
+            fig.update_layout(height=height)
+            st.plotly_chart(fig, use_container_width=True)
+            telemetry_figures['profile', 'boats'] = fig
+            
 
 logger.info("Download data")
 with st.expander("Download Data"):
