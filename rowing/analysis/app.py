@@ -430,6 +430,77 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
     return profiles, boat_profiles, crew_profiles
 
 
+@st.cache_data
+def make_telemetry_figure(piece_power, col, name, start_time):
+    if col == 'Work PC':
+        WorkPC_cols = [
+            'Work PC Q1', 'Work PC Q2', 'Work PC Q3', 'Work PC Q4']
+        pc_work = piece_power.set_index("Time")[
+            WorkPC_cols
+        ].stack([0, 1]).rename("PC").reset_index()
+        pc_work['Elapsed'] = (
+            (pc_work['Time'] - start_time) + pd.Timestamp(0)
+        ).dt.tz_localize(None)
+        fig = px.area(
+            pc_work, 
+            x="Elapsed", 
+            y='PC', 
+            facet_col='Position',
+            facet_col_wrap=3,  
+            color='Measurement',
+            title=name, 
+            color_discrete_sequence=[
+                "#0068c9",
+                "#83c9ff",
+                "#ff2b2b",
+                "#ffabab",
+                "#29b09d",
+                "#7defa1",
+                "#ff8700",
+                "#ffd16a",
+                "#6d3fc0",
+                "#d5dae5",
+            ],
+        )
+    else:
+        plot_data = piece_power.stack(1)[
+            ['Time', col]
+        ]
+        plot_data['Time'] = plot_data['Time'].ffill()
+        plot_data['Elapsed'] = (
+            (plot_data['Time'] - start_time) + pd.Timestamp(0)
+        ).dt.tz_localize(None)
+        plot_data = plot_data.dropna().reset_index()
+        fig = px.line(
+            plot_data, 
+            x='Elapsed', 
+            y=col, 
+            color='Position',
+            title=name, 
+            template="streamlit",
+            color_discrete_sequence=[
+                "#0068c9",
+                "#83c9ff",
+                "#ff2b2b",
+                "#ffabab",
+                "#29b09d",
+                "#7defa1",
+                "#ff8700",
+                "#ffd16a",
+                "#6d3fc0",
+                "#d5dae5",
+            ],
+        )
+
+    fig.update_xaxes(
+        tickformat="%M:%S",
+        dtick=60*1000, 
+        showgrid=True, 
+        griddash='solid', 
+    )
+    fig.update_traces(visible=True)
+    return fig 
+
 
 @st.cache_data
 def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=None):
@@ -458,7 +529,8 @@ def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=N
             'Work PC Q1', 
             'Work PC Q2',
             'Work PC Q3', 
-            'Work PC Q4'
+            'Work PC Q4',
+            'Work PC', 
         ]
 
     telemetry_figures = {}
@@ -484,35 +556,7 @@ def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=N
             (piece_times - start_time) #+ pd.Timestamp(0)
         ).dt.total_seconds()
         for col in tab_names:
-            plot_data = piece_power.stack(1)[
-                ['Time', col]
-            ]
-            plot_data['Time'] = plot_data['Time'].ffill()
-            plot_data['Elapsed'] = (
-                (plot_data['Time'] - start_time) + pd.Timestamp(0)
-            ).dt.tz_localize(None)
-            plot_data = plot_data.dropna().reset_index()
-
-            fig = px.line(
-                plot_data, 
-                x='Elapsed', 
-                y=col, 
-                color='Position',
-                title=name, 
-                template="streamlit",
-                color_discrete_sequence=[
-                    "#0068c9",
-                    "#83c9ff",
-                    "#ff2b2b",
-                    "#ffabab",
-                    "#29b09d",
-                    "#7defa1",
-                    "#ff8700",
-                    "#ffd16a",
-                    "#6d3fc0",
-                    "#d5dae5",
-                ],
-            )
+            fig = make_telemetry_figure(piece_power, col, name, start_time)
             for landmark, epoch in epoch_times.items():
                 fig.add_vline(
                     x=int((epoch - 3600) * 1000), 
@@ -521,13 +565,7 @@ def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=N
                         textangle=-90
                     )
                 )
-            fig.update_xaxes(
-                tickformat="%M:%S",
-                dtick=60*1000, 
-                showgrid=True, 
-                griddash='solid', 
-            )
-            fig.update_traces(visible=True)
+
             telemetry_figures[col, name] = fig
 
     return telemetry_figures

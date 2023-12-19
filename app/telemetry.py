@@ -229,12 +229,14 @@ with st.expander("Plot piece data", True):
                         st.plotly_chart(fig, use_container_width=True)
                         
                     st.subheader("Interval Averages")
-                    interval_stats = piece_data[f"Interval {col}"]
-                    st.write(interval_stats)
+                    interval_stats = piece_data.get(f"Interval {col}")
+                    if interval_stats is not None:
+                        st.write(interval_stats)
             
                     st.subheader("Piece Averages")
-                    interval_stats = piece_data[f"Average {col}"]
-                    st.write(interval_stats)
+                    interval_stats = piece_data.get(f"Average {col}")
+                    if interval_stats is not None:
+                        st.write(interval_stats)
 
 with st.expander("Plot Stroke Profiles", True):
     if st.toggle('Make profile plots'):

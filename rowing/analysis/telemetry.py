@@ -25,11 +25,11 @@ FIELDS = [
     'Rower Swivel Power', 
     'StrokeNumber', 
     'SwivelPower',
-    # 'Time', 
     'Work PC Q1', 
     'Work PC Q2',
     'Work PC Q3', 
-    'Work PC Q4'
+    'Work PC Q4',
+    'Work PC', 
 ]
 
 def Unnamed(col):
