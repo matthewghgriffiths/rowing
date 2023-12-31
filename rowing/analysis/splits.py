@@ -435,6 +435,7 @@ def get_piece_gps_data(
     piece_timestamps,
     start_landmark,
     finish_landmark,
+    landmark_distances,
 ):
     positions = positions.loc[
         positions.distance.searchsorted(
