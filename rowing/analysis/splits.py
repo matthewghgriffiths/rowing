@@ -407,7 +407,8 @@ def get_piece_times(crossing_times, start_landmark, finish_landmark):
             "Distance Travelled": piece_distances, 
             "Average Split": avg_split, 
             "Interval Split": interval_split,
-            "Timestamp": piece_data['Time'][col_order]
+            "Timestamp": piece_data['Time'][col_order], 
+            "Total Distance": piece_data['distance'][col_order], 
         }
 
         return piece_data
@@ -426,3 +427,29 @@ def get_interval_averages(X, time, timestamps):
     intervalX = Xdt.groupby(group_intervals).sum() / intervalT
     avgX = (intervalX * intervalT).cumsum() / intervalT.cumsum()
     return avgX.dropna(axis=1), intervalX.dropna(axis=1)
+
+
+def get_piece_gps_data(
+    positions,
+    piece_distances,
+    piece_timestamps,
+    start_landmark,
+    finish_landmark,
+):
+    positions = positions.loc[
+        positions.distance.searchsorted(
+            piece_distances[start_landmark]
+        ) - 1:
+        positions.distance.searchsorted(
+            piece_distances[finish_landmark]
+        ) + 1
+    ].copy()
+    positions['timeElapsed'] = (
+        positions.time - piece_timestamps[start_landmark]
+    )
+    positions[
+        'Distance Travelled'
+    ] = np.interp(
+        positions.distance, piece_distances, landmark_distances
+    )
+    return positions

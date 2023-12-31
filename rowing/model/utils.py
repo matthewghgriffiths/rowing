@@ -11,8 +11,8 @@ def integrate_series(s, initial=0):
     )
 
 
-def interpolate_series(index, s, **kwargs):
-    return pd.Series(
-        np.interp(index, s.index, s.values, **kwargs),
-        index=index
-    )
+# def interpolate_series(index, s, **kwargs):
+#     return pd.Series(
+#         np.interp(index, s.index, s.values, **kwargs),
+#         index=index
+#     )

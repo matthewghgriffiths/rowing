@@ -250,12 +250,12 @@ with st.expander("Plot Stroke Profiles", True):
             with cols[0]:
                 x = st.selectbox(
                     "Select x-axis", 
-                    ['GateAngle', 'GateForceX', 'GateAngleVel', "GateAngle0"]
+                    ['GateAngle', 'Normalized Time', 'GateForceX', 'GateAngleVel', "GateAngle0"]
                 )
             with cols[1]:
                 y = st.selectbox(
                     "Select y-axis", 
-                    ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0"]
+                    ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0", 'Normalized Time']
                 )
             with cols[2]:
                 height = st.number_input(
@@ -301,13 +301,13 @@ with st.expander("Plot Stroke Profiles", True):
             with cols[0]:
                 x = st.selectbox(
                     "Select x-axis", 
-                    ['GateAngle', 'GateForceX', 'GateAngleVel', "GateAngle0"],
+                    ['GateAngle', 'Normalized Time', 'GateForceX', 'GateAngleVel', "GateAngle0"],
                     key="Select x-axis2", 
                 )
             with cols[1]:
                 y = st.selectbox(
                     "Select y-axis", 
-                    ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0"],
+                    ['GateForceX', 'GateAngle', 'GateAngleVel', "GateAngle0", 'Normalized Time'],
                     key="Select y-axis2", 
                 )
             with cols[2]:
@@ -322,7 +322,7 @@ with st.expander("Plot Stroke Profiles", True):
             
             crew_profile = pd.concat(
                 crew_profiles, names=['File']
-            ).reset_index("File")
+            ).reset_index()
             crew_profile['Rower'] = (
                 # crew_profile.Position + "|" + crew_profile.File
                 crew_profile.File + "|" + crew_profile.Position

@@ -14,6 +14,21 @@ from rowing import utils
 from rowing.app import threads 
 
 
+logger = logging.getLogger(__name__)
+
+color_discrete_sequence=[
+    "#0068c9",
+    "#83c9ff",
+    "#ff2b2b",
+    "#ffabab",
+    "#29b09d",
+    "#7defa1",
+    "#ff8700",
+    "#ffd16a",
+    "#6d3fc0",
+    "#d5dae5",
+]
+
 @st.cache_data
 def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
@@ -420,18 +435,23 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
         )
         boat_profiles[name] = boat_profile = mean_profile.xs("Boat", axis=1, level=1)
         
-        crew_profiles[name] = mean_profile[
+        profile = mean_profile[
             mean_profile.columns.levels[0].difference(
                 boat_profile.columns)
         ].rename_axis(
             columns=("Measurement", "Position")
-        ).stack(1).reset_index("Position")
+        ).stack(1).reset_index(
+            "Position"
+        ).rename_axis(
+            index="Normalized Time"
+        ).reset_index()
+        crew_profiles[name] = profile
 
     return profiles, boat_profiles, crew_profiles
 
 
 @st.cache_data
-def make_telemetry_figure(piece_power, col, name, start_time):
+def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
     if col == 'Work PC':
         WorkPC_cols = [
             'Work PC Q1', 'Work PC Q2', 'Work PC Q3', 'Work PC Q4']
@@ -446,21 +466,10 @@ def make_telemetry_figure(piece_power, col, name, start_time):
             x="Elapsed", 
             y='PC', 
             facet_col='Position',
-            facet_col_wrap=3,  
+            facet_col_wrap=4,  
             color='Measurement',
             title=name, 
-            color_discrete_sequence=[
-                "#0068c9",
-                "#83c9ff",
-                "#ff2b2b",
-                "#ffabab",
-                "#29b09d",
-                "#7defa1",
-                "#ff8700",
-                "#ffd16a",
-                "#6d3fc0",
-                "#d5dae5",
-            ],
+            color_discrete_sequence=color_discrete_sequence,
         )
     else:
         plot_data = piece_power.stack(1)[
@@ -478,18 +487,16 @@ def make_telemetry_figure(piece_power, col, name, start_time):
             color='Position',
             title=name, 
             template="streamlit",
-            color_discrete_sequence=[
-                "#0068c9",
-                "#83c9ff",
-                "#ff2b2b",
-                "#ffabab",
-                "#29b09d",
-                "#7defa1",
-                "#ff8700",
-                "#ffd16a",
-                "#6d3fc0",
-                "#d5dae5",
-            ],
+            color_discrete_sequence=color_discrete_sequence,
+        )
+
+    for landmark, epoch in epoch_times.items():
+        fig.add_vline(
+            x=int((epoch - 3600) * 1000), 
+            annotation_text=landmark, 
+            annotation=dict(
+                textangle=-90
+            )
         )
 
     fig.update_xaxes(
@@ -505,33 +512,7 @@ def make_telemetry_figure(piece_power, col, name, start_time):
 @st.cache_data
 def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=None):
     if tab_names is None:
-        tab_names = [
-            'Angle 0.7 F', 
-            'Angle Max F', 
-            'Average Power', 
-            'AvgBoatSpeed',
-            'CatchSlip', 
-            'Dist/Stroke', 
-            'Drive Start T', 
-            'Drive Time',
-            'FinishSlip', 
-            'Max Force PC', 
-            'MaxAngle', 
-            'MinAngle', 
-            'Length', 
-            'Effective', 
-            'Rating',
-            'Recovery Time', 
-            'Rower Swivel Power', 
-            'StrokeNumber', 
-            'SwivelPower',
-            # 'Time', 
-            'Work PC Q1', 
-            'Work PC Q2',
-            'Work PC Q3', 
-            'Work PC Q4',
-            'Work PC', 
-        ]
+        tab_names = telemetry.FIELDS
 
     telemetry_figures = {}
     for piece, piece_times in piece_data['Timestamp'].iterrows():
@@ -555,17 +536,18 @@ def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=N
         epoch_times = (
             (piece_times - start_time) #+ pd.Timestamp(0)
         ).dt.total_seconds()
-        for col in tab_names:
-            fig = make_telemetry_figure(piece_power, col, name, start_time)
-            for landmark, epoch in epoch_times.items():
-                fig.add_vline(
-                    x=int((epoch - 3600) * 1000), 
-                    annotation_text=landmark, 
-                    annotation=dict(
-                        textangle=-90
-                    )
-                )
-
+        figures, errors = utils.map_concurrent(
+            make_telemetry_figure, 
+            {
+                col: (piece_power, col, name, start_time, epoch_times)
+                for col in tab_names
+            },
+            # max_workers=1
+            # progress_bar=None,
+        )
+        if errors:
+            logger.warning(errors)
+        for col, fig in figures.items():
             telemetry_figures[col, name] = fig
 
     return telemetry_figures

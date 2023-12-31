@@ -34,6 +34,27 @@ _pyodide = "pyodide" in sys.modules
 logger = logging.getLogger(__name__)
 
 
+def interpolate_series(s, index, **kwargs):
+    if pd.api.types.is_datetime64_any_dtype(s):
+        return pd.Series(pd.to_datetime(np.interp(
+            index,
+            s.index, 
+            (s - pd.Timestamp(0)).dt.total_seconds(), 
+            **kwargs
+        ), unit='s'), index)
+    elif pd.api.types.is_timedelta64_dtype(s):
+        return pd.Series(pd.to_timedelta(np.interp(
+            index,
+            s.index, 
+            s.dt.total_seconds(),
+            **kwargs
+        ), unit='s'), index)
+    else:
+        return pd.Series(
+            np.interp(index, s.index, s, **kwargs), index
+        )
+
+
 @lru_cache
 def load_gsheet(sheet):
     from gspread_pandas import Spread

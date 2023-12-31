@@ -6,6 +6,8 @@
 import numpy as np
 from scipy import stats
 
+import jax
+
 from rowing.model.gp import linalg
 
 
@@ -103,3 +105,55 @@ def test_block_pentadiagonal():
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
 
 
+def test_block_banded():
+    nblocks = 6
+    ak0, ak1 = -2, 1 
+    bk0, bk1 = -1, 2
+
+    A = linalg.BlockBanded.from_flat(
+        np.random.randn(linalg._tot_blocks(nblocks, ak0, ak1), 3, 2), 
+        nblocks, ak0, ak1
+    )
+    B = linalg.BlockBanded.from_flat(
+        np.random.randn(linalg._tot_blocks(nblocks, bk0, bk1), 2, 2), 
+        nblocks, bk0, bk1
+    )
+    C = A @ B
+    assert np.allclose(A.dense() @ B.dense(), C.dense())
+    assert np.allclose(
+        jax.jit(lambda x, y: (x @ y).dense())(A, B), C.dense()
+    )
+    assert np.allclose(
+        jax.jit(lambda x, y: (x @ y).dense())(A, B), C.dense()
+    )
+
+    for M in [A, B, C]:
+        assert np.allclose(
+            linalg.BlockBanded.from_dense(
+                M.dense(), M.blockshape, M.k0, M.k1).dense(), 
+            M.dense()
+        )
+
+        assert np.allclose(M.T.T.dense(), M.dense())
+
+def test_symmetry_block_banded():
+    nblocks = 5
+    blockshape = 2, 2
+    shape = tuple(s * nblocks for s in blockshape)
+    D = np.random.randn(*shape)
+    D = D @ D.T + np.eye(len(D))
+
+    D = linalg.BlockBanded.from_dense(D, blockshape, -2, 2)
+    A = D.dense()
+    L = np.linalg.cholesky(A)
+
+    BL = linalg.BlockBanded.from_dense(L, blockshape, -2, 0)
+    BU = linalg.BlockBanded.from_dense(L.T, blockshape, 0, 2)
+    BLU = BL @ BU
+
+    assert np.allclose(BL.dense(), L)
+    assert np.allclose(BU.dense(), L.T)
+    assert np.allclose((L @ L.T), A)
+    assert np.allclose(BLU.dense(), A)
+    assert np.allclose(BL.T.dense(), BU.dense())
+    assert np.allclose(BLU.T.dense(), BLU.dense())

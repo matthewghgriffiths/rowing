@@ -1,6 +1,8 @@
 
-from typing import NamedTuple
+from typing import NamedTuple, Tuple
 from functools import partial 
+
+import numpy as np
 
 import jax
 import jax.numpy as jnp
@@ -59,7 +61,248 @@ def cholesky(A, min_eig=0):
         A
     )
 
+def maximum(x, *args):
+    for y in args:
+        x = jnp.maximum(x, y)
+    return x
+
+def minimum(x, *args):
+    for y in args:
+        x = jnp.minimum(x, y)
+    return x
+
+
+def _tot_blocks(nblocks, k0, k1):
+    return (
+        nblocks * (k1 - k0 + 1) - (k0 * (k0 - 1)) // 2 - (k1 * (k1 + 1)) // 2
+    )
+
+def _block_matmul(A, B, args):
+    i, j, ak0, ak1, kc = args
+    
+    def body(ka, val):
+        CB = (
+            A.get_diag_block(jnp.minimum(i, i + ka), ka) 
+            @ B.get_diag_block(jnp.minimum(j, i + ka), kc - ka)
+        )
+        return val + CB
+    
+    res = jax.lax.fori_loop(
+        ak0, ak1 + 1, body, 
+        jnp.zeros(A.blockshape[:1] + B.blockshape[1:])
+    )
+    return res
+
+@partial(jax.jit, static_argnums=list(range(5)))
+def _blocks_matmul_indexes(nblocks, ak0, ak1, bk0, bk1):
+    ck0, ck1 = ak0 + bk0, ak1 + bk1
+    size = BlockBanded._tot_blocks(nblocks, ck0, ck1)
+    cks, cblocksizes, cblockstart, _ = BlockBanded.block_shapes(nblocks, ck0, ck1)
+    ck = jnp.repeat(cks, cblocksizes, total_repeat_length=size)
+    kstart = jnp.repeat(cblockstart, cblocksizes, total_repeat_length=size)
+    cn = jnp.arange(ck.size) - kstart
+    ci, cj = jnp.maximum(cn - ck, cn), jnp.maximum(cn + ck, cn)
+    k0 = maximum(ak0, - ci, ck - bk1, ck - cj)
+    k1 = minimum(ak1, nblocks - ci - 1, ck - bk0, ck - cj + nblocks - 1)
+    return (ci, cj, k0, k1, ck), (int(ck0), int(ck1))
+
+@partial(jax.jit, static_argnums=range(2, 7))
+def _block_banded_matmul(A, B, nblocks, ak0, ak1, bk0, bk1):
+    args, (ck0, ck1) = _blocks_matmul_indexes(nblocks, ak0, ak1, bk0, bk1)
+    return jax.lax.map(partial(_block_matmul, A, B), args)
+
+def block_banded_matmul(A, B):
+    nblocks = A.nblocks
+    blocks = _block_banded_matmul(A, B, nblocks, A.k0, A.k1, B.k0, B.k1)
+    return block_banded(blocks, nblocks, A.k0 + B.k0, A.k1 + B.k1)
+
+
+@partial(jax.jit, static_argnums=range(1, 4))
+def block_banded(blocks, nblocks, k0, k1):
+    return BlockBanded(blocks, nblocks, k0, k1)
+
+@jax.tree_util.register_pytree_node_class
+class BlockBanded:
+    blocks: jax.Array
+    nblocks: int
+    k0: int
+    k1: int
+
+    # @partial(jax.jit, static_argnums=range(2, 5))
+    def __init__(self, blocks, nblocks: int, k0: int, k1: int):
+        self.blocks = blocks
+        self.nblocks = int(nblocks)
+        self.k0 = int(k0)
+        self.k1 = int(k1)
+        # self.nblocks = jnp.array(nblocks, int).item()
+        # self.k0 = jnp.array(k0, int).item()
+        # self.k1 = jnp.array(k1, int).item()
+
+    def tree_flatten(self):
+        return ((self.blocks,), (self.nblocks, self.k0, self.k1,))
+    
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        return cls(*children, *aux_data)
+    
+    @staticmethod
+    def _tot_blocks(nblocks, k0, k1):
+        return (
+            nblocks * (k1 - k0 + 1) 
+            - (k0 * (k0 - 1)) // 2 
+            - (k1 * (k1 + 1)) // 2
+        )
+
+    @staticmethod
+    def block_coords(n, k):
+        return jnp.maximum(n - k, n), jnp.maximum(n + k, n)
+    
+    @staticmethod
+    def diag_coords(i, j):
+        return jnp.minimum(i, j), j - i
+    
+    def get_diag_block(self, n, k):
+        return self.blocks[self.blockstart[k] + n]
+    
+    def get_block(self, i, j):
+        return self.get_diag_block(*self.diag_coords(i, j))
+    
+    @staticmethod
+    @partial(jax.jit, static_argnums=range(3))
+    def block_shapes(nblocks, k0, k1):
+        ks = np.roll(np.arange(k0, k1 + 1), k0)
+        blocksizes = nblocks - abs(ks)
+        blockstart = np.r_[0, blocksizes[:-1].cumsum()]
+        return ks, blocksizes, blockstart, BlockBanded._tot_blocks(nblocks, k0, k1)
+
+    @classmethod
+    def from_flat(cls, flatblocks, nblocks, k0, k1):
+        return cls(jnp.array(flatblocks), nblocks, k0, k1)
+
+    @classmethod
+    def from_blocks(cls, blocks, k0):
+        nblocks = len(blocks[0])
+        blockshape = blocks[0][0].shape
+        k1 = len(blocks) + k0 - 1
+        ks, blocksizes, blockstart, blocktot = cls.block_shapes(nblocks, k0, k1)
+        flat_blocks = jnp.zeros((blocktot,) + blockshape)
+        for k in ks:
+            for i, M in enumerate(blocks[k]):
+                flat_blocks = flat_blocks.at[blockstart[k] + i].set(M)
+
+        return cls(flat_blocks, nblocks, k0, k1)
+    
+    @classmethod
+    def block_diag_indexes(cls, nblocks, k0, k1):
+        ks, blocksizes, blockstart, size = cls.block_shapes(nblocks, k0, k1)
+        k = jnp.repeat(ks, blocksizes, total_repeat_length=size)
+        n = jnp.arange(size) - jnp.repeat(blockstart, blocksizes, total_repeat_length=size)
+        return n, k
+
+    @classmethod
+    def from_dense(cls, A, blockshape, k0, k1):
+        n0, n1 = blockshape
+        nblocks = A.shape[0] // n0
+        assert A.shape[1] // n1 == nblocks
+        ks, blocksizes, blockstart, size = cls.block_shapes(nblocks, k0, k1)
+        k = jnp.repeat(ks, blocksizes, total_repeat_length=size)
+        n = jnp.arange(size) - jnp.repeat(blockstart, blocksizes, total_repeat_length=size)
+        i, j = cls.block_coords(n, k)
+
+        def Aindex(args):
+            return jax.lax.dynamic_slice(A, args, blockshape)
+            # return A[i*n0:i*n0 + n0, j*n1:j*n1 + n1]
+
+        blocks = jax.lax.map(Aindex, (n0 * i, n1 * j))
+        return cls(blocks, nblocks, k0, k1)
+        
+        # A = jnp.zeros(self.shape, self.dtype)
+        # n, m = self.blockshape
+        # for (i, j), M in self.items():
+        #     A = A.at[i*n:i*n + n, j*m:j*m + m].set(M)
+        # return A
+
+
+
+    @property 
+    def dtype(self):
+        return self.blocks.dtype
+    
+    @property
+    def blockshape(self):
+        return self.blocks.shape[1:]
+    
+    @property 
+    def tot_blocks(self):
+        return len(self.blocks)
+    
+    @property 
+    def shape(self):
+        nblocks = self.nblocks
+        return tuple(n * nblocks for n in self.blockshape)
+    
+    @property 
+    def ks(self):
+        return jnp.roll(jnp.arange(self.k0, self.k1 + 1), self.k0)
+    
+    @property 
+    def blocksizes(self):
+        return self.nblocks - abs(self.ks)
+
+    @property 
+    def blockstart(self):
+        return jnp.r_[0, self.blocksizes[:-1].cumsum()]
+
+    def items(self):
+        for k, kstart in zip(self.ks, self.blockstart):
+            for n in range(self.nblocks - abs(k)):
+                yield self.block_coords(n, k), self.blocks[kstart + n]
+
+
+    def diag_indexes(self):
+        ks, blocksizes, blockstart, size = self.block_shapes(self.nblocks, self.k0, self.k1)
+        k = jnp.repeat(ks, blocksizes, total_repeat_length=len(self.blocks))
+        n = jnp.arange(len(self.blocks)) - jnp.repeat(blockstart, blocksizes, total_repeat_length=len(self.blocks))
+        return n, k
+
+    def dense(self):
+        A = jnp.zeros(self.shape, self.dtype)
+        n, k = self.diag_indexes()
+        i, j = self.block_coords(n, k)
+        n, m = self.blockshape
+        
+        ni, mj = n * i, m * j
+
+        def body(k, A):
+            return jax.lax.dynamic_update_slice(A, self.blocks[k], (ni[k], mj[k]))
+        return jax.lax.fori_loop(0, len(self.blocks), body, A)
+    
+    def __matmul__(self, other):
+        if isinstance(other, BlockBanded):
+            return block_banded_matmul(self, other)
+        raise NotImplementedError()
+    
+    @property
+    def T(self):
+        nblocks, k0, k1 = self.nblocks, self.k0, self.k1
+        n, k = BlockBanded.block_diag_indexes(nblocks, -k1, -k0)
+        _, _, blockstart, _ = BlockBanded.block_shapes(nblocks, k0, k1)
+        return BlockBanded(
+            block_transpose(self.blocks)[n + blockstart[- k]], 
+            nblocks, -k1, -k0
+        )
+
+
 block_transpose = jax.vmap(jnp.transpose)
+
+class SymmetricBlockBanded(BlockBanded):
+    def get_diag_block(self, n, k):
+        return jax.lax.cond(
+            k < 0, 
+            lambda n, k: self.blocks[self.blockstart[-k] + n].T, 
+            lambda n, k: self.blocks[self.blockstart[k] + n]
+        )
+
 
 
 @partial(jax.jit, static_argnames=['k', 'trans'])
