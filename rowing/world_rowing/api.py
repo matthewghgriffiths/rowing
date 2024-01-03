@@ -520,7 +520,7 @@ def get_most_recent_competition(fisa=True):
     comps = get_this_years_competitions(fisa=fisa)
     started = comps[fields.competition_StartDate] < datetime.datetime.now()
     if not started.any():
-        comp = get_last_years_competitions(fisa=fisa)
+        comps = get_last_years_competitions(fisa=fisa)
         started = comps[fields.competition_StartDate] < datetime.datetime.now()
 
     competition = comps.loc[started].iloc[-1]
