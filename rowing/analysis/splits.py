@@ -361,8 +361,8 @@ def calc_time_above_hr(
 
 
 def get_piece_times(crossing_times, start_landmark, finish_landmark):
-    start_times = crossing_times.xs(start_landmark, level=3).droplevel(-1)
-    finish_times = crossing_times.xs(finish_landmark, level=3).droplevel(-1)
+    start_times = crossing_times.xs(start_landmark, level=-2).droplevel(-1)
+    finish_times = crossing_times.xs(finish_landmark, level=-2).droplevel(-1)
     times = pd.concat({
         "Elapsed time": crossing_times - start_times,
         "Time left": finish_times - crossing_times,
@@ -375,23 +375,16 @@ def get_piece_times(crossing_times, start_landmark, finish_landmark):
     )
     if valid_times.any():
         piece_data = times[valid_times].reset_index("distance").unstack()
-        legs = piece_data.index
-
         avg_distance = piece_data.distance.mean().sort_values()
         col_order = avg_distance.index 
-
-        legs = piece_data.index
-        # startfinish = pd.concat({
-        #     "Start time": start_times.loc[legs], 
-        #     "Finish Time": finish_times.loc[legs]
-        # }, axis=1)
         piece_data.index = pd.MultiIndex.from_frame(
-            start_times.loc[legs].rename("Start Time").reset_index()[
-                ["Start Time", "file", "location", "leg"]
+            start_times.loc[
+                piece_data.index
+            ].rename("Start Time").reset_index()[
+                ["Start Time", "name", "leg"]
             ]
         )
         piece_data = piece_data.sort_index(level=0)
-        legs = piece_data.index.droplevel(0)
         piece_distances = (
             piece_data.distance 
             - piece_data.distance[start_landmark].values[:, None]

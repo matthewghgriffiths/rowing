@@ -11,7 +11,7 @@ import plotly.express as px
 
 from rowing.analysis import splits, files, geodesy, telemetry
 from rowing import utils
-from rowing.app import threads 
+from rowing.app import threads
 
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,7 @@ def get_crossing_times(gpx_data, locations=None, thresh=0.5):
         locations=locations,
         thresh=thresh, 
     )
+    print(errors)
     if errors:
         logging.error(errors)
     return crossing_times
@@ -127,7 +128,7 @@ def get_fastest_times(gpx_data):
 
 def select_pieces(all_crossing_times):
     piece_dates = np.sort(all_crossing_times.dt.date.unique())
-    cols = st.columns(3)
+    cols = st.columns(4)
     with cols[0]:
         select_dates = st.multiselect(
             "select piece dates", 
@@ -136,7 +137,6 @@ def select_pieces(all_crossing_times):
         )
         select_dates = pd.to_datetime(select_dates).date
 
-    
     sel_times = all_crossing_times[
         all_crossing_times.dt.date.isin(select_dates)
     ].sort_index(level=(0, 4))
@@ -163,10 +163,16 @@ def select_pieces(all_crossing_times):
             "select finish landmark", 
             landmarks, 
             index=end, 
+        )    
+    with cols[3]:
+        intervals = st.number_input(
+            "Enter distance intervals (m)", 
+            min_value=10, max_value=2000, value=None, step=10, 
         )
 
     piece_data = splits.get_piece_times(sel_times, start_landmark, finish_landmark)
-    return piece_data, start_landmark, finish_landmark
+    return piece_data, start_landmark, finish_landmark, intervals
+
 
 def show_piece_data(piece_data):
     tabs = st.tabs(list(piece_data))
@@ -178,6 +184,35 @@ def show_piece_data(piece_data):
                     data[c] = col.map(utils.format_timedelta)
 
             st.dataframe(data)
+
+def align_pieces(piece_data, start_landmark, finish_landmark, gps_data, resolution=0.005):
+    piece_distances = piece_data['Total Distance']
+    piece_timestamps = piece_data['Timestamp']
+    landmark_distances = piece_data['Distance Travelled'].mean()[piece_distances.columns]
+    dists = np.arange(0, landmark_distances.max(), resolution)
+
+    piece_gps_data = {}
+    for piece in piece_distances.index:
+        positions = gps_data[piece[1]]
+        piece_gps_data[piece] = splits.get_piece_gps_data(
+            positions, 
+            piece_distances.loc[piece], 
+            piece_timestamps.loc[piece], 
+            start_landmark, 
+            finish_landmark,  
+            landmark_distances
+        )
+        
+    piece_compare_gps = pd.concat({
+        piece: sel_data.set_index(
+            "Distance Travelled"
+        ).apply(utils.interpolate_series, index=dists)
+        for piece, sel_data in piece_gps_data.items()
+    }, axis=1, names=piece_distances.index.names
+    ).rename_axis(index='distance')
+
+    return piece_compare_gps
+
 
 
 def set_landmarks(landmarks=None, title=True):

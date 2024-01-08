@@ -120,7 +120,7 @@ with st.expander("Show map"):
 logger.info("Crossing Times")
 with st.spinner("Processing Crossing Times"):
     crossing_times = app.get_crossing_times(gps_data, locations=locations)
-    all_crossing_times = pd.concat(crossing_times, names=['file'])
+    all_crossing_times = pd.concat(crossing_times, names=['name'])
 
 logger.info("All Crossing Times")
 with st.expander("All Crossing times"):
@@ -162,10 +162,37 @@ with st.expander("Individual Crossing Times"):
 
 logger.info("Select piece start end")
 with st.expander("Select Piece start/end"):
-    piece_data, start_landmark, finish_landmark = app.select_pieces(all_crossing_times)
+    piece_data, start_landmark, finish_landmark, intervals = app.select_pieces(all_crossing_times)
     if piece_data is None:
         st.write("No valid pieces could be found")
     else:
+        piece_compare_gps = app.align_pieces(
+            piece_data, start_landmark, finish_landmark, gps_data, 0.005)
+
+        if intervals:
+            sep = intervals/1e3
+            piece_gps = app.align_pieces(
+                piece_data, start_landmark, finish_landmark, gps_data, sep
+            )
+            interval_locations = pd.concat({
+                v: piece_gps.xs(v, level=-1, axis=1).mean(1)
+                for v in ["latitude", 'longitude', 'bearing']
+            }, axis=1).iloc[1:]
+            print(interval_locations)
+            interval_locations.index = interval_locations.index.map("{:.2f} km".format)
+            start_finish = locations.loc[(slice(None), [start_landmark, finish_landmark]), :]
+            new_locations = pd.concat([
+                start_finish,
+                # locations, 
+                pd.concat({"intervals": interval_locations})
+            ]).rename_axis(index=locations.index.names)
+            crossing_times = app.get_crossing_times(gps_data, locations=new_locations)
+            all_crossing_times = pd.concat(crossing_times, names=['name'])
+            sel_times = all_crossing_times.sort_index(level=(4,)).droplevel('location')
+            piece_data = splits.get_piece_times(
+                sel_times, start_landmark, finish_landmark
+            )
+
         avg_telem, interval_telem = {}, {}
         for piece, timestamps in piece_data['Timestamp'].iterrows():
             name = piece[1]
@@ -173,7 +200,9 @@ with st.expander("Select Piece start/end"):
                 'power'
             ].sort_values("Time").reset_index(drop=True)
             avgP, intervalP = splits.get_interval_averages(
-                power.drop("Time", axis=1, level=0), power.Time, timestamps
+                power.drop("Time", axis=1, level=0), 
+                power.Time, 
+                timestamps
             )
             for k in avgP.columns.remove_unused_levels().levels[0]:
                 avg_telem.setdefault(k, {})[name] = avgP[k].T
@@ -182,10 +211,10 @@ with st.expander("Select Piece start/end"):
 
         for k, data in avg_telem.items():
             piece_data[f"Average {k}"] = pd.concat(
-                data, names=['file', 'position'])
+                data, names=['name', 'position'])
         for k, data in interval_telem.items():
             piece_data[f"Interval {k}"] = pd.concat(
-                data, names=['file', 'position'])
+                data, names=['name', 'position'])
 
         app.show_piece_data(piece_data)
 
@@ -194,14 +223,9 @@ telemetry_figures = {}
 with st.expander("Plot piece data", True):
     cols = st.columns(3)
     with cols[0]:
-        on = st.toggle('Make plots')
+        all_plots = st.toggle('Make all plots')
 
-    if on and piece_data:
-        tab_names = st.multiselect(
-            "Select data fields to plot", 
-            options=telemetry.FIELDS, 
-            default=telemetry.FIELDS,
-        )
+    if piece_data:
         with cols[1]:
             window = st.number_input(
                 "Select window to average over (s), set to 0 to remove smoothing",
@@ -214,29 +238,84 @@ with st.expander("Plot piece data", True):
                 "Set figures height", 
                 100, 3000, 600, step=50, 
             )
-        telemetry_figures = app.make_telemetry_figures(
-            telemetry_data, piece_data, window=window, tab_names=tab_names
-        )
-        if tab_names:
-            telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
-            for col, tab in telem_tabs.items():
-                with tab:
+
+        telemetry_plot_data = {}
+        for piece, piece_times in piece_data['Timestamp'].iterrows():
+            name = piece[1]
+            power = telemetry_data[name]['power']
+            if window:
+                time_power = power.set_index("Time").sort_index()
+                avg_power = time_power.rolling(
+                    pd.Timedelta(seconds=window)
+                ).mean()
+                power = avg_power.reset_index()
+
+            start_time = piece_times.min()
+            finish_time = piece_times.max()
+            piece_power = power[
+                power.Time.between(start_time, finish_time)
+            ]
+            piece_power.columns.names = 'Measurement', 'Position'
+            epoch_times = (piece_times - start_time).dt.total_seconds()
+            telemetry_plot_data[name] = (piece_power, name, start_time, epoch_times)
+
+        telemetry_figures = {}
+        telem_tabs = dict(zip(telemetry.FIELDS, st.tabs(telemetry.FIELDS)))
+        for col, tab in telem_tabs.items():
+            with tab:
+                on = st.toggle('Make plot', value=all_plots, key=col + ' make plot')
+                if on: 
                     for name in piece_data['Timestamp'].index.get_level_values(1):
-                        fig = telemetry_figures[col, name]
+                        piece_power, name, start_time, epoch_times = telemetry_plot_data[name]
+                        fig = app.make_telemetry_figure(piece_power, col, name, start_time, epoch_times)
                         fig.update_layout(
                             height=height, 
                         )
                         st.plotly_chart(fig, use_container_width=True)
-                        
+                        telemetry_figures[col, name] = fig
+
+                cols = st.columns(2)
+                with cols[0]:                
                     st.subheader("Interval Averages")
                     interval_stats = piece_data.get(f"Interval {col}")
                     if interval_stats is not None:
                         st.write(interval_stats)
-            
+        
+                with cols[1]:
                     st.subheader("Piece Averages")
                     interval_stats = piece_data.get(f"Average {col}")
                     if interval_stats is not None:
                         st.write(interval_stats)
+
+        # telemetry_figures = app.make_telemetry_figures(
+        #     telemetry_data, piece_data, window=window, tab_names=tab_names
+        # )
+        # tab_names = st.multiselect(
+        #     "Select data fields to plot", 
+        #     options=telemetry.FIELDS, 
+        #     default=telemetry.FIELDS,
+        # )
+        # tab_names = []
+        # if tab_names:
+        #     telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
+        #     for col, tab in telem_tabs.items():
+        #         with tab:
+        #             for name in piece_data['Timestamp'].index.get_level_values(1):
+        #                 fig = telemetry_figures[col, name]
+        #                 fig.update_layout(
+        #                     height=height, 
+        #                 )
+        #                 st.plotly_chart(fig, use_container_width=True)
+                        
+        #             st.subheader("Interval Averages")
+        #             interval_stats = piece_data.get(f"Interval {col}")
+        #             if interval_stats is not None:
+        #                 st.write(interval_stats)
+            
+        #             st.subheader("Piece Averages")
+        #             interval_stats = piece_data.get(f"Average {col}")
+        #             if interval_stats is not None:
+        #                 st.write(interval_stats)
 
 with st.expander("Plot Stroke Profiles", True):
     if st.toggle('Make profile plots'):
@@ -381,6 +460,7 @@ with st.expander("Plot Stroke Profiles", True):
             st.plotly_chart(fig, use_container_width=True)
             telemetry_figures['profile', 'boats'] = fig
 
+
 with st.expander("Compare Piece Profile"):
     if piece_data:
         piece_distances = piece_data['Total Distance']
@@ -399,6 +479,7 @@ with st.expander("Compare Piece Profile"):
                 finish_landmark,  
                 landmark_distances
             )
+
         piece_compare_gps = pd.concat({
             piece: sel_data.set_index(
                 "Distance Travelled"
@@ -448,9 +529,11 @@ with st.expander("Compare Piece Profile"):
             time_behind, 
             x='distance', 
             y='time behind pace boat (s)', 
-            color='file', 
+            color='name', 
         )
         fig.update_yaxes(autorange="reversed")
+        fig.update_layout(height=height)
+        telemetry_figures['pacing', 'time behind pace boat'] = fig
         st.plotly_chart(fig, use_container_width=True)
 
 
