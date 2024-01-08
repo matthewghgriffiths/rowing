@@ -162,7 +162,9 @@ with st.expander("Individual Crossing Times"):
 
 logger.info("Select piece start end")
 with st.expander("Select Piece start/end"):
-    piece_data, start_landmark, finish_landmark, intervals = app.select_pieces(all_crossing_times)
+    piece_data, start_landmark, finish_landmark, intervals = app.select_pieces(
+        all_crossing_times
+    )
     if piece_data is None:
         st.write("No valid pieces could be found")
     else:
@@ -400,7 +402,7 @@ with st.expander("Plot Stroke Profiles", True):
                 )
             
             crew_profile = pd.concat(
-                crew_profiles, names=['File']
+                crew_profiles, names=['name']
             ).reset_index()
             crew_profile['Rower'] = (
                 # crew_profile.Position + "|" + crew_profile.File
@@ -441,17 +443,17 @@ with st.expander("Plot Stroke Profiles", True):
                 )
             
             boat_profile = pd.concat(
-                boat_profiles, names=['File']
-            ).reset_index("File").rename_axis(
+                boat_profiles, names=['name']
+            ).reset_index("name").rename_axis(
                 columns='Measurement'
             ).set_index(
-                ["Normalized Time", "File"]
+                ["Normalized Time", "name"]
             )[facets].stack().rename("value").reset_index()
             fig = px.line(
                 boat_profile, 
                 x="Normalized Time", 
                 y="value",
-                color='File', 
+                color='name', 
                 facet_row='Measurement', 
                 # title=name
             )
