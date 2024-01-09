@@ -180,7 +180,6 @@ with st.expander("Select Piece start/end"):
                 v: piece_gps.xs(v, level=-1, axis=1).mean(1)
                 for v in ["latitude", 'longitude', 'bearing']
             }, axis=1).iloc[1:]
-            print(interval_locations)
             interval_locations.index = interval_locations.index.map("{:.2f} km".format)
             start_finish = locations.loc[(slice(None), [start_landmark, finish_landmark]), :]
             new_locations = pd.concat([
