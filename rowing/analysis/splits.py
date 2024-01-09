@@ -361,13 +361,7 @@ def calc_time_above_hr(
 
 
 def get_piece_times(crossing_times, start_landmark, finish_landmark):
-    if crossing_times.index.nlevels == 5:
-        name, leg, loc, landmark, distance = crossing_times.index.names
-    elif crossing_times.index.nlevels == 4:
-        name, leg, landmark, distance = crossing_times.index.names
-    else:
-        raise ValueError()
-        
+    name, leg, *loc, landmark, distance = crossing_times.index.names
     start_times = crossing_times.xs(start_landmark, level=landmark).droplevel(distance)
     finish_times = crossing_times.xs(finish_landmark, level=landmark).droplevel(distance)
     times = pd.concat({
