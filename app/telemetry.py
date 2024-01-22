@@ -402,10 +402,10 @@ with st.expander("Plot Stroke Profiles", True):
             
             crew_profile = pd.concat(
                 crew_profiles, names=['name']
-            ).reset_index()
+            ).reset_index("name")
             crew_profile['Rower'] = (
                 # crew_profile.Position + "|" + crew_profile.File
-                crew_profile.File + "|" + crew_profile.Position
+                crew_profile.name + "|" + crew_profile.Position
             )
             fig = px.line(
                 crew_profile, 
