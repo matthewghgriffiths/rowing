@@ -1,6 +1,7 @@
 
 import importlib
 import logging
+import signal
 
 import pytest
 
@@ -15,15 +16,25 @@ app_GMTs = importlib.import_module("app.world_rowing.pages.1_GMTs", "..")
 app_livetracker = importlib.import_module("app.world_rowing.pages.2_livetracker", "..")
 app_realtime = importlib.import_module("app.world_rowing.pages.3_realtime", "..")
 
+TIMEOUT = 30
+
+def timeout(signum, frame):
+    raise TimeoutError("Timed out after {} seconds".format(TIMEOUT))
+
+signal.signal(signal.SIGALRM, timeout)
 
 def run_streamlit(main, params):
     try:
+        signal.alarm(TIMEOUT)
         main(params)
     except (
         st.runtime.scriptrunner.StopException,
         st.runtime.scriptrunner.RerunException,
     ):
         pass
+    finally:
+        signal.alarm(0)
+
 
 @pytest.mark.parametrize(
     "params", [
