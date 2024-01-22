@@ -1,7 +1,8 @@
 
 import importlib
 import logging
-import signal
+from multiprocessing import Process, Queue
+from functools import wraps
 
 import pytest
 
@@ -18,22 +19,44 @@ app_realtime = importlib.import_module("app.world_rowing.pages.3_realtime", ".."
 
 TIMEOUT = 30
 
-def timeout(signum, frame):
+def raise_timeout():
     raise TimeoutError("Timed out after {} seconds".format(TIMEOUT))
 
-signal.signal(signal.SIGALRM, timeout)
+def timeout(seconds):
+    """Calls any function with timeout after 'seconds'.
+       If a timeout occurs, 'action' will be returned or called if
+       it is a function-like object.
+    """
+    def handler(queue, func, args, kwargs):
+        queue.put(func(*args, **kwargs))
 
+    def decorator(func):
+        @wraps(func)
+        def new_func(*args, **kwargs):
+            q = Queue()
+            p = Process(target=handler, args=(q, func, args, kwargs))
+            p.start()
+            p.join(timeout=seconds)
+            if p.is_alive():
+                p.terminate()
+                p.join()
+                raise TimeoutError("Timed out after {} seconds".format(seconds))
+            else:
+                return q.get()
+
+        return new_func
+    
+    return decorator
+
+@timeout(TIMEOUT)
 def run_streamlit(main, params):
     try:
-        signal.alarm(TIMEOUT)
         main(params)
     except (
         st.runtime.scriptrunner.StopException,
         st.runtime.scriptrunner.RerunException,
     ):
         pass
-    finally:
-        signal.alarm(0)
 
 
 @pytest.mark.parametrize(
