@@ -24,17 +24,29 @@ logger = logging.getLogger(__name__)
 
 
 def main(state=None):
-    if state:
-        data = state.pop("gpx_data", {})
-        st.session_state.update(state)
+    state = state or {}
+    data = state.pop("gpx_data", {})
+    st.session_state.update(state)
+    state = st.session_state or state
 
     st.set_page_config(
         page_title="Rowing GPX",
-        layout='wide'
+        layout='wide',
+        initial_sidebar_state='collapsed'
     )
     """
     # GPX data processing
     """
+    with st.sidebar:
+        st.subheader("QR Code")
+        st.image(
+            "https://chart.googleapis.com/chart"
+            "?cht=qr&chl=https%3A%2F%2Frowing-gps.streamlit.app"
+            "&chs=360x360&choe=UTF-8&chld=L|0"
+        )
+        if st.button("Reset State"):
+            st.session_state.clear()
+            st.cache_resource.clear()
 
     uploaded_files = st.file_uploader(
         "Upload GPX files", accept_multiple_files=True

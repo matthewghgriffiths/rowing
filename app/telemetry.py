@@ -43,11 +43,29 @@ def main(state=None):
     logger.info("telemetry")
     st.set_page_config(
         page_title="Peach Telemetry Analysis",
-        layout='wide'
+        layout='wide',
+        initial_sidebar_state='collapsed'
     )
     """
     # Peach Telemetry processing
     """
+    with st.sidebar:
+        st.subheader("QR Code")
+        st.image(
+            "https://chart.googleapis.com/chart"
+            "?cht=qr&chl=https%3A%2F%2Frowing-gps.streamlit.app"
+            "&chs=360x360&choe=UTF-8&chld=L|0"
+        )
+        default_height = st.number_input(
+            "Default Figure Height",
+            min_value=100,
+            max_value=3000,
+            value=600,
+            step=50,
+        )
+        if st.button("Reset State"):
+            st.session_state.clear()
+            st.cache_resource.clear()
 
     with st.expander("Upload Telemetry Data"):
         use_names = st.checkbox("Use crew list", True)
@@ -252,7 +270,7 @@ def main(state=None):
             with cols[2]:
                 height = st.number_input(
                     "Set figures height",
-                    100, 3000, 600, step=50,
+                    100, 3000, default_height, step=50,
                 )
 
             telemetry_plot_data = {}
@@ -338,7 +356,7 @@ def main(state=None):
                         key='rower profile fig height',
                         min_value=100,
                         max_value=None,
-                        value=500,
+                        value=default_height,
                         step=100,
                     )
                 with cols[3]:
@@ -394,7 +412,7 @@ def main(state=None):
                         key='rower profile fig height2',
                         min_value=100,
                         max_value=None,
-                        value=500,
+                        value=default_height,
                         step=100,
                     )
 
@@ -508,7 +526,7 @@ def main(state=None):
             with cols[1]:
                 height = st.number_input(
                     "Set figure height",
-                    100, 3000, 600, step=50,
+                    100, 3000, default_height, step=50,
                     key="height piece profile",
                 )
 
@@ -575,7 +593,7 @@ def main(state=None):
             with cols[3]:
                 height = st.number_input(
                     "Save figure height",
-                    value=600,
+                    value=default_height,
                     min_value=50,
                     max_value=3000,
                     step=50,
