@@ -6,17 +6,20 @@ import pytest
 
 import streamlit as st
 from rowing.app import select, inputs, state, plots
-from rowing.utils import timeout 
+from rowing.utils import timeout
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
 
 
 app_GMTs = importlib.import_module("app.world_rowing.pages.1_GMTs", "..")
-app_livetracker = importlib.import_module("app.world_rowing.pages.2_livetracker", "..")
-app_realtime = importlib.import_module("app.world_rowing.pages.3_realtime", "..")
+app_livetracker = importlib.import_module(
+    "app.world_rowing.pages.2_livetracker", "..")
+app_realtime = importlib.import_module(
+    "app.world_rowing.pages.3_realtime", "..")
 
 TIMEOUT = 30
+
 
 @timeout(TIMEOUT)
 def run_streamlit(main, params):

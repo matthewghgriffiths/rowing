@@ -40,8 +40,8 @@ def parse_gpx_data(gpx_data):
                 'distanceDelta', 'distance', 'bearing_r', 'bearing'
             ])
 
-
     return process_latlontime(positions)
+
 
 def process_latlontime(positions):
     first = positions.index[0]
@@ -57,6 +57,7 @@ def process_latlontime(positions):
     positions['bearing'] = np.rad2deg(positions.bearing_r)
 
     return positions
+
 
 def read_fit_zipfile(zip_file):
     with zipfile.ZipFile(zip_file, 'r') as zipf:

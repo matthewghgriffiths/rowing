@@ -19,11 +19,13 @@ from . import state
 
 logger = logging.getLogger(__name__)
 
+
 def clear_cache():
     clear = st.button("clear cache")
     if clear:
         st.cache_data.clear()
         api.clear_cache()
+
 
 def modal_button(label1, label2, key=None, mode=False):
     key = key or ".".join(["modal_button", label1, label2])

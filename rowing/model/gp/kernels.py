@@ -114,7 +114,7 @@ class IntSEKernel(AbstractKernel):
     def __init__(self, t0=0., scale=None, variance=None, *, name=None, active_dim=0):
         super().__init__(name=name)
         self.active_dim = active_dim
-        
+
         self.t0 = t0 or hk.get_parameter(
             "t0", shape=(), dtype="f", init=jnp.zeros)
         self.variance = variance or jnp.exp(hk.get_parameter(

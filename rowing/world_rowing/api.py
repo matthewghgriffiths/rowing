@@ -387,13 +387,13 @@ def parse_races(races):
     parsed = [races]
     if "race_RscCode" in races.columns:
         parsed.append(parse_race_codes(races.race_RscCode))
-        
+
     if fields.race_event_boatClassId in races.columns:
         boat_classes = races[
             fields.race_event_boatClassId
         ].replace(BOATCLASSES).rename(fields.race_boatClass)
         parsed.append(boat_classes)
-    
+
     if fields.race_Date in races.columns:
         races[fields.Day] = races[fields.race_Date].dt.date
 
@@ -406,7 +406,7 @@ INCLUDE_RACE = (
     "raceBoats.raceBoatIntermediates.distance,event"
 )
 INCLUDE_RACE_ATHLETES = (
-    INCLUDE_RACE 
+    INCLUDE_RACE
     + ",raceBoats.raceBoatAthletes,raceBoats.raceBoatAthletes.person"
 )
 
@@ -421,10 +421,10 @@ def get_races(competition_id=None, cached=True, athletes=False):
         include=INCLUDE_RACE_ATHLETES if athletes else INCLUDE_RACE,
     )
     if races.empty:
-        return races 
-    
+        return races
+
     return parse_races(races)
-    
+
 
 def get_race(race_id, **kwargs):
     kwargs.setdefault(
@@ -444,7 +444,7 @@ def extract_results(races):
     race_results = pd.concat(
         races[fields.race_raceBoats].map(pd.json_normalize).values
     ).reset_index(drop=True).rename(columns=fields.renamer('raceBoats'))
-    
+
     race_intermediates = pd.concat(
         race_results[fields.raceBoats_raceBoatIntermediates].map(
             pd.json_normalize).values,
@@ -855,12 +855,12 @@ def merge_competition_results(
     event_wbts = pd.merge(
         competition_events, boat_wbts,
         left_on=fields.event_boatClassId, right_on=fields.boatClass_id,
-        suffixes = ('', '_1'),
+        suffixes=('', '_1'),
     )
     race_wbts = pd.merge(
         competition_races, event_wbts,
         left_on=fields.race_eventId, right_on=fields.event_id,
-        suffixes = ('', '_1'),
+        suffixes=('', '_1'),
     )
     race_data = pd.merge(
         race_results.loc[
@@ -869,7 +869,7 @@ def merge_competition_results(
         ],
         race_wbts,
         left_on=fields.raceBoats_raceId,  right_on=fields.race_id,
-        suffixes = ('', '_1'),
+        suffixes=('', '_1'),
     )
     race_data[fields.raceBoatIntermediates_Rank] = \
         race_data[fields.raceBoatIntermediates_Rank].astype(int)

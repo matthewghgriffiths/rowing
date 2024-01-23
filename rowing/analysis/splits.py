@@ -97,6 +97,7 @@ def find_all_crossing_data(positions, locations=None, thresh=0.5, cols=None):
 
     return crossing_data
 
+
 def calc_timings(loc_times):
     times = loc_times.values
     loc_timings = pd.DataFrame(
@@ -111,6 +112,7 @@ def calc_timings(loc_times):
     loc_timings /= dist_diffs
 
     return pd.concat({'splits': pd.concat({'times': loc_timings})}, axis=1)
+
 
 def get_location_timings(positions, locations=None, thresh=0.5):
     locations = load_landmarks() if locations is None else locations
@@ -362,12 +364,14 @@ def calc_time_above_hr(
 
 def get_piece_times(crossing_times, start_landmark, finish_landmark):
     name, leg, *loc, landmark, distance = crossing_times.index.names
-    start_times = crossing_times.xs(start_landmark, level=landmark).droplevel(distance)
-    finish_times = crossing_times.xs(finish_landmark, level=landmark).droplevel(distance)
+    start_times = crossing_times.xs(
+        start_landmark, level=landmark).droplevel(distance)
+    finish_times = crossing_times.xs(
+        finish_landmark, level=landmark).droplevel(distance)
     times = pd.concat({
         "Elapsed time": crossing_times - start_times,
         "Time left": finish_times - crossing_times,
-        "Time": crossing_times, 
+        "Time": crossing_times,
     }, axis=1)
     valid_times = (
         times.notna().all(axis=1)
@@ -387,36 +391,38 @@ def get_piece_times(crossing_times, start_landmark, finish_landmark):
         )
         piece_data = piece_data.sort_index(level=0)
         piece_distances = (
-            piece_data.distance 
+            piece_data.distance
             - piece_data.distance[start_landmark].values[:, None]
         )[col_order]
         piece_time = piece_data['Elapsed time'][col_order]
-        avg_split = (piece_time * 0.5 / piece_distances).fillna(pd.Timedelta(0))
+        avg_split = (piece_time * 0.5 /
+                     piece_distances).fillna(pd.Timedelta(0))
         interval_split = (
             piece_time.diff(axis=1) * 0.5 / piece_distances.diff(axis=1)
         ).fillna(pd.Timedelta(0))
 
         piece_data = {
-            "Elapsed Time": piece_time, 
-            "Distance Travelled": piece_distances, 
-            "Average Split": avg_split, 
+            "Elapsed Time": piece_time,
+            "Distance Travelled": piece_distances,
+            "Average Split": avg_split,
             "Interval Split": interval_split,
-            "Timestamp": piece_data['Time'][col_order], 
-            "Total Distance": piece_data[distance][col_order], 
+            "Timestamp": piece_data['Time'][col_order],
+            "Total Distance": piece_data[distance][col_order],
         }
 
         return piece_data
-    
+
+
 def get_interval_averages(X, time, timestamps):
     time_intervals = pd.IntervalIndex.from_breaks(timestamps)
     group_intervals = pd.cut(time, time_intervals).replace(
         pd.Series(timestamps.index[1:], time_intervals)
     )
     t = (time - time.min()).dt.total_seconds()
-    
+
     dt = t.diff().values[:, None] * X.notna()
     Xdt = X * dt
-    
+
     intervalT = dt.groupby(group_intervals).sum()
     intervalX = Xdt.groupby(group_intervals).sum() / intervalT
     avgX = (intervalX * intervalT).cumsum() / intervalT.cumsum()

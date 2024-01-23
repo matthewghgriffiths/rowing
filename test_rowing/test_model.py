@@ -1,6 +1,5 @@
 
 
-
 # import pytest
 
 import numpy as np
@@ -12,7 +11,7 @@ from rowing.model.gp import linalg
 
 
 def make_tridiagonal(nblock, blocksize):
-    n = blocksize * nblock 
+    n = blocksize * nblock
     W = stats.wishart(blocksize, np.eye(blocksize))
 
     A = np.zeros((n,)*2)
@@ -22,14 +21,15 @@ def make_tridiagonal(nblock, blocksize):
         i1 = i0 + blocksize * 2
         A[i0:i1, i0:i1] += W.rvs()
 
-    return A 
+    return A
+
 
 def test_block_tridiagonal():
     np.random.seed(1)
 
     nblock = 4
     blocksize = 5
-    n = blocksize * nblock 
+    n = blocksize * nblock
 
     A = make_tridiagonal(nblock, blocksize)
     D = linalg.block_diag(A, blocksize, 0)
@@ -44,14 +44,16 @@ def test_block_tridiagonal():
     y = np.random.randn(n)
     x = linalg.solve_block_triangular_bidiagonal(DL, DL1, y, lower=True)
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
-    x = linalg.solve_block_triangular_bidiagonal(DL, DL1, y, lower=True, trans=1)
+    x = linalg.solve_block_triangular_bidiagonal(
+        DL, DL1, y, lower=True, trans=1)
     assert np.allclose(np.linalg.solve(L.T, y), x, rtol=1e-10, atol=1e-6)
 
     DU = DL.swapaxes(1, 2)
     DU1 = linalg.block_transpose(DL1)
     x = linalg.solve_block_triangular_bidiagonal(DU, DU1, y, lower=False)
     assert np.allclose(np.linalg.solve(L.T, y), x, rtol=1e-10, atol=1e-6)
-    x = linalg.solve_block_triangular_bidiagonal(DU, DU1, y, lower=False, trans=1)
+    x = linalg.solve_block_triangular_bidiagonal(
+        DU, DU1, y, lower=False, trans=1)
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
 
 
@@ -59,7 +61,7 @@ def make_pentadiagonal(nblock, blocksize):
     D = np.zeros((nblock, blocksize, blocksize))
     D1 = np.zeros((nblock - 1, blocksize, blocksize))
     D2 = np.zeros((nblock - 2, blocksize, blocksize))
-    W = stats.wishart(blocksize **2 * 3, np.eye(blocksize * 3))
+    W = stats.wishart(blocksize ** 2 * 3, np.eye(blocksize * 3))
     for i in range(nblock - 2):
         A = W.rvs()
         D[i] += A[:blocksize, :blocksize]
@@ -95,27 +97,29 @@ def test_block_pentadiagonal():
     y = np.random.randn(nblock * blocksize)
     x = linalg.solve_block_triangular_tridiagonal(DL, DL1, DL2, y, lower=True)
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
-    x = linalg.solve_block_triangular_tridiagonal(DL, DL1, DL2, y, lower=True, trans=1)
+    x = linalg.solve_block_triangular_tridiagonal(
+        DL, DL1, DL2, y, lower=True, trans=1)
     assert np.allclose(np.linalg.solve(L.T, y), x, rtol=1e-10, atol=1e-6)
 
     U_Ds = tuple(map(linalg.block_transpose, L_Ds))
     x = linalg.solve_block_triangular_tridiagonal(*U_Ds, y, lower=False)
     assert np.allclose(np.linalg.solve(L.T, y), x, rtol=1e-10, atol=1e-6)
-    x = linalg.solve_block_triangular_tridiagonal(*U_Ds, y, lower=False, trans=1)
+    x = linalg.solve_block_triangular_tridiagonal(
+        *U_Ds, y, lower=False, trans=1)
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
 
 
 def test_block_banded():
     nblocks = 6
-    ak0, ak1 = -2, 1 
+    ak0, ak1 = -2, 1
     bk0, bk1 = -1, 2
 
     A = linalg.BlockBanded.from_flat(
-        np.random.randn(linalg._tot_blocks(nblocks, ak0, ak1), 3, 2), 
+        np.random.randn(linalg._tot_blocks(nblocks, ak0, ak1), 3, 2),
         nblocks, ak0, ak1
     )
     B = linalg.BlockBanded.from_flat(
-        np.random.randn(linalg._tot_blocks(nblocks, bk0, bk1), 2, 2), 
+        np.random.randn(linalg._tot_blocks(nblocks, bk0, bk1), 2, 2),
         nblocks, bk0, bk1
     )
     C = A @ B
@@ -130,11 +134,12 @@ def test_block_banded():
     for M in [A, B, C]:
         assert np.allclose(
             linalg.BlockBanded.from_dense(
-                M.dense(), M.blockshape, M.k0, M.k1).dense(), 
+                M.dense(), M.blockshape, M.k0, M.k1).dense(),
             M.dense()
         )
 
         assert np.allclose(M.T.T.dense(), M.dense())
+
 
 def test_symmetry_block_banded():
     nblocks = 5

@@ -40,14 +40,14 @@ def interpolate_series(s, index, **kwargs):
     if pd.api.types.is_datetime64_any_dtype(s):
         return pd.Series(pd.to_datetime(np.interp(
             index,
-            s.index, 
-            (s - pd.Timestamp(0)).dt.total_seconds(), 
+            s.index,
+            (s - pd.Timestamp(0)).dt.total_seconds(),
             **kwargs
         ), unit='s'), index)
     elif pd.api.types.is_timedelta64_dtype(s):
         return pd.Series(pd.to_timedelta(np.interp(
             index,
-            s.index, 
+            s.index,
             s.dt.total_seconds(),
             **kwargs
         ), unit='s'), index)
@@ -398,8 +398,7 @@ def map_concurrent(
     pbar = progress_bar(total=total or len(
         items)) if progress_bar else nullcontext()
     with pbar, Executor(max_workers=max_workers, **(executor_kws or {})) as executor:
-        work = {executor.submit(func, *get(args), **kwargs)
-                                : k for k, args in items}
+        work = {executor.submit(func, *get(args), **kwargs)                : k for k, args in items}
 
         status: Dict[str, Any] = {}
         for future in as_completed(work):
@@ -745,6 +744,7 @@ class CachedClient:
         else:
             func(*args, **kwargs)
 
+
 def timeout(seconds):
     """Calls any function with timeout after 'seconds'.
        If a timeout occurs, 'action' will be returned or called if
@@ -763,10 +763,11 @@ def timeout(seconds):
             if p.is_alive():
                 p.terminate()
                 p.join()
-                raise TimeoutError("Timed out after {} seconds".format(seconds))
+                raise TimeoutError(
+                    "Timed out after {} seconds".format(seconds))
             else:
                 return q.get()
 
         return new_func
-    
+
     return decorator

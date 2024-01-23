@@ -1,42 +1,44 @@
-import io 
+import io
 
-import numpy as np 
-import pandas as pd 
+import numpy as np
+import pandas as pd
 
-from rowing.analysis import files, splits, geodesy 
+from rowing.analysis import files, splits, geodesy
 
 FIELDS = [
-    'Angle 0.7 F', 
-    'Angle Max F', 
-    'Average Power', 
+    'Angle 0.7 F',
+    'Angle Max F',
+    'Average Power',
     'AvgBoatSpeed',
-    'CatchSlip', 
-    'Dist/Stroke', 
-    'Drive Start T', 
+    'CatchSlip',
+    'Dist/Stroke',
+    'Drive Start T',
     'Drive Time',
-    'FinishSlip', 
-    'Max Force PC', 
-    'MaxAngle', 
-    'MinAngle', 
-    'Length', 
-    'Effective', 
+    'FinishSlip',
+    'Max Force PC',
+    'MaxAngle',
+    'MinAngle',
+    'Length',
+    'Effective',
     'Rating',
-    'Recovery Time', 
-    'Rower Swivel Power', 
-    'StrokeNumber', 
+    'Recovery Time',
+    'Rower Swivel Power',
+    'StrokeNumber',
     'SwivelPower',
-    'Work PC Q1', 
+    'Work PC Q1',
     'Work PC Q2',
-    'Work PC Q3', 
+    'Work PC Q3',
     'Work PC Q4',
-    'Work PC', 
+    'Work PC',
 ]
+
 
 def Unnamed(col):
     if str(col).startswith("Unnamed: "):
         return ''
     else:
         return col
+
 
 def parse_powerline_text_data(raw_text_data, sep='\t', use_names=True):
     parts = raw_text_data.split("=====")
@@ -48,27 +50,28 @@ def parse_powerline_text_data(raw_text_data, sep='\t', use_names=True):
             key = k.replace("\t", "").replace(sep, "").strip()
             if 'eriodic' in key:
                 split_data[key] = pd.read_table(
-                    io.StringIO(raw_text), 
-                    header=[0, 1], 
+                    io.StringIO(raw_text),
+                    header=[0, 1],
                     low_memory=False,
                     sep=sep
-                ).rename(columns=Unnamed)#.dropna(axis=1, how='all')
+                ).rename(columns=Unnamed)  # .dropna(axis=1, how='all')
             elif 'Rig' in key:
                 split_data[key] = pd.read_table(
-                    io.StringIO(raw_text), 
-                    header=None, skiprows=[0, 1], 
+                    io.StringIO(raw_text),
+                    header=None, skiprows=[0, 1],
                     names=['Position', 'Side'],
-                    low_memory=False, 
-                    sep=sep, 
-                ).rename(columns=Unnamed)#.dropna(axis=1, how='all')
+                    low_memory=False,
+                    sep=sep,
+                ).rename(columns=Unnamed)  # .dropna(axis=1, how='all')
             elif raw_text:
                 split_data[key] = pd.read_table(
-                    io.StringIO(raw_text), 
+                    io.StringIO(raw_text),
                     low_memory=False,
-                    sep=sep, 
-                ).rename(columns=Unnamed)#.dropna(axis=1, how='all')
-    
+                    sep=sep,
+                ).rename(columns=Unnamed)  # .dropna(axis=1, how='all')
+
     return parse_powerline_data(split_data, use_names=use_names)
+
 
 def parse_powerline_excel(data, use_names=True):
     data_groups = data[data[0] == "====="]
@@ -76,7 +79,8 @@ def parse_powerline_excel(data, use_names=True):
     split_data = {}
     for i0, i1 in zip(data_groups.index, np.r_[data_groups.index[1:], data.index[-1] + 1]):
         key = data_keys[i0]
-        key_data = data.loc[i0+1:i1-1].dropna(axis=1, how='all').dropna(axis=0, how='all')
+        key_data = data.loc[i0+1:i1 -
+                            1].dropna(axis=1, how='all').dropna(axis=0, how='all')
         if "eriodic" in key:
             key_columns = pd.MultiIndex.from_frame(
                 key_data.iloc[:2].fillna("").T
@@ -87,7 +91,7 @@ def parse_powerline_excel(data, use_names=True):
             key_columns = key_data.iloc[0]
             key_data = key_data.iloc[1:].convert_dtypes()
             key_data.columns = key_columns
-            
+
         for c, vals in key_data.items():
             if pd.api.types.is_numeric_dtype(vals.dtype):
                 key_data[c] = vals.astype(float)
@@ -95,19 +99,19 @@ def parse_powerline_excel(data, use_names=True):
 
     return parse_powerline_data(split_data, use_names=use_names)
 
+
 def parse_powerline_data(split_data, use_names=True):
     crew_data = split_data['Crew Info']
     gps_data = split_data["Aperiodic0x8013"]
     power_data = split_data["Aperiodic0x800A"]
     gps_info = split_data['GPS Info'].iloc[0]
 
-
     split_data['Crew List'] = crew_list = crew_data.set_index("Position").Name
     crew_list[crew_list.isna()] = crew_list.index[crew_list.isna()]
 
     start_time = pd.to_datetime(
-        gps_info.UTC, 
-        exact=False, 
+        gps_info.UTC,
+        exact=False,
         format="%d %b %Y %H:%M:%S (%Z)"
     )
     start_date = pd.Timestamp(start_time.date())
@@ -120,16 +124,18 @@ def parse_powerline_data(split_data, use_names=True):
     split_data["Periodic"]['Time'] = pd.to_datetime(pd.to_timedelta(
         split_data['Periodic'].Time, unit='milli'
     ) + start_time)
-    
+
     positions = pd.concat({
         "time":  pd.to_timedelta(gps_data['UTC Time'].Boat, unit='milli') + start_date,
-        "longitude": gps_data.long / long_scale + lon, 
+        "longitude": gps_data.long / long_scale + lon,
         "latitude": gps_data.lat / lat_scale + lat
     }, axis=1).dropna().droplevel(1, axis=1)
 
     positions = files.process_latlontime(positions)
-    positions['timeDelta'] = (positions.time.shift(-1) - positions.time).fillna(pd.Timedelta(0))
-    positions['metrePerSeconds'] = positions.distanceDelta * 1000 / positions['timeDelta'].dt.total_seconds()
+    positions['timeDelta'] = (
+        positions.time.shift(-1) - positions.time).fillna(pd.Timedelta(0))
+    positions['metrePerSeconds'] = positions.distanceDelta * \
+        1000 / positions['timeDelta'].dt.total_seconds()
 
     power = power_data.copy()
     power.Time = pd.to_datetime(
@@ -139,8 +145,8 @@ def parse_powerline_data(split_data, use_names=True):
     effect = stroke_length - power.CatchSlip - power.FinishSlip
     power = pd.concat([
         power, pd.concat({
-            "Length": stroke_length, 
-            "Effective": effect, 
+            "Length": stroke_length,
+            "Effective": effect,
         }, axis=1)
     ], axis=1)
 
@@ -151,7 +157,7 @@ def parse_powerline_data(split_data, use_names=True):
         split_data["Periodic"] = split_data["Periodic"].rename(
             columns=crew_list.to_dict(), level=1)
 
-    return split_data 
+    return split_data
 
 
 def interp_series(s, x, **kwargs):

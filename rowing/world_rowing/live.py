@@ -56,7 +56,7 @@ def parse_livetracker_data(data):
     live_data = parse_livetracker_lane_data(data, 'live', 'id')
     if live_data.empty:
         return live_data
-    
+
     for boat, speed in live_data[
         fields.live_raceBoatTracker_metrePerSecond
     ].items():
@@ -102,21 +102,20 @@ def parse_livetracker(data):
     lane_info, race_distance = parse_livetracker_info(data)
 
     lane_info = lane_info.sort_values(fields.lane_Lane)
-    
+
     if live_boat_data.empty:
         live_boat_data = None
     else:
         ordered = pd.MultiIndex.from_product([
-            live_boat_data.columns.levels[0], lane_info.index, 
+            live_boat_data.columns.levels[0], lane_info.index,
         ])
         live_boat_data = live_boat_data.reindex(columns=ordered)
 
     if not intermediates.empty:
         ordered = pd.MultiIndex.from_product([
-            intermediates.columns.levels[0], lane_info.index, 
+            intermediates.columns.levels[0], lane_info.index,
         ])
         intermediates = intermediates.reindex(columns=ordered)
-
 
     return live_boat_data, intermediates, lane_info, race_distance
 
@@ -135,7 +134,7 @@ def shift_down(s, shift, min_val=0):
 
 
 def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_distance):
-    
+
     intermediate_distances = []
     intermediate_times = pd.DataFrame([])
     if not intermediates.empty:
@@ -202,14 +201,14 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     live_data = live_time_data.stack(1).reset_index().join(
         lane_info[[
             fields.lane_Rank,
-            fields.lane_Lane, 
+            fields.lane_Lane,
             fields.lane_ResultTime,
             fields.lane_country_CountryCode,
             fields.lane_country,
             fields.lane__finished,
             fields.lane_InvalidMarkResult,
             fields.lane_Remark,
-        ]], 
+        ]],
         on=fields.raceBoats,
         rsuffix='_1'
     )
@@ -240,7 +239,7 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
     lane_info = pd.concat(
         {
             race_id: data[2] for race_id, data in race_livetracks.items()
-        }, 
+        },
         axis=0
     ).reset_index(drop=True)
     return races_live_data, intermediates, lane_info
@@ -301,7 +300,6 @@ class RealTimeLivetracker:
             lane_data['live'] = lane_data['live'][s]
             lane_data['currentPoint'], = lane_data['live']
             live_data['config']['lanes'][lane] = lane_data
-            
 
         self.replay_start += self.replay_step
         return live_data
@@ -389,15 +387,15 @@ class LiveRaceData:
         self.new_points = None
         self.mutex = threading.Lock()
 
-        self.max_workers = max_workers 
+        self.max_workers = max_workers
         self.queue_size = 1
 
-    @property 
+    @property
     def distance(self):
         if self.livetracker is not None:
             return int(self.livetracker[fields.live_distanceOfLeader].max(1).max())
         return 0
-    
+
     def gen_data(self, *funcs):
         with utils.ThreadPoolExecutor(max_workers=self.max_workers) as self.executor:
             queue = self.tracker.run()
@@ -410,20 +408,20 @@ class LiveRaceData:
 
     def __iter__(self):
         return self.gen_data(self.update)
-    
-    @property 
+
+    @property
     def lanes(self):
         if self.lane_info is None:
-            return None 
-        
+            return None
+
         return self.lane_info[fields.lane_Lane].sort_values()
-    
+
     def livetracker_times(self, **kwargs):
         return estimate_livetracker_times(
-            self.livetracker, 
-            self.intermediates, 
-            self.lane_info, 
-            self.race_distance, 
+            self.livetracker,
+            self.intermediates,
+            self.lane_info,
+            self.race_distance,
         )[0]
 
     def update(self, data):
@@ -442,8 +440,8 @@ class LiveRaceData:
                     self.livetracker, livetracker_update)
             if inter_update is not None:
                 inter_update.index.name = fields.Distance
-            
-            self.lane_info = lane_update 
+
+            self.lane_info = lane_update
             self.intermediates = inter_update
             if livetracker_update is not None:
                 track_count = livetracker_update[fields.live_trackCount].mean(

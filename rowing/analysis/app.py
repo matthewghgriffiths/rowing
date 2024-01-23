@@ -1,10 +1,10 @@
 import streamlit as st
-import io 
+import io
 import zipfile
 import logging
 
 import numpy as np
-import pandas as pd 
+import pandas as pd
 
 import plotly.graph_objects as go
 import plotly.express as px
@@ -16,7 +16,7 @@ from rowing.app import threads
 
 logger = logging.getLogger(__name__)
 
-color_discrete_sequence=[
+color_discrete_sequence = [
     "#0068c9",
     "#83c9ff",
     "#ff2b2b",
@@ -29,21 +29,23 @@ color_discrete_sequence=[
     "#d5dae5",
 ]
 
+
 @st.cache_data
 def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
 
 
 def download_csv(
-        file_name, df, label=":inbox_tray: Download data as csv", csv_kws=None, **kwargs
-    ):
+    file_name, df, label=":inbox_tray: Download data as csv", csv_kws=None, **kwargs
+):
     st.download_button(
-        label=label, 
+        label=label,
         file_name=file_name,
-        data=df.to_csv(**(csv_kws or {})).encode("utf-8"), 
+        data=df.to_csv(**(csv_kws or {})).encode("utf-8"),
         mime="text/csv",
-        **kwargs, 
+        **kwargs,
     )
+
 
 @st.cache_data
 def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
@@ -52,15 +54,15 @@ def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
         for file in uploaded_files
     }
     data, errs = utils.map_concurrent(
-        telemetry.parse_powerline_text_data, 
-        uploaded_data, 
-        singleton=True, 
+        telemetry.parse_powerline_text_data,
+        uploaded_data,
+        singleton=True,
         use_names=use_names,
         sep=sep
     )
     if errs:
         logging.error(errs)
-    
+
     return data
 
 
@@ -77,38 +79,39 @@ def parse_telemetry_excel(uploaded_files, use_names=True):
         for file in uploaded_files
     }
     data, errs = utils.map_concurrent(
-        parse_excel, 
-        uploaded_data, 
-        singleton=True, 
+        parse_excel,
+        uploaded_data,
+        singleton=True,
         use_names=use_names,
     )
     if errs:
         logging.error(errs)
-    
+
     return data
 
 
 @st.cache_data
 def get_crossing_times(gpx_data, locations=None, thresh=0.5):
     crossing_times, errors = utils.map_concurrent(
-        splits.find_all_crossing_times, 
-        gpx_data, 
-        singleton=True, 
+        splits.find_all_crossing_times,
+        gpx_data,
+        singleton=True,
         locations=locations,
-        thresh=thresh, 
+        thresh=thresh,
     )
     print(errors)
     if errors:
         logging.error(errors)
     return crossing_times
 
+
 @st.cache_data
 def get_location_timings(gpx_data, locations=None, thresh=0.5):
     location_timings, errors = utils.map_concurrent(
-        splits.get_location_timings, gpx_data, 
-        singleton=True, 
-        locations=locations, 
-        thresh=thresh, 
+        splits.get_location_timings, gpx_data,
+        singleton=True,
+        locations=locations,
+        thresh=thresh,
     )
     if errors:
         logging.error(errors)
@@ -118,8 +121,8 @@ def get_location_timings(gpx_data, locations=None, thresh=0.5):
 @st.cache_data
 def get_fastest_times(gpx_data):
     best_times, errors = utils.map_concurrent(
-        splits.find_all_best_times, 
-        gpx_data, singleton=True, 
+        splits.find_all_best_times,
+        gpx_data, singleton=True,
     )
     if errors:
         logging.error(errors)
@@ -131,7 +134,7 @@ def select_pieces(all_crossing_times):
     cols = st.columns(4)
     with cols[0]:
         select_dates = st.multiselect(
-            "select piece dates", 
+            "select piece dates",
             piece_dates,
             piece_dates,
         )
@@ -154,23 +157,24 @@ def select_pieces(all_crossing_times):
     )
     with cols[1]:
         start_landmark = st.selectbox(
-            "select start landmark", 
-            landmarks, 
-            index=start, 
+            "select start landmark",
+            landmarks,
+            index=start,
         )
     with cols[2]:
         finish_landmark = st.selectbox(
-            "select finish landmark", 
-            landmarks, 
-            index=end, 
-        )    
+            "select finish landmark",
+            landmarks,
+            index=end,
+        )
     with cols[3]:
         intervals = st.number_input(
-            "Enter distance intervals (m)", 
-            min_value=10, max_value=2000, value=None, step=10, 
+            "Enter distance intervals (m)",
+            min_value=10, max_value=2000, value=None, step=10,
         )
 
-    piece_data = splits.get_piece_times(sel_times, start_landmark, finish_landmark)
+    piece_data = splits.get_piece_times(
+        sel_times, start_landmark, finish_landmark)
     return piece_data, start_landmark, finish_landmark, intervals
 
 
@@ -185,24 +189,26 @@ def show_piece_data(piece_data):
 
             st.dataframe(data)
 
+
 def align_pieces(piece_data, start_landmark, finish_landmark, gps_data, resolution=0.005):
     piece_distances = piece_data['Total Distance']
     piece_timestamps = piece_data['Timestamp']
-    landmark_distances = piece_data['Distance Travelled'].mean()[piece_distances.columns]
+    landmark_distances = piece_data['Distance Travelled'].mean()[
+        piece_distances.columns]
     dists = np.arange(0, landmark_distances.max(), resolution)
 
     piece_gps_data = {}
     for piece in piece_distances.index:
         positions = gps_data[piece[1]]
         piece_gps_data[piece] = splits.get_piece_gps_data(
-            positions, 
-            piece_distances.loc[piece], 
-            piece_timestamps.loc[piece], 
-            start_landmark, 
-            finish_landmark,  
+            positions,
+            piece_distances.loc[piece],
+            piece_timestamps.loc[piece],
+            start_landmark,
+            finish_landmark,
             landmark_distances
         )
-        
+
     piece_compare_gps = pd.concat({
         piece: sel_data.set_index(
             "Distance Travelled"
@@ -214,26 +220,25 @@ def align_pieces(piece_data, start_landmark, finish_landmark, gps_data, resoluti
     return piece_compare_gps
 
 
-
 def set_landmarks(landmarks=None, title=True):
     tab1, tab2 = st.tabs([
-        "Edit Landmarks", "Upload Landmarks", #"Map of Landmarks"
+        "Edit Landmarks", "Upload Landmarks",  # "Map of Landmarks"
     ])
     if landmarks is None:
         landmarks = splits.load_location_landmarks().reset_index()
-    
+
     if title:
         landmarks['landmark'] = landmarks['landmark'].str.replace(
             "_", " "
         ).str.title().str.replace(
-            r"([0-9][A-Z])", 
-            lambda m: m.group(0).lower(), 
+            r"([0-9][A-Z])",
+            lambda m: m.group(0).lower(),
             regex=True
         )
 
     with tab2:
         uploaded = st.file_uploader(
-            "Upload landmarks csv", 
+            "Upload landmarks csv",
             accept_multiple_files=False
         )
         if uploaded:
@@ -251,16 +256,14 @@ def set_landmarks(landmarks=None, title=True):
         if input:
             st.write("Entered Landmarks")
             new_landmarks = pd.read_csv(
-                io.StringIO(input), 
-                header=None, 
-                names=landmarks.columns 
+                io.StringIO(input),
+                header=None,
+                names=landmarks.columns
             )
             st.dataframe(new_landmarks)
             landmarks = pd.concat(
                 [new_landmarks, landmarks]
             ).drop_duplicates().reset_index(drop=True)
-
-
 
     with tab1:
         col1, col2 = st.columns(2)
@@ -272,8 +275,8 @@ def set_landmarks(landmarks=None, title=True):
             set_landmarks = st.data_editor(
                 landmarks[
                     landmarks.location.isin(sel_locations)
-                ], 
-                hide_index=True, 
+                ],
+                hide_index=True,
                 num_rows="dynamic"
             )
         with col2:
@@ -290,57 +293,57 @@ def set_landmarks(landmarks=None, title=True):
                 A custom landmarks can be uploaded as a csv which will be merged with the existing landmarks. 
                 This csv must match the format of the downloaded csv
                 """)
-        
+
         download_csv(
-            "landmarks.csv", 
-            set_landmarks, 
-            ':inbox_tray: download set landmarks as csv', 
-            csv_kws=dict(index=False), 
-        )
-        
-    with tab2:
-        download_csv(
-            "landmarks.csv", 
-            set_landmarks, 
-            ':inbox_tray: download landmarks as csv', 
-            csv_kws=dict(index=False), 
+            "landmarks.csv",
+            set_landmarks,
+            ':inbox_tray: download set landmarks as csv',
+            csv_kws=dict(index=False),
         )
 
-    # with tab3: 
+    with tab2:
+        download_csv(
+            "landmarks.csv",
+            set_landmarks,
+            ':inbox_tray: download landmarks as csv',
+            csv_kws=dict(index=False),
+        )
+
+    # with tab3:
     if True:
-        st.subheader("Map of Landmarks")       
+        st.subheader("Map of Landmarks")
         cols = st.columns([5, 2])
         with cols[0]:
             map_style = st.selectbox(
-                "map style", 
+                "map style",
                 ["open-street-map", "carto-positron", "carto-darkmatter"],
                 key='landmark map style'
 
             )
         with cols[1]:
             height = st.number_input(
-                "Set figure height", 100, 3000, 600, step=50, 
+                "Set figure height", 100, 3000, 600, step=50,
                 key='landmark map height'
             )
-        
+
         fig = go.Figure()
-        
+
         fig.add_trace(go.Scattermapbox(
-            lon = set_landmarks.longitude, 
-            lat = set_landmarks.latitude,
+            lon=set_landmarks.longitude,
+            lat=set_landmarks.latitude,
             # customdata = set_landmarks,
-            mode = 'markers+text',
-            name = 'Landmarks',
-            text = set_landmarks.landmark, 
+            mode='markers+text',
+            name='Landmarks',
+            text=set_landmarks.landmark,
             cluster=dict(
-                enabled=True, 
-                maxzoom=5, 
-                step=1, 
-                size=20, 
+                enabled=True,
+                maxzoom=5,
+                step=1,
+                size=20,
             ),
             marker={
-                'size': 5, 
-                # 'symbol': "airfield", 
+                'size': 5,
+                # 'symbol': "airfield",
                 # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
             },
             textposition='bottom right',
@@ -350,35 +353,35 @@ def set_landmarks(landmarks=None, title=True):
             arrow = geodesy.make_arrow_base(landmark, 0.25, 0.1, 20)
 
             fig.add_trace(go.Scattermapbox(
-                lon = arrow.longitude, 
-                lat = arrow.latitude,
+                lon=arrow.longitude,
+                lat=arrow.latitude,
                 # hoverinfo = landmark_locs.index,
-                mode = 'lines',
-                name = landmark.landmark,
-                fill = 'toself', 
-                hovertext = f"bearing={landmark.bearing:.1f}",
-                line = dict(
-                    width=3, 
+                mode='lines',
+                name=landmark.landmark,
+                fill='toself',
+                hovertext=f"bearing={landmark.bearing:.1f}",
+                line=dict(
+                    width=3,
                 ),
-                # text = list(set_landmarks.landmark), 
+                # text = list(set_landmarks.landmark),
                 # marker={
-                #     'size': 5, 
+                #     'size': 5,
                 #     # 'symbol': landmark_locs.index,
                 # },
                 textposition='bottom right',
             ))
 
         fig.update_layout(
-            mapbox = {
+            mapbox={
                 'style': map_style,
                 'center': {
-                    'lon': set_landmarks.longitude.mean(), 
-                    'lat': set_landmarks.latitude.mean(), 
+                    'lon': set_landmarks.longitude.mean(),
+                    'lat': set_landmarks.latitude.mean(),
                 },
                 'zoom': 5
             },
             showlegend=False,
-            height=height, 
+            height=height,
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -389,7 +392,7 @@ def draw_gps_data(gps_data, locations):
     cols = st.columns([5, 2])
     with cols[0]:
         map_style = st.selectbox(
-            "map style", 
+            "map style",
             ["open-street-map", "carto-positron", "carto-darkmatter"]
         )
     with cols[1]:
@@ -399,31 +402,31 @@ def draw_gps_data(gps_data, locations):
     data = locations
     for name, data in gps_data.items():
         fig.add_trace(go.Scattermapbox(
-            lon = data.longitude, 
-            lat = data.latitude,
-            mode = 'lines',
-            name = name, 
+            lon=data.longitude,
+            lat=data.latitude,
+            mode='lines',
+            name=name,
         ))
     fig.add_trace(go.Scattermapbox(
-        lon = locations.longitude, 
-        lat = locations.latitude,
+        lon=locations.longitude,
+        lat=locations.latitude,
         # hoverinfo = landmark_locs.index,
-        mode = 'markers+text',
-        name = 'Landmarks',
-        text = locations.index.get_level_values("landmark"), 
+        mode='markers+text',
+        name='Landmarks',
+        text=locations.index.get_level_values("landmark"),
         marker={
-            'size': 20, 
-            # 'symbol': "airfield", 
+            'size': 20,
+            # 'symbol': "airfield",
             # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
         },
         textposition='bottom right',
     ))
     fig.update_layout(
-        mapbox = {
+        mapbox={
             'style': map_style,
             'center': {
-                'lon': data.longitude.mean(), 
-                'lat': data.latitude.mean(), 
+                'lon': data.longitude.mean(),
+                'lat': data.latitude.mean(),
             },
             'zoom': 10
         },
@@ -434,7 +437,7 @@ def draw_gps_data(gps_data, locations):
             xanchor="right",
             x=1
         ),
-        height=height, 
+        height=height,
     )
     st.plotly_chart(
         fig, use_container_width=True
@@ -457,8 +460,8 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
 
         profiles[name] = profile = telemetry.norm_stroke_profile(
             piece_profile, nres)
-        
-        gate_angle = profile.GateAngle 
+
+        gate_angle = profile.GateAngle
         gate_angle0 = gate_angle - gate_angle.values.mean(0, keepdims=True)
         for pos, angle0 in gate_angle0.items():
             profile["GateAngle0", pos] = angle0
@@ -468,8 +471,9 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
         ).mean().reset_index().rename(
             {"": "Boat"}, axis=1, level=1
         )
-        boat_profiles[name] = boat_profile = mean_profile.xs("Boat", axis=1, level=1)
-        
+        boat_profiles[name] = boat_profile = mean_profile.xs(
+            "Boat", axis=1, level=1)
+
         profile = mean_profile[
             mean_profile.columns.levels[0].difference(
                 boat_profile.columns)
@@ -497,13 +501,13 @@ def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
             (pc_work['Time'] - start_time) + pd.Timestamp(0)
         ).dt.tz_localize(None)
         fig = px.area(
-            pc_work, 
-            x="Elapsed", 
-            y='PC', 
+            pc_work,
+            x="Elapsed",
+            y='PC',
             facet_col='Position',
-            facet_col_wrap=4,  
+            facet_col_wrap=4,
             color='Measurement',
-            title=name, 
+            title=name,
             color_discrete_sequence=color_discrete_sequence,
         )
     else:
@@ -516,19 +520,19 @@ def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
         ).dt.tz_localize(None)
         plot_data = plot_data.dropna().reset_index()
         fig = px.line(
-            plot_data, 
-            x='Elapsed', 
-            y=col, 
+            plot_data,
+            x='Elapsed',
+            y=col,
             color='Position',
-            title=name, 
+            title=name,
             template="streamlit",
             color_discrete_sequence=color_discrete_sequence,
         )
 
     for landmark, epoch in epoch_times.items():
         fig.add_vline(
-            x=int((epoch - 3600) * 1000), 
-            annotation_text=landmark, 
+            x=int((epoch - 3600) * 1000),
+            annotation_text=landmark,
             annotation=dict(
                 textangle=-90
             )
@@ -536,16 +540,16 @@ def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
 
     fig.update_xaxes(
         tickformat="%M:%S",
-        dtick=60*1000, 
-        showgrid=True, 
-        griddash='solid', 
+        dtick=60*1000,
+        showgrid=True,
+        griddash='solid',
     )
     fig.update_traces(visible=True)
-    return fig 
+    return fig
 
 
 @st.cache_data
-def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=None):
+def make_telemetry_figures(telemetry_data, piece_data, window: int = 0, tab_names=None):
     if tab_names is None:
         tab_names = telemetry.FIELDS
 
@@ -569,10 +573,10 @@ def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=N
         piece_power.columns.names = 'Measurement', 'Position'
 
         epoch_times = (
-            (piece_times - start_time) #+ pd.Timestamp(0)
+            (piece_times - start_time)  # + pd.Timestamp(0)
         ).dt.total_seconds()
         figures, errors = utils.map_concurrent(
-            make_telemetry_figure, 
+            make_telemetry_figure,
             {
                 col: (piece_power, col, name, start_time, epoch_times)
                 for col in tab_names
@@ -586,6 +590,7 @@ def make_telemetry_figures(telemetry_data, piece_data, window:int=0, tab_names=N
             telemetry_figures[col, name] = fig
 
     return telemetry_figures
+
 
 @st.cache_data
 def figures_to_zipfile(figures, file_type, **kwargs):

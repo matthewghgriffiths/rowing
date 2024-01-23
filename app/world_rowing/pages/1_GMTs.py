@@ -1,9 +1,11 @@
 
+from rowing.app import state, inputs, select, plots
+from rowing.world_rowing import api, utils, fields
 import streamlit as st
 
-import sys 
+import sys
 import os
-from pathlib import Path 
+from pathlib import Path
 
 import logging
 
@@ -16,8 +18,6 @@ realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
 
-from rowing.world_rowing import api, utils, fields
-from rowing.app import state, inputs, select, plots
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def main(params=None):
         fields.PGMT: {"tickformat": ",.0%"}
     }
     plot_inputs['hover_data'] = {
-        fields.raceBoatIntermediates_Rank: True, 
+        fields.raceBoatIntermediates_Rank: True,
         fields.raceBoatIntermediates_ResultTime: "|%-M:%S.%L",
         fields.GMT: "|%-M:%S.%L",
     }

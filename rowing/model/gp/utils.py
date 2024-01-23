@@ -14,6 +14,7 @@ import haiku as hk
 from ...utils import map_concurrent
 from .linalg import vdot, get_pos_def, solve_triangular
 
+
 def transform(func):
     return hk.without_apply_rng(hk.transform(func))
 
@@ -31,8 +32,8 @@ def apply(func, *args, **kwargs):
 def init_full(fill_value):
     def full(shape, dtype):
         return jnp.full(shape, fill_value, dtype)
-    
-    return full 
+
+    return full
 
 
 class GPSystem(NamedTuple):
@@ -44,49 +45,49 @@ class GPSystem(NamedTuple):
     @classmethod
     def from_cholesky(cls, L, y):
         Ly = solve_triangular(L, y, lower=True, trans=0)
-        a = solve_triangular(L, Ly, lower=True, trans=1)#
+        a = solve_triangular(L, Ly, lower=True, trans=1)
         return cls(a, Ly, L, y)
-    
+
     @classmethod
     def from_gram(cls, K, y):
         L = jnp.linalg.cholesky(K)
         return cls.from_cholesky(L, y)
-    
+
     def log_marginal(self, constant=1):
-        L = self.L 
-        Ly = self.Ly 
+        L = self.L
+        Ly = self.Ly
         log_like = constant * (
-            - jnp.dot(Ly, Ly)/2 
+            - jnp.dot(Ly, Ly)/2
             - jnp.log(L.diagonal()).sum()
         )
-        return log_like 
-    
+        return log_like
+
     def loss(self):
         return self.log_marginal(-1)
-    
+
     def inv_K(self):
         L, y = self.L, self.y
         invK = solve_triangular(
-            L, 
+            L,
             solve_triangular(
-                L, jnp.eye(len(y)), 
+                L, jnp.eye(len(y)),
                 lower=True, trans=0
             ),
             lower=True, trans=1
         )
         return invK
-    
+
     def leave_one_out(self):
         y = self.y
-        a = self.a 
+        a = self.a
         invK = self.inv_K()
         iKii = invK.diagonal()
-        y_loo = y - a / iKii 
-        return y_loo 
-    
+        y_loo = y - a / iKii
+        return y_loo
+
     def predict(self, K):
-        return K @ self.a 
-    
+        return K @ self.a
+
     def var(self, Kvar, K):
         L = self.L
         LdivK = solve_triangular(
@@ -94,20 +95,16 @@ class GPSystem(NamedTuple):
         )
         if jnp.ndim(Kvar) == 2:
             Kvar = Kvar.diagonal()
-        
+
         y_var = Kvar - jnp.square(LdivK).sum(0)
-        return y_var 
-    
+        return y_var
+
     def covar(self, Kcov, K):
         L = self.L
         LdivK = solve_triangular(
             L, K.T, lower=True, trans=0
         )
-        return Kcov - LdivK.T @ LdivK 
-
-        
-
-
+        return Kcov - LdivK.T @ LdivK
 
 
 def _2d(x):

@@ -1,9 +1,11 @@
+from rowing.app import select, inputs, state, plots
+from rowing.world_rowing import fields
 import streamlit as st
 
 
-import sys 
+import sys
 import os
-from pathlib import Path 
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -16,8 +18,6 @@ realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
 
-from rowing.world_rowing import fields
-from rowing.app import select, inputs, state, plots
 
 st.set_page_config(
     page_title="World Rowing livetracker",
@@ -67,8 +67,6 @@ def main(params=None):
 
             inputs.clear_cache()
 
-            
-
     # st.subheader("Select livetracker data")
     with st.expander("Select livetracker data"):
         st.write(
@@ -80,14 +78,14 @@ def main(params=None):
 
             To filter races, select which criteria to filter the races on using 'Filter Dataframe on', 
             for example, Event, Phase, Day or Boat Class. 
-            """     
+            """
         )
         select_competition, filter_races, select_gmts, filter_live = st.tabs([
             "Select Competition", "Filter Races", "Select GMTS", "Filter livetracker data"
         ])
 
     races = select.select_races(
-        competition_container=select_competition, 
+        competition_container=select_competition,
         races_container=filter_races,
         filters=True, select_all=False, select_first=True,
         default=[
@@ -96,7 +94,7 @@ def main(params=None):
             fields.race_raceStatus
         ],
         **{
-        #     fields.Phase: ['Final A'],
+            #     fields.Phase: ['Final A'],
             fields.race_raceStatus: ["Official", "Unofficial"],
         }
     ).reset_index(drop=True)

@@ -452,8 +452,8 @@ def load_fit_activities(activity_ids, max_workers=4, api=None, **kwargs):
 
 
 def get_activities(
-        start=0, limit=20, *, api=None, activityType=None, 
-        startDate=None, endDate=None, minDistance=None, maxDistance=None, 
+        start=0, limit=20, *, api=None, activityType=None,
+        startDate=None, endDate=None, minDistance=None, maxDistance=None,
         **params
 ):
     if activityType:

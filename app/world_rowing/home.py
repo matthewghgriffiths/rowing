@@ -2,9 +2,9 @@
 
 import streamlit as st
 
-import sys 
+import sys
 import os
-from pathlib import Path 
+from pathlib import Path
 
 DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)

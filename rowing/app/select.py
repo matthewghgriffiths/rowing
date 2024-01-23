@@ -1,7 +1,7 @@
 
 import logging
 import datetime
-import time 
+import time
 from functools import partial, wraps
 
 import streamlit as st
@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 get_live_race_data = st.cache_resource(live.LiveRaceData)
 
 USE_CACHE = True
+
+
 def cache_data(func=None, **kwargs):
     if func:
         cached_func = st.cache_data(func, **kwargs)
@@ -27,15 +29,15 @@ def cache_data(func=None, **kwargs):
             else:
                 logger.debug("not using cache for %s", func)
                 return func(*args, **kwargs)
-            
+
         return new_func
     else:
         return partial(cache_data, **kwargs)
 
+
 @st.cache_data(persist=True)
 def get_competitions(**kwargs):
     return api.get_competitions(**kwargs)
-
 
 
 @st.cache_data(persist=False, ttl=600)
@@ -44,6 +46,7 @@ def get_races(competition_id):
     return api.get_races(competition_id=competition_id).sort_values(
         fields.race_Date, ascending=False
     )
+
 
 @st.cache_data(persist=True)
 def get_events(competition_id):
@@ -96,11 +99,11 @@ def get_races_livedata(races, max_workers=10):
     )
     live_data = live_data.join(
         races[[
-            fields.race_Date, fields.Race, fields.race_event, 
-            fields.Gender, fields.Category, fields.Phase, 
+            fields.race_Date, fields.Race, fields.race_event,
+            fields.Gender, fields.Category, fields.Phase,
             fields.boatClass, fields.GMT
         ]],
-        on=fields.live_raceId, 
+        on=fields.live_raceId,
         lsuffix='',
         rsuffix="_1"
     )
@@ -108,6 +111,7 @@ def get_races_livedata(races, max_workers=10):
     live_data[fields.crew] = (
         live_data[fields.raceBoats] + " " + live_data[fields.boatClass])
     return live_data, intermediates, lane_info
+
 
 get_realtime_race_data = st.cache_resource(live.LiveRaceData)
 
@@ -204,7 +208,6 @@ def select_competition(current=True):
 
         competition = inputs.select_dataframe(competitions, "competition")
 
-    
     competition.loc[fields.WBTCompetitionType] = api.COMPETITION_TYPES.get(
         competition[fields.competition_competitionType],
         competition[fields.competition_competitionType]
@@ -216,7 +219,7 @@ def select_competition(current=True):
 
 RACE_COL = [
     fields.boatClass,
-    fields.race_event, 
+    fields.race_event,
     fields.Race,
     fields.Phase,
     fields.Gender,
@@ -240,16 +243,17 @@ def filter_races(
         races, boat_classes,
         left_on=fields.race_event_boatClassId,
         right_on=fields.boatClass_id,
-        how='left', 
+        how='left',
         suffixes=("", "_1")
     )
     st.subheader("Filter races to look at")
-    
+
     a_finals = races[
         (races[fields.Phase] == 'Final A')
         & (races[fields.race_raceStatus] == 'Official')
     ]
-    phases = races[fields.race_raceStatus].unique() if a_finals.size else ['Final A']
+    phases = races[fields.race_raceStatus].unique() if a_finals.size else [
+        'Final A']
 
     kwargs.setdefault(fields.Phase, phases)
     kwargs.setdefault(
@@ -278,10 +282,10 @@ def filter_races(
 
 
 def select_races(
-        competition_id=None, 
-        competition_container=None, 
+        competition_id=None,
+        competition_container=None,
         races_container=None,
-        **kwargs, 
+        **kwargs,
 ):
     logger.debug(
         "select_races(%r, filters=%s)", competition_id, kwargs.get("filters"))
@@ -306,6 +310,7 @@ def select_race(races):
     )
     race = races.loc[races[fields.Race] == sel_race]
     return race.iloc[0]
+
 
 def wait_for_next_race(n=5):
     next_races = api.get_next_races(n)
@@ -332,8 +337,8 @@ def wait_for_next_race(n=5):
 def select_live_race(replay=False, **kwargs):
     if replay:
         races = select_races(
-            filters=True, 
-            select_all=True, 
+            filters=True,
+            select_all=True,
             default=[fields.race_raceStatus],
             **kwargs
         )
@@ -379,6 +384,8 @@ RESULT_COLS = [
     fields.Distance,
     fields.race_Date,
 ]
+
+
 def select_results(race_results, key='race_results', **kwargs):
     filtered = inputs.filter_dataframe(
         race_results[RESULT_COLS].sort_values("PGMT", ascending=False),
@@ -511,8 +518,6 @@ def select_competition_results(
         results[fields.raceBoats] + " " + results[fields.boatClass]
     results = results.set_index(fields.crew)
 
-    
-
     if results.empty and stop_if_empty:
         st.write("no results loaded")
         st.stop()
@@ -522,10 +527,10 @@ def select_competition_results(
 
 LIVE_COLS = [
     fields.Phase,
-    fields.Event, 
+    fields.Event,
     fields.Race,
-    fields.lane_Rank, 
-    fields.lane_Lane, 
+    fields.lane_Rank,
+    fields.lane_Lane,
     fields.Gender,
     fields.Category,
     fields.Gender,
@@ -542,7 +547,7 @@ def filter_livetracker(live_data):
         # default=[fields.lane_Rank],
         select=False,
         categories={
-            fields.Event, 
+            fields.Event,
             fields.boatClass,
         },
         **{

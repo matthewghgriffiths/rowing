@@ -5,7 +5,7 @@ import logging
 
 
 import click
-import streamlit 
+import streamlit
 from streamlit.web import cli
 
 from rowing.app import *
@@ -14,11 +14,12 @@ DIR = Path(__file__).absolute().parent
 PACKAGE_DIR = (DIR / "../../..").resolve()
 
 LOG_LEVELS = {
-    "error": logging.ERROR, 
-    "warning": logging.WARNING, 
-    "info": logging.WARNING, 
+    "error": logging.ERROR,
+    "warning": logging.WARNING,
+    "info": logging.WARNING,
     "debug": logging.DEBUG
 }
+
 
 def get_working_directory(folder="app/world_rowing", start_dir=DIR):
     start_dir = Path(start_dir)
@@ -28,10 +29,11 @@ def get_working_directory(folder="app/world_rowing", start_dir=DIR):
         if os.path.exists(work_dir):
             print(work_dir)
             return work_dir
-        
-        start_dir = start_dir.parent 
+
+        start_dir = start_dir.parent
 
     raise FileNotFoundError("could not find 'app/world_rowing/main.py")
+
 
 @click.command()
 @click.option("--dir", show_default=True, default=str(DIR), help="folder to search for app")
@@ -52,6 +54,7 @@ def main(dir, application, log_level):
     os.chdir(work_dir)
     cli.bootstrap.load_config_options(flag_options=flag_options)
     cli._main_run("home.py", flag_options)
+
 
 if __name__ == "__main__":
     main()

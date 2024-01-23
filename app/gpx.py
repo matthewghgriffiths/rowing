@@ -1,13 +1,15 @@
+from rowing import utils
+from rowing.analysis import geodesy, splits, app
 import streamlit as st
-import io 
-from pathlib import Path 
+import io
+from pathlib import Path
 import os
 import sys
 
-import logging 
+import logging
 
 import numpy as np
-import pandas as pd 
+import pandas as pd
 
 import plotly.graph_objects as go
 
@@ -17,8 +19,6 @@ realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
 
-from rowing.analysis import geodesy, splits, app
-from rowing import utils
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +40,9 @@ with st.expander("Landmarks"):
     locations = set_landmarks.set_index(["location", "landmark"])
 
 gpx_data, errors = utils.map_concurrent(
-    app.parse_gpx, 
-    {file.name.rsplit(".", 1)[0]: file for file in uploaded_files}, 
-    singleton=True, 
+    app.parse_gpx,
+    {file.name.rsplit(".", 1)[0]: file for file in uploaded_files},
+    singleton=True,
 )
 
 if not gpx_data:
@@ -59,11 +59,11 @@ with st.spinner("Processing Crossing Times"):
 
 with st.expander("All Crossing times"):
     show_times = pd.concat({
-        "date": all_crossing_times.dt.normalize(), 
+        "date": all_crossing_times.dt.normalize(),
         "time": all_crossing_times,
     }, axis=1)
     st.dataframe(
-        show_times, 
+        show_times,
         column_config={
             "date": st.column_config.DateColumn("Date"),
             "time": st.column_config.TimeColumn(
@@ -79,11 +79,11 @@ with st.expander("Individual Crossing Times"):
     for tab, (name, crossings) in zip(tabs, crossing_times.items()):
         with tab:
             show_crossings = pd.concat({
-                "date": crossings.dt.normalize(), 
+                "date": crossings.dt.normalize(),
                 "time": crossings,
             }, axis=1)
             st.dataframe(
-                show_crossings, 
+                show_crossings,
                 column_config={
                     "date": st.column_config.DateColumn("Date"),
                     "time": st.column_config.TimeColumn(
@@ -95,7 +95,8 @@ with st.expander("Individual Crossing Times"):
 
 
 with st.expander("Piece selecter"):
-    piece_data, start_landmark, finish_landmark = app.select_pieces(all_crossing_times)
+    piece_data, start_landmark, finish_landmark = app.select_pieces(
+        all_crossing_times)
     if piece_data is None:
         st.write("No valid pieces could be found")
     else:
@@ -132,7 +133,7 @@ with st.expander("Fastest times"):
         show_times = times + pd.Timestamp(0)
         with tab:
             st.dataframe(
-                show_times, 
+                show_times,
                 column_config={
                     "split": st.column_config.TimeColumn(
                         "Split", format="m:ss.SS"
@@ -143,7 +144,7 @@ with st.expander("Fastest times"):
                 }
             )
             app.download_csv(
-                f"{name}-fastest.csv", 
+                f"{name}-fastest.csv",
                 times.applymap(
                     utils.format_timedelta, hours=True
                 ).replace("00:00:00.00", "")
@@ -181,8 +182,8 @@ with st.spinner("Generating excel file"):
 
     xldata.seek(0)
     st.download_button(
-        ":inbox_tray: Download all: GPS_data.xlsx", 
+        ":inbox_tray: Download all: GPS_data.xlsx",
         xldata,
-        # type='primary', 
-        file_name="GPS_data.xlsx",  
+        # type='primary',
+        file_name="GPS_data.xlsx",
     )

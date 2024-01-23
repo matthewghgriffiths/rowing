@@ -4,9 +4,10 @@ import pytest
 
 from rowing.world_rowing import api, fields
 
-from rowing.utils import timeout 
+from rowing.utils import timeout
 
 TIMEOUT = 30
+
 
 @timeout(TIMEOUT)
 def test_data_retrieval():
