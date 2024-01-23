@@ -50,6 +50,7 @@ setup(
             'data/iso_country.json',
             'data/flags/*.png',
             'data/*.tsv'
+            'data/*'
         ],
     }
 )

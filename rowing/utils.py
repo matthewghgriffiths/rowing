@@ -8,6 +8,7 @@ import json
 from functools import lru_cache, cached_property
 from pathlib import Path
 import threading
+import queue
 from multiprocessing import Process, Queue
 from functools import wraps
 
@@ -747,14 +748,18 @@ def timeout(seconds):
        If a timeout occurs, 'action' will be returned or called if
        it is a function-like object.
     """
-    def handler(queue, func, args, kwargs):
-        queue.put(func(*args, **kwargs))
+    def handler(queue, errorq, func, args, kwargs):
+        try:
+            queue.put(func(*args, **kwargs))
+        except Exception as exc:
+            errorq.put(exc)
 
     def decorator(func):
         @wraps(func)
         def new_func(*args, **kwargs):
             q = Queue()
-            p = Process(target=handler, args=(q, func, args, kwargs))
+            errorq = Queue()
+            p = Process(target=handler, args=(q, errorq, func, args, kwargs))
             p.start()
             p.join(timeout=seconds)
             if p.is_alive():
@@ -763,7 +768,11 @@ def timeout(seconds):
                 raise TimeoutError(
                     "Timed out after {} seconds".format(seconds))
             else:
-                return q.get()
+                try:
+                    exc = errorq.get(block=False)
+                    raise exc
+                except queue.Empty:
+                    return q.get()
 
         return new_func
 
