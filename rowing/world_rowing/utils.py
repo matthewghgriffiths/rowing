@@ -161,8 +161,8 @@ def make_flag_box(
 def update_fill_between(poly, x, y0, y1):
     x, y0, y1 = map(np.asarray, (x, y0, y1))
     vertices = poly.get_paths()[0].vertices
-    vertices[1:len(x)+1, 0] = x
-    vertices[1:len(x)+1, 1] = y0
+    vertices[1:len(x) + 1, 0] = x
+    vertices[1:len(x) + 1, 1] = y0
     vertices[len(x) + 1:-2, 0] = x[::-1]
     vertices[len(x) + 1:-2, 1] = y1[::-1]
     vertices[0, 0] = vertices[-1, 0] = x[0]
@@ -173,8 +173,8 @@ def update_fill_betweenx(poly, y, x0, x1):
     y, x0, x1 = map(np.asarray, (y, x0, x1))
     vertices = poly.get_paths()[0].vertices
     n = len(y)
-    vertices[1:n+1, 0] = x0
-    vertices[1:n+1, 1] = y
+    vertices[1:n + 1, 0] = x0
+    vertices[1:n + 1, 1] = y
     vertices[n + 1:-2, 0] = x1[::-1]
     vertices[n + 1:-2, 1] = y[::-1]
     vertices[0, 0] = vertices[-1, 0] = x1[0]

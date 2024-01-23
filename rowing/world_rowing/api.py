@@ -577,7 +577,7 @@ def get_last_race_started(fisa=True, competition=None):
     races = get_last_races(n=1, fisa=fisa, competition=competition)
     if races is not None:
         race = races.iloc[0]
-        logger.info(f"loaded last race started: %s", race[fields.Race])
+        logger.info("loaded last race started: %s", race[fields.Race])
         return race
 
 
@@ -868,7 +868,7 @@ def merge_competition_results(
             & (race_results[fields.raceBoatIntermediates_ResultTime] > pd.Timedelta(0))
         ],
         race_wbts,
-        left_on=fields.raceBoats_raceId,  right_on=fields.race_id,
+        left_on=fields.raceBoats_raceId, right_on=fields.race_id,
         suffixes=('', '_1'),
     )
     race_data[fields.raceBoatIntermediates_Rank] = \

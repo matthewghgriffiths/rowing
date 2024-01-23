@@ -8,7 +8,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name='rowing',
     version='0.3.1',
-    description='Library for loading and presenting data from the worldrowing.com',
+    description='Library for loading and presenting data from the worldrowing.com'
+    ' and analysing rowing data',
     author='Matthew Griffiths',
     author_email='matthewghgriffiths@gmail.com',
     url='https://github.com/matthewghgriffiths/rowing',

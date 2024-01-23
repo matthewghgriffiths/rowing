@@ -1,16 +1,11 @@
 
-
-from typing import Dict
-from collections import namedtuple
-import logging
-
 import numpy as np
 import pandas as pd
 from scipy import linalg, integrate, stats
 
-from . import api, utils, livetracker
+from . import utils
 from .livetracker import RaceTracker
-from .utils import cache, lru_cache, cached_property
+from .utils import cache, lru_cache
 
 
 def calc_win_probs(times, std):
@@ -50,8 +45,8 @@ def load_predicter(noise=1., data_path=utils._data_path):
     )
     cov_pace.columns = cov_pace.columns.astype(int)
     assert (
-        (cov_pace.index == distances).all() and
-        (cov_pace.columns == distances).all()
+        (cov_pace.index == distances).all()
+        and (cov_pace.columns == distances).all()
     )
     mean_cov = mean_pace.values[:, None] * mean_pace.values[None, :]
     K = pd.DataFrame(

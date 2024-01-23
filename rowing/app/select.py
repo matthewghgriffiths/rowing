@@ -156,8 +156,8 @@ def select_competition(current=True):
         today = datetime.date.today()
         start_date = pd.to_datetime(state.get("competition.start_date", today))
         end_date = pd.to_datetime(
-            state.get("competition.end_date", today -
-                      datetime.timedelta(days=365*2))
+            state.get("competition.end_date",
+                      today - datetime.timedelta(days=365*2))
         )
         date_input = st.date_input(
             "Select date range to load",

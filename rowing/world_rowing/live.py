@@ -191,8 +191,6 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
             fields.avg_speed, c].replace(np.inf, np.nan)
         speed = live_time_data[
             fields.live_raceBoatTracker_metrePerSecond, c].replace(0, np.nan)
-        avg_speed = live_time_data[
-            fields.avg_speed, c].replace(0, np.nan)
         live_time_data[(fields.split, c)] = pd.to_timedelta(
             500 / speed.replace(0, np.nan), unit='s', errors='coerce')
         live_time_data[(fields.avg_split, c)] = pd.to_timedelta(

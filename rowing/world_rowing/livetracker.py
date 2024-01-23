@@ -764,7 +764,7 @@ def get_intermediate_times(intermediates):
 
 
 def _parse_livetracker_data(data):
-    total_length = data['config']['plot']
+    # total_length = data['config']['plot']
     lane_boat = {
         lane['Lane']: lane for lane in data['config']['lanes']
     }
@@ -999,9 +999,10 @@ def match_intermediate_times(live_data, intermediates, race_distance):
         if i[-1] not in adj_live.index:
             i, x, y = i[:-1], x[:-1], y[:-1]
 
-        x0, y0 = adj_live.distanceTravelled[cnt][i -
-                                                 1].values, adj_live.time[cnt][i - 1].values
-        x1, y1 = adj_live.distanceTravelled[cnt][i].values, adj_live.time[cnt][i].values
+        x0 = adj_live.distanceTravelled[cnt][i - 1].values
+        y0 = adj_live.time[cnt][i - 1].values
+        x1 = adj_live.distanceTravelled[cnt][i].values
+        y1 = adj_live.time[cnt][i].values
         shift = (x - x0) - (y - y0) / (y1 - y0) * (x1 - x0)
 
         adj_live.loc[:, ('distanceTravelled', cnt)] += np.interp(

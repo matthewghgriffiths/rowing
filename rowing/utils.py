@@ -3,10 +3,9 @@ import sys
 import logging
 from typing import Callable, Dict, TypeVar, Tuple, Any, Optional
 from contextlib import nullcontext
-from datetime import timedelta, datetime
-import re
+from datetime import timedelta
 import json
-from functools import lru_cache
+from functools import lru_cache, cached_property
 from pathlib import Path
 import threading
 from multiprocessing import Process, Queue
@@ -24,12 +23,6 @@ except ModuleNotFoundError:
 from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
-
-# Python 3.7 compatible cached_property
-try:
-    from functools import cached_property
-except ImportError:
-    from ._compat import cached_property
 
 _pyodide = "pyodide" in sys.modules
 
@@ -327,12 +320,12 @@ def map_concurrent(
 
     >>> output = {k: func(*args, **kwargs) for k, args in inputs.items()}
 
-    except that the function is called using either `ThreadPoolExecutor` 
+    except that the function is called using either `ThreadPoolExecutor`
     if `threaded=True` or a `ProcessPoolExecutor` otherwise.
 
     The function returns a tuple of `(output, errors)` where errors returns
     the errors that happened during the calling of any of the functions. So
-    the function will run all the other work before 
+    the function will run all the other work before
 
     The function also generates a status bar indicating the progress of the
     computation.
@@ -395,10 +388,14 @@ def map_concurrent(
         def get(args):
             return args
 
-    pbar = progress_bar(total=total or len(
-        items)) if progress_bar else nullcontext()
+    pbar = progress_bar(
+        total=total or len(items)
+    ) if progress_bar else nullcontext()
     with pbar, Executor(max_workers=max_workers, **(executor_kws or {})) as executor:
-        work = {executor.submit(func, *get(args), **kwargs)                : k for k, args in items}
+        work = {
+            executor.submit(func, *get(args), **kwargs): k
+            for k, args in items
+        }
 
         status: Dict[str, Any] = {}
         for future in as_completed(work):

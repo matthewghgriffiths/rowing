@@ -42,8 +42,8 @@ def load_place_locations(loc=None):
         loc = [loc]
 
     return {
-        l: pd.read_table(_LOCATION_DATA[l], index_col=0)
-        for l in loc
+        p: pd.read_table(_LOCATION_DATA[p], index_col=0)
+        for p in loc
     }
 
 
@@ -330,8 +330,8 @@ def calc_pareto_front(positions):
     i, j = np.triu_indices(len(positions), 1)
 
     time_diffs = (
-        positions.timeElapsed[j].dt.total_seconds().values -
-        positions.timeElapsed[i].dt.total_seconds().values
+        positions.timeElapsed[j].dt.total_seconds().values
+        - positions.timeElapsed[i].dt.total_seconds().values
     )
     dist_diffs = (
         positions.distance[j].values - positions.distance[i].values)
@@ -395,8 +395,8 @@ def get_piece_times(crossing_times, start_landmark, finish_landmark):
             - piece_data.distance[start_landmark].values[:, None]
         )[col_order]
         piece_time = piece_data['Elapsed time'][col_order]
-        avg_split = (piece_time * 0.5 /
-                     piece_distances).fillna(pd.Timedelta(0))
+        avg_split = (
+            piece_time * 0.5 / piece_distances).fillna(pd.Timedelta(0))
         interval_split = (
             piece_time.diff(axis=1) * 0.5 / piece_distances.diff(axis=1)
         ).fillna(pd.Timedelta(0))

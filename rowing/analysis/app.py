@@ -282,15 +282,15 @@ def set_landmarks(landmarks=None, title=True):
         with col2:
             st.write(
                 """
-                Add new landmarks by entering at the bottom. 
-                        
+                Add new landmarks by entering at the bottom.
+                
                 Delete old landmarks by selecting the left column and pressing delete
                 
                 Hold shift to select multiple landmarks
                 
-                The current set of landmarks can be downloaded as a csv 
+                The current set of landmarks can be downloaded as a csv
                 
-                A custom landmarks can be uploaded as a csv which will be merged with the existing landmarks. 
+                A custom landmarks can be uploaded as a csv which will be merged with the existing landmarks.
                 This csv must match the format of the downloaded csv
                 """)
 

@@ -25,8 +25,8 @@ from garminconnect import (
 )
 
 from rowing.analysis.utils import (
-    map_concurrent, unflatten_json, strfsplit,
-    add_logging_argument, set_logging, _YMD, add_credentials_arguments
+    map_concurrent, unflatten_json,
+    add_logging_argument, set_logging, add_credentials_arguments
 )
 from rowing.analysis.files import parse_gpx_data, read_fit_zipfile, parse_fit_data, activity_data_to_excel
 from rowing.analysis import splits, files, utils

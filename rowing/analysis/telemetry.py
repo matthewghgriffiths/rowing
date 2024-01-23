@@ -3,7 +3,7 @@ import io
 import numpy as np
 import pandas as pd
 
-from rowing.analysis import files, splits, geodesy
+from rowing.analysis import files, geodesy
 
 FIELDS = [
     'Angle 0.7 F',
@@ -79,8 +79,9 @@ def parse_powerline_excel(data, use_names=True):
     split_data = {}
     for i0, i1 in zip(data_groups.index, np.r_[data_groups.index[1:], data.index[-1] + 1]):
         key = data_keys[i0]
-        key_data = data.loc[i0+1:i1 -
-                            1].dropna(axis=1, how='all').dropna(axis=0, how='all')
+        key_data = data.loc[i0+1:i1 - 1].dropna(
+            axis=1, how='all'
+        ).dropna(axis=0, how='all')
         if "eriodic" in key:
             key_columns = pd.MultiIndex.from_frame(
                 key_data.iloc[:2].fillna("").T
@@ -126,7 +127,7 @@ def parse_powerline_data(split_data, use_names=True):
     ) + start_time)
 
     positions = pd.concat({
-        "time":  pd.to_timedelta(gps_data['UTC Time'].Boat, unit='milli') + start_date,
+        "time": pd.to_timedelta(gps_data['UTC Time'].Boat, unit='milli') + start_date,
         "longitude": gps_data.long / long_scale + lon,
         "latitude": gps_data.lat / lat_scale + lat
     }, axis=1).dropna().droplevel(1, axis=1)

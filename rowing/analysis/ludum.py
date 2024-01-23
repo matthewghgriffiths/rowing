@@ -545,8 +545,8 @@ def extract_session_data(sessions):
     }, axis=0, ignore_index=False)
 
     for c in session_files.columns[
-        session_files.columns.str.endswith('id') &
-        ~ session_files.columns.str.endswith('guid')
+        session_files.columns.str.endswith('id')
+        & ~ session_files.columns.str.endswith('guid')
     ]:
         session_files[c] = session_files[c].fillna(0).astype(int)
 
@@ -583,8 +583,8 @@ def extract_session_files(sessions):
     ).droplevel(1)
 
     for c in session_files.columns[
-        session_files.columns.str.endswith('id') &
-        ~ session_files.columns.str.endswith('guid')
+        session_files.columns.str.endswith('id')
+        & ~ session_files.columns.str.endswith('guid')
     ]:
         session_files[c] = session_files[c].fillna(0).astype(int)
 
@@ -935,8 +935,8 @@ def run(args):
     if calc_best_times or calc_crossings:
         activity_info = extract_activity_info(agenda, sessions)
         metadata, positions = api.load_sessions_gps_data(
-            activity_info.loc[activity_info.sport_name ==
-                              "Rowing"].set_index("id").T
+            activity_info.loc[
+                activity_info.sport_name == "Rowing"].set_index("id").T
         )
 
     if calc_best_times:
