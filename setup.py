@@ -46,10 +46,8 @@ setup(
     python_requires=">=3.9",
     package_data={
         'rowing': [
-            'data/*.csv.gz',
             'data/iso_country.json',
             'data/flags/*.png',
-            'data/*.tsv'
             'data/*'
         ],
     }
