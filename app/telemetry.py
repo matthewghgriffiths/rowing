@@ -53,7 +53,7 @@ def main(state=None):
         st.subheader("QR Code")
         st.image(
             "https://chart.googleapis.com/chart"
-            "?cht=qr&chl=https%3A%2F%2Frowing-gps.streamlit.app"
+            "?cht=qr&chl=https%3A%2F%2Frowing-telemetry.streamlit.app"
             "&chs=360x360&choe=UTF-8&chld=L|0"
         )
         default_height = st.number_input(
