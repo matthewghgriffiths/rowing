@@ -13,6 +13,6 @@ plotly==5.14.1
 pyarrow==12.0.0
 pyqt5==5.15.9
 requests==2.31.0
-scipy==1.7.0
+scipy==1.11.4
 streamlit==1.29.0
 tqdm==4.65.0
