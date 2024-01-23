@@ -4,7 +4,11 @@ import pytest
 
 from rowing.world_rowing import api, fields
 
+from rowing.utils import timeout 
 
+TIMEOUT = 30
+
+@timeout(TIMEOUT)
 def test_data_retrieval():
     competitions = api.get_competitions()
     competition = api.get_most_recent_competition()
@@ -32,6 +36,7 @@ def test_data_retrieval():
     api.find_world_best_time(race_id=race.race_id)
 
 
+@timeout(TIMEOUT)
 def test_get_stats():
     # Load 2021 olympics for consistency
     competitions = api.get_competitions(2021)

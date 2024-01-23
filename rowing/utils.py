@@ -9,6 +9,8 @@ import json
 from functools import lru_cache
 from pathlib import Path
 import threading
+from multiprocessing import Process, Queue
+from functools import wraps
 
 from concurrent.futures import (
     ThreadPoolExecutor, as_completed,
@@ -742,3 +744,29 @@ class CachedClient:
                 )
         else:
             func(*args, **kwargs)
+
+def timeout(seconds):
+    """Calls any function with timeout after 'seconds'.
+       If a timeout occurs, 'action' will be returned or called if
+       it is a function-like object.
+    """
+    def handler(queue, func, args, kwargs):
+        queue.put(func(*args, **kwargs))
+
+    def decorator(func):
+        @wraps(func)
+        def new_func(*args, **kwargs):
+            q = Queue()
+            p = Process(target=handler, args=(q, func, args, kwargs))
+            p.start()
+            p.join(timeout=seconds)
+            if p.is_alive():
+                p.terminate()
+                p.join()
+                raise TimeoutError("Timed out after {} seconds".format(seconds))
+            else:
+                return q.get()
+
+        return new_func
+    
+    return decorator
