@@ -1,5 +1,4 @@
-from rowing import utils
-from rowing.analysis import geodesy, splits, app
+
 import streamlit as st
 import io
 from pathlib import Path
@@ -13,11 +12,18 @@ import pandas as pd
 
 import plotly.graph_objects as go
 
-DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent)
-realpaths = [os.path.realpath(p) for p in sys.path]
-if LIBPATH not in realpaths:
-    sys.path.append(LIBPATH)
+try:
+    from rowing import utils
+    from rowing.analysis import geodesy, splits, app
+except ImportError:
+    DIRPATH = Path(__file__).resolve().parent
+    LIBPATH = str(DIRPATH.parent)
+    realpaths = [os.path.realpath(p) for p in sys.path]
+    if LIBPATH not in realpaths:
+        sys.path.append(LIBPATH)
+
+    from rowing import utils
+    from rowing.analysis import geodesy, splits, app
 
 
 logger = logging.getLogger(__name__)
