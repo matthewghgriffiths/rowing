@@ -263,11 +263,12 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
                         )
                         data = gps_data[name]
                     with cols[1]:
-                        dist = st.select_slider(
+                        dist = st.slider(
                             "Select distance",
-                            # value=data.distance.sample().iloc[0],
-                            options=data.distance,
-                            format_func="{:.3f} km".format,
+                            min_value=data.distance.min(),
+                            max_value=data.distance.max(),
+                            step=0.001,
+                            format="%.3f km",
                             key=f"Pick piece distance {i}",
                         )
                     with cols[2]:
@@ -276,9 +277,12 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
                             value=f"{name} {dist:.3f} km",
                             key=f"Pick piece landmark {i}",
                         )
-
-                    new_landmarks[name, landmark] = data.set_index("distance").loc[
-                        [dist], ['latitude', 'longitude', 'bearing']]
+                    position = data.set_index("distance")[
+                        ['latitude', 'longitude', 'bearing']
+                    ].apply(
+                        utils.interpolate_series, index=[dist]
+                    ).rename_axis(index='distance')
+                    new_landmarks[name, landmark] = position
 
     if landmarks is None:
         landmarks = splits.load_location_landmarks().reset_index()
