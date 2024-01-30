@@ -1,6 +1,4 @@
 
-from rowing.app import state, inputs, select, plots
-from rowing.world_rowing import api, utils, fields
 import streamlit as st
 
 import sys
@@ -12,11 +10,19 @@ import logging
 import plotly.express as px
 import pandas as pd
 
-DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent.parent.parent)
-realpaths = [os.path.realpath(p) for p in sys.path]
-if LIBPATH not in realpaths:
-    sys.path.append(LIBPATH)
+try:
+    from rowing.app import state, inputs, select, plots
+    from rowing.world_rowing import fields
+
+except ImportError:
+    DIRPATH = Path(__file__).resolve().parent
+    LIBPATH = str(DIRPATH.parent)
+    realpaths = [os.path.realpath(p) for p in sys.path]
+    if LIBPATH not in realpaths:
+        sys.path.append(LIBPATH)
+
+    from rowing.app import state, inputs, select, plots
+    from rowing.world_rowing import fields
 
 
 logger = logging.getLogger(__name__)

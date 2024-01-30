@@ -1,30 +1,25 @@
 
-from rowing.app import select, inputs, state, plots
-from rowing.world_rowing import api, live, utils, fields
 import streamlit as st
 
 import logging
-import datetime
-import time
 
 import sys
 import os
 from pathlib import Path
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-
 from tqdm.autonotebook import tqdm
 
-import plotly as pl
-from plotly import express as px, subplots
 
-DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent.parent.parent)
-realpaths = [os.path.realpath(p) for p in sys.path]
-if LIBPATH not in realpaths:
-    sys.path.append(LIBPATH)
+try:
+    from rowing.app import select, state, plots
+except ImportError:
+    DIRPATH = Path(__file__).resolve().parent
+    LIBPATH = str(DIRPATH.parent)
+    realpaths = [os.path.realpath(p) for p in sys.path]
+    if LIBPATH not in realpaths:
+        sys.path.append(LIBPATH)
+
+    from rowing.app import select, state, plots
 
 
 logging.basicConfig(level=logging.INFO)
