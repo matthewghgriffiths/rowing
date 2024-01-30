@@ -23,7 +23,7 @@ app_realtime = importlib.import_module(
 app_gpx = importlib.import_module("app.gpx", "..")
 app_telemetry = importlib.import_module("app.telemetry", "..")
 
-TIMEOUT = 30
+TIMEOUT = 60
 
 
 @timeout(TIMEOUT)

@@ -2,6 +2,7 @@ import streamlit as st
 import io
 import zipfile
 import logging
+from itertools import count
 
 import numpy as np
 import pandas as pd
@@ -99,7 +100,6 @@ def get_crossing_times(gpx_data, locations=None, thresh=0.5):
         locations=locations,
         thresh=thresh,
     )
-    print(errors)
     if errors:
         logging.error(errors)
     return crossing_times
@@ -142,14 +142,16 @@ def select_pieces(all_crossing_times):
 
     sel_times = all_crossing_times[
         all_crossing_times.dt.date.isin(select_dates)
-    ].sort_index(level=(0, 4))
+    ].sort_index(level=(0, 4)).droplevel("location")
     landmark_distance = sel_times.reset_index(
         'distance'
     ).distance
     landmarks = landmark_distance.groupby(
-        level=3).mean().sort_values().index
+        level=2).mean().sort_values().index
     landmark_dist = landmark_distance.unstack(
-        'landmark').dropna(axis=1).mean(0)
+        'landmark'
+    ).dropna(axis=1).mean(0)
+
     start, end = map(
         int, landmarks.get_indexer(
             [landmark_dist.idxmin(), landmark_dist.idxmax()]
@@ -220,10 +222,64 @@ def align_pieces(piece_data, start_landmark, finish_landmark, gps_data, resoluti
     return piece_compare_gps
 
 
-def set_landmarks(landmarks=None, title=True):
-    tab1, tab2 = st.tabs([
-        "Edit Landmarks", "Upload Landmarks",  # "Map of Landmarks"
+def set_landmarks(gps_data=None, landmarks=None, title=True):
+    tab0, tab1, tab2 = st.tabs([
+        "From Pieces",
+        "Edit Landmarks",
+        "Upload Landmarks",  # "Map of Landmarks"
     ])
+    with tab0:
+        new_landmarks = {}
+        if not gps_data:
+            st.write("no gps data loaded")
+        else:
+            if 'npick_distance' not in st.session_state:
+                st.session_state.setdefault("npick_distance", 0)
+                # st.session_state.npick_distance = 0
+
+            cols = st.columns((1, 5))
+            with cols[0]:
+                st.markdown("<br>", unsafe_allow_html=True)
+                count = st.empty()
+                if st.button("Add piece landmark"):
+                    st.session_state.npick_distance += 1
+                    # st.experimental_rerun()
+                if st.button("Remove piece landmark"):
+                    st.session_state.npick_distance -= 1
+                    # st.experimental_rerun()
+                with count:
+                    npick = st.session_state.get("npick_distance", 0)
+                    st.write(
+                        f"\nSetting {npick} landmarks from pieces")
+
+            with cols[1]:
+                for i in range(st.session_state.get("npick_distance", 0)):
+                    cols = st.columns(3)
+                    with cols[0]:
+                        name = st.selectbox(
+                            "Pick piece",
+                            options=list(gps_data.keys()),
+                            key=f"Pick piece {i}",
+                        )
+                        data = gps_data[name]
+                    with cols[1]:
+                        dist = st.select_slider(
+                            "Select distance",
+                            # value=data.distance.sample().iloc[0],
+                            options=data.distance,
+                            format_func="{:.3f} km".format,
+                            key=f"Pick piece distance {i}",
+                        )
+                    with cols[2]:
+                        landmark = st.text_input(
+                            "Enter landmark name",
+                            value=f"{name} {dist:.3f} km",
+                            key=f"Pick piece landmark {i}",
+                        )
+
+                    new_landmarks[name, landmark] = data.set_index("distance").loc[
+                        [dist], ['latitude', 'longitude', 'bearing']]
+
     if landmarks is None:
         landmarks = splits.load_location_landmarks().reset_index()
 
@@ -234,6 +290,21 @@ def set_landmarks(landmarks=None, title=True):
             r"([0-9][A-Z])",
             lambda m: m.group(0).lower(),
             regex=True
+        )
+
+    # new_locations = pd.DataFrame()
+    if new_landmarks:
+        new_locations = pd.concat(
+            new_landmarks, names=['location', 'landmark'], axis=0
+        ).reset_index("distance", drop=True).reset_index()
+        landmarks = pd.concat(
+            [new_locations, landmarks]
+        )
+        download_csv(
+            "piece_landmarks.csv",
+            new_locations,
+            ':inbox_tray: download piece landmarks as csv',
+            csv_kws=dict(index=False),
         )
 
     with tab2:
@@ -325,8 +396,16 @@ def set_landmarks(landmarks=None, title=True):
                 "Set figure height", 100, 3000, 600, step=50,
                 key='landmark map height'
             )
-
         fig = go.Figure()
+
+        if gps_data:
+            for name, data in gps_data.items():
+                fig.add_trace(go.Scattermapbox(
+                    lon=data.longitude,
+                    lat=data.latitude,
+                    mode='lines',
+                    name=name,
+                ))
 
         fig.add_trace(go.Scattermapbox(
             lon=set_landmarks.longitude,
@@ -351,8 +430,11 @@ def set_landmarks(landmarks=None, title=True):
 
         for i, landmark in set_landmarks.iterrows():
             arrow = geodesy.make_arrow_base(landmark, 0.25, 0.1, 20)
+            color = 'black'
+            if (landmark.location, landmark.landmark) in new_landmarks:
+                color = 'red'
 
-            fig.add_trace(go.Scattermapbox(
+            trace = go.Scattermapbox(
                 lon=arrow.longitude,
                 lat=arrow.latitude,
                 # hoverinfo = landmark_locs.index,
@@ -363,40 +445,71 @@ def set_landmarks(landmarks=None, title=True):
                 line=dict(
                     width=3,
                 ),
-                # text = list(set_landmarks.landmark),
-                # marker={
-                #     'size': 5,
-                #     # 'symbol': landmark_locs.index,
-                # },
+                marker={"color": color},
                 textposition='bottom right',
-            ))
+            )
+            fig.add_trace(trace)
+
+        lon = set_landmarks.longitude.mean()
+        lat = set_landmarks.latitude.mean()
+        zoom = 5
+
+        if gps_data:
+            positions = pd.concat(gps_data)
+            lon = positions.longitude.mean()
+            lat = positions.latitude.mean()
+            zoom = 15 - max(
+                np.ptp(positions.longitude),
+                np.ptp(positions.latitude),
+            ) * 111
+        # if new_landmarks:
+        #     lon = new_locations.longitude.mean()
+        #     lat = new_locations.latitude.mean()
+        #     if len(new_locations) > 1:
+        #         zoom = 15 - max(
+        #             np.ptp(new_locations.longitude),
+        #             np.ptp(new_locations.latitude),
+        #         ) * 111
 
         fig.update_layout(
+            {"uirevision": True},
             mapbox={
                 'style': map_style,
-                'center': {
-                    'lon': set_landmarks.longitude.mean(),
-                    'lat': set_landmarks.latitude.mean(),
-                },
-                'zoom': 5
+                'center': {'lon': lon, 'lat': lat},
+                'zoom': zoom
             },
             showlegend=False,
             height=height,
+            overwrite=True
         )
         st.plotly_chart(fig, use_container_width=True)
 
     return set_landmarks
 
 
-def draw_gps_data(gps_data, locations):
+def draw_gps_data(gps_data, locations, index=None):
+    fig = make_gps_figure(gps_data, locations, index)
+    st.plotly_chart(fig, use_container_width=True)
+    return fig
+
+
+gps_figure_count = count()
+
+
+def make_gps_figure(gps_data, locations, index=None):
+    index = index or next(gps_figure_count)
     cols = st.columns([5, 2])
     with cols[0]:
         map_style = st.selectbox(
             "map style",
-            ["open-street-map", "carto-positron", "carto-darkmatter"]
+            ["open-street-map", "carto-positron", "carto-darkmatter"],
+            key=f'gps map style {index}'
         )
     with cols[1]:
-        height = st.number_input("Set figure height", 100, 2000, 600)
+        height = st.number_input(
+            "Set figure height", 100, 2000, 600,
+            key=f'gps map height {index}'
+        )
 
     fig = go.Figure()
     data = locations
@@ -439,9 +552,7 @@ def draw_gps_data(gps_data, locations):
         ),
         height=height,
     )
-    st.plotly_chart(
-        fig, use_container_width=True
-    )
+    return fig
 
 
 @st.cache_data

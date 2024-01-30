@@ -131,7 +131,7 @@ def main(state=None):
         }
 
     with st.expander("Landmarks"):
-        set_landmarks = app.set_landmarks()
+        set_landmarks = app.set_landmarks(gps_data=gps_data)
         locations = set_landmarks.set_index(["location", "landmark"])
 
     if not telemetry_data:
@@ -141,7 +141,59 @@ def main(state=None):
 
     logger.info("Show map")
     with st.expander("Show map"):
-        app.draw_gps_data(gps_data, locations)
+        fig = app.draw_gps_data(gps_data, locations)
+
+    # with st.expander("Pick Piece Landmarks"):
+    #     if 'npick distance' not in st.session_state:
+    #         st.session_state['npick distance'] = 0
+
+    #     cols = st.columns((1, 5))
+    #     with cols[0]:
+    #         if st.button("Add piece landmark"):
+    #             st.session_state['npick distance'] += 1
+    #             # st.experimental_rerun()
+    #         if st.button("Remove piece landmark"):
+    #             st.session_state['npick distance'] -= 1
+    #             # st.experimental_rerun()
+
+    #     new_landmarks = {}
+    #     with cols[1]:
+    #         for i in range(st.session_state['npick distance']):
+    #             cols = st.columns(3)
+    #             with cols[0]:
+    #                 name = st.selectbox(
+    #                     "Pick piece",
+    #                     options=list(gps_data.keys()),
+    #                     key=f"Pick piece {i}",
+    #                 )
+    #                 data = gps_data[name]
+    #             with cols[1]:
+    #                 dist = st.select_slider(
+    #                     "Select distance",
+    #                     value=data.distance.sample().iloc[0],
+    #                     options=data.distance,
+    #                     format_func="{:.3f} km".format,
+    #                     key=f"Pick piece distance {i}",
+    #                 )
+    #             with cols[2]:
+    #                 landmark = st.text_input(
+    #                     "Enter landmark name",
+    #                     value=f"{name} {dist:.3f} km",
+    #                     key=f"Pick piece landmark {i}",
+    #                 )
+
+    #             new_landmarks[name, landmark] = data.set_index("distance").loc[
+    #                 [dist], ['latitude', 'longitude', 'bearing']]
+
+    #     new_locations = pd.concat(
+    #         new_landmarks, names=['location', 'landmark'], axis=0
+    #     )  # .reset_index()
+
+    #     fig = app.make_gps_figure(gps_data, new_locations)
+    #     fig.update_layout({"uirevision": True}, overwrite=True)
+    #     st.plotly_chart(fig, use_container_width=True)
+
+    #     st.write(new_locations)
 
     logger.info("Crossing Times")
     with st.spinner("Processing Crossing Times"):

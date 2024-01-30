@@ -416,7 +416,7 @@ def get_piece_times(crossing_times, start_landmark, finish_landmark):
 def get_interval_averages(X, time, timestamps):
     time_intervals = pd.IntervalIndex.from_breaks(timestamps)
     group_intervals = pd.cut(time, time_intervals).replace(
-        pd.Series(timestamps.index[1:], time_intervals)
+        dict(zip(time_intervals, timestamps.index[1:]))
     )
     t = (time - time.min()).dt.total_seconds()
 
@@ -426,7 +426,10 @@ def get_interval_averages(X, time, timestamps):
     intervalT = dt.groupby(group_intervals).sum()
     intervalX = Xdt.groupby(group_intervals).sum() / intervalT
     avgX = (intervalX * intervalT).cumsum() / intervalT.cumsum()
-    return avgX.dropna(axis=1), intervalX.dropna(axis=1)
+    return (
+        avgX.dropna(axis=0, how="all").dropna(axis=1),
+        intervalX.dropna(axis=0, how="all").dropna(axis=1),
+    )
 
 
 def get_piece_gps_data(
