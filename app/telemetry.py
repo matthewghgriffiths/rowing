@@ -1,10 +1,14 @@
 
+from tracemalloc import start
 import streamlit as st
 import io
 from functools import partial
 from pathlib import Path
 import os
 import sys
+
+import io
+import zipfile
 
 import logging
 
@@ -73,7 +77,7 @@ def main(state=None):
     with st.expander("Upload Telemetry Data"):
         use_names = st.checkbox("Use crew list", True)
         tabs = st.tabs([
-            "Upload text", "Upload csv", "Upload xlsx",
+            "Upload text", "Upload csv", "Upload xlsx", "Upload Zip"
         ])
         with tabs[0]:
             uploaded_files = st.file_uploader(
@@ -128,10 +132,38 @@ def main(state=None):
                     uploaded_files, use_names=use_names
                 )
             )
+        with tabs[3]:
+            uploaded_files = st.file_uploader(
+                "Upload Zip of Data Exports",
+                accept_multiple_files=True
+            )
+            telemetry_data.update(
+                app.parse_telemetry_zip(uploaded_files)
+            )
+            # st.spinner("Processing Zip Files")
+            #     for file in uploaded_files:
+            #         with zipfile.ZipFile(file) as z:
+            #             for f in z.filelist:
+            #                 name, key = f.filename.removesuffix(
+            #                     ".parquet").split("/")
+            #                 data = pd.read_parquet(
+            #                     z.open(f.filename)
+            #                 )
+            #                 telemetry_data.setdefault(name, {})[key] = data
 
         gps_data = {
             k: split_data['positions'] for k, split_data in telemetry_data.items()
         }
+
+        if st.toggle("save as zip"):
+            with st.spinner("Creating Zip File"):
+                zipdata = app.telemetry_to_zipfile(telemetry_data)
+
+            st.download_button(
+                label=":inbox_tray: Download Telemetry_Data.zip",
+                file_name="Telemetry_Data.zip",
+                data=zipdata,
+            )
 
     with st.expander("Landmarks"):
         set_landmarks = app.set_landmarks(gps_data=gps_data)
@@ -201,7 +233,6 @@ def main(state=None):
 
     logger.info("Select piece start end")
     with st.expander("Select Piece start/end"):
-        # piece_data
         piece_data, start_landmark, finish_landmark, intervals = app.select_pieces(
             all_crossing_times
         )
