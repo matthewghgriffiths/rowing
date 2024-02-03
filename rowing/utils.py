@@ -31,24 +31,31 @@ logger = logging.getLogger(__name__)
 
 
 def interpolate_series(s, index, **kwargs):
+    if isinstance(index, pd.Series):
+        x = index.values
+        index = index.index
+    else:
+        x = index
     if pd.api.types.is_datetime64_any_dtype(s):
-        return pd.Series(pd.to_datetime(np.interp(
-            index,
+        si = pd.Series(pd.to_datetime(np.interp(
+            x,
             s.index,
             (s - pd.Timestamp(0)).dt.total_seconds(),
             **kwargs
         ), unit='s'), index)
     elif pd.api.types.is_timedelta64_dtype(s):
-        return pd.Series(pd.to_timedelta(np.interp(
-            index,
+        si = pd.Series(pd.to_timedelta(np.interp(
+            x,
             s.index,
             s.dt.total_seconds(),
             **kwargs
         ), unit='s'), index)
     else:
-        return pd.Series(
-            np.interp(index, s.index, s, **kwargs), index
+        si = pd.Series(
+            np.interp(x, s.index, s, **kwargs), index
         )
+    si.index.name = si.index.name or s.index.name
+    return si
 
 
 @lru_cache

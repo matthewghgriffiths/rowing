@@ -166,6 +166,16 @@ def main(state=None):
                 )
             }
         )
+
+        landmark_times = all_crossing_times.droplevel(
+            ["location", "distance"]
+        ).unstack("landmark")
+        landmark_times = landmark_times.loc[
+            landmark_times.min(1).sort_values().index,
+            landmark_times.min().sort_values().index
+        ]
+        st.write(landmark_times)
+
         app.download_csv("all-crossings.csv", show_times)
 
     logger.info("Individual Crossing Times")
@@ -276,66 +286,182 @@ def main(state=None):
                     100, 3000, default_height, step=50,
                 )
 
-            telemetry_plot_data = {}
-            for piece, piece_times in piece_data['Timestamp'].iterrows():
-                name = piece[1]
-                power = telemetry_data[name]['power']
-                if window:
-                    time_power = power.set_index("Time").sort_index()
-                    avg_power = time_power.rolling(
-                        pd.Timedelta(seconds=window)
-                    ).mean()
-                    power = avg_power.reset_index()
+            piece_distances = piece_data['Total Distance']
+            piece_timestamps = piece_data['Timestamp']
+            landmark_distances = piece_data['Distance Travelled'].mean()[
+                piece_distances.columns
+            ].sort_values()
 
-                start_time = piece_times.min()
-                finish_time = piece_times.max()
-                piece_power = power[
-                    power.Time.between(start_time, finish_time)
-                ]
-                piece_power.columns.names = 'Measurement', 'Position'
-                epoch_times = (piece_times - start_time).dt.total_seconds()
-                telemetry_plot_data[name] = (
-                    piece_power, name, start_time, epoch_times)
+            compare_power = telemetry.compare_piece_telemetry(
+                telemetry_data, piece_data, gps_data, landmark_distances, window=window)
+
+            # telemetry_distance_data = {}
+            # for piece, distances in piece_data['Total Distance'].iterrows():
+            #     name = piece[1]
+            #     power = telemetry_data[name]['power']
+            #     if window:
+            #         time_power = power.set_index("Time").sort_index()
+            #         avg_power = time_power.rolling(
+            #             pd.Timedelta(seconds=window)
+            #         ).mean()
+            #         power = avg_power.reset_index()
+
+            #     gps = gps_data[name]
+            #     gps_adjusted_distance = np.interp(
+            #         gps.distance,
+            #         distances,
+            #         landmark_distances,
+            #         left=np.nan, right=np.nan
+            #     )
+            #     power_adjusted_distance = np.interp(
+            #         power['Time'].astype(int),
+            #         gps.time.astype(int),
+            #         gps_adjusted_distance,
+            #         left=np.nan, right=np.nan
+            #     )
+            #     power_distance = power.rename(columns={"Time": "Distance"})
+            #     power_distance['Distance'] = power_adjusted_distance
+            #     power_distance = power_distance[
+            #         power_distance.Distance.notna()
+            #     ].set_index("Distance")
+            #     power_distance.columns.names = 'Measurement', 'Position'
+            #     telemetry_distance_data[piece] = power_distance
+
+            #     # start_time = piece_times.min()
+            #     # finish_time = piece_times.max()
+            #     # piece_power = power[
+            #     #     power.Time.between(start_time, finish_time)
+            #     # ]
+            #     # piece_power.columns.names = 'Measurement', 'Position'
+            #     # epoch_times = (piece_times - start_time).dt.total_seconds()
+            #     # telemetry_plot_data[name] = (
+            #     #     piece_power, name, start_time, epoch_times)
+
+            # compare_power = pd.concat(
+            #     telemetry_distance_data,
+            #     names=piece_data['Timestamp'].index.names
+            # ).stack(1).reset_index()
+            n_legs = compare_power.groupby(
+                ["name", "leg"]
+            ).size().groupby(level=0).size()
 
             telemetry_figures = {}
-            telem_tabs = dict(zip(telemetry.FIELDS, st.tabs(telemetry.FIELDS)))
+            tab_names = ["Pace Boat"] + list(telemetry.FIELDS)
+            telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
             for col, tab in tqdm(telem_tabs.items()):
                 with tab:
-                    on = st.toggle('Make plot', value=all_plots,
-                                   key=col + ' make plot')
-                    if on:
-                        for name in piece_data['Timestamp'].index.get_level_values(1):
-                            piece_power, name, start_time, epoch_times = telemetry_plot_data[name]
-                            fig = app.make_telemetry_figure(
-                                piece_power, col, name, start_time, epoch_times)
-                            fig.update_layout(
-                                height=height,
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                            telemetry_figures[col, name] = fig
+                    if col == "Pace Boat":
+                        cols = st.columns((1, 4))
+                    else:
+                        cols = st.columns((1, 2, 2))
 
-                    cols = st.columns(2)
                     with cols[0]:
-                        st.subheader("Interval Averages")
-                        interval_stats = piece_data.get(f"Interval {col}")
-                        if interval_stats is not None:
-                            st.write(interval_stats)
+                        on = st.toggle('Make plot', value=all_plots,
+                                       key=col + ' make plot')
 
-                    with cols[1]:
-                        st.subheader("Piece Averages")
-                        interval_stats = piece_data.get(f"Average {col}")
-                        if interval_stats is not None:
-                            st.write(interval_stats)
+                    _height = height
+                    facet_col_wrap = 4
+                    if col == "Pace Boat" and on:
+                        fig, time_behind = app.plot_pace_boat(
+                            piece_data,
+                            landmark_distances,
+                            gps_data,
+                            height=_height,
+                            col=cols[1],
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        st.subheader("Time behind pace boat")
+                        st.dataframe(time_behind)
+                        telemetry_figures[
+                            col, f"{start_landmark} to {finish_landmark}"] = fig
+
+                    elif on:
+                        if col == 'Work PC':
+                            n_plots = len(
+                                compare_power[['name', 'leg', 'Position']].value_counts())
+                            with cols[1]:
+                                facet_col_wrap = st.number_input(
+                                    "Select number of columns",
+                                    value=4, min_value=1, step=1,
+                                )
+                                n_rows = np.ceil(n_plots / facet_col_wrap)
+                            with cols[2]:
+                                _height = st.number_input(
+                                    "Set Work PC figure height",
+                                    min_value=100,
+                                    # 3000,
+                                    value=int(height * n_rows // 2),
+                                    step=50,
+                                )
+
+                        fig = app.make_telemetry_distance_figure(
+                            compare_power, landmark_distances, col,
+                            facet_col_wrap=facet_col_wrap
+                        )
+                        fig.update_layout(
+                            title=f"{start_landmark} to {finish_landmark}: {col}",
+                            height=_height,
+                            legend=dict(
+                                itemclick='toggle',
+                                itemdoubleclick='toggleothers',
+                                groupclick='toggleitem',
+                            )
+                            # xaxis_title="Distance (km)",
+                            # yaxis_title=col,
+                        )
+
+                        st.plotly_chart(fig, use_container_width=True)
+                        telemetry_figures[
+                            col, f"{start_landmark} to {finish_landmark}"] = fig
+
+                        st.write(
+                            "Click on legend to toggle traces, "
+                            "double click to select only one piece"
+                        )
+
+                    # if on:
+                    #     for name in piece_data['Timestamp'].index.get_level_values(1):
+                    #         piece_power, name, start_time, epoch_times = telemetry_plot_data[name]
+                    #         fig = app.make_telemetry_figure(
+                    #             piece_power, col, name, start_time, epoch_times)
+                    #         fig.update_layout(
+                    #             height=height,
+                    #         )
+                    #         st.plotly_chart(fig, use_container_width=True)
+                    #         telemetry_figures[col, name] = fig
+
+                        cols = st.columns(2)
+                        with cols[0]:
+                            st.subheader("Interval Averages")
+                            interval_stats = piece_data.get(f"Interval {col}")
+                            if interval_stats is not None:
+                                st.write(interval_stats)
+
+                        with cols[1]:
+                            st.subheader("Piece Averages")
+                            interval_stats = piece_data.get(f"Average {col}")
+                            if interval_stats is not None:
+                                st.write(interval_stats)
 
     with st.expander("Plot Stroke Profiles", True):
         if st.toggle(
             'Make profile plots',
             value=state.get('Make profile plots'),
             key='Make profile plots'
-        ):
+        ) and piece_data:
             profiles, boat_profiles, crew_profiles = app.make_stroke_profiles(
                 telemetry_data, piece_data
             )
+            crew_profile = pd.concat(
+                crew_profiles, names=['name', 'leg']
+            ).reset_index(['name', 'leg'])
+            crew_profile['Rower'] = (
+                # crew_profile.Position + "|" + crew_profile.File
+                crew_profile.name + "|" + crew_profile.Position
+            )
+            n_legs = crew_profile.groupby(
+                ["name", "leg"]
+            ).size().groupby(level=0).size()
 
             tabs = st.tabs(
                 ["Rower Profiles", "Boat Profile", "Grouped Profiles"])
@@ -376,7 +502,7 @@ def main(state=None):
                         10, (ymin - yr/10, ymax + yr/10)
                     )
 
-                for name, profile in crew_profiles.items():
+                for (name, leg), profile in crew_profiles.items():
                     fig = px.line(
                         profile,
                         x=x,
@@ -419,21 +545,48 @@ def main(state=None):
                         step=100,
                     )
 
-                crew_profile = pd.concat(
-                    crew_profiles, names=['name']
-                ).reset_index("name")
-                crew_profile['Rower'] = (
-                    # crew_profile.Position + "|" + crew_profile.File
-                    crew_profile.name + "|" + crew_profile.Position
-                )
-                fig = px.line(
-                    crew_profile,
-                    x=x,
-                    y=y,
-                    color='Rower',
-                )
+                fig = go.Figure()
+                for (file, leg), piece_profile in crew_profile.groupby(["name", "leg"]):
+                    for pos, profile in piece_profile.groupby("Position"):
+                        name = file if n_legs[file] == 1 else f"{file} {leg=}"
+                        fig.add_trace(
+                            go.Scatter(
+                                x=profile[x],
+                                y=profile[y],
+                                legendgroup=f"{name} {leg}",
+                                legendgrouptitle_text=name,
+                                name=pos,
+                                mode='lines',
+                            )
+                        )
+                #         fig = px.line(
+                #             profile,
+                #             x=x,
+                #             y=y,
+                #             color='Rower',
+                #             title=f"{name}: {pos}"
+                #         )
+                #         fig.update_layout(
+                #             height=height,
+                #         )
+                #         st.plotly_chart(fig, use_container_width=True)
+                #         telemetry_figures['profile', f'{x}-{y}'] = fig
+
+                # fig = px.line(
+                #     crew_profile,
+                #     x=x,
+                #     y=y,
+                #     color='Rower',
+                # )
+
                 fig.update_layout(
+                    title=f"{start_landmark} to {finish_landmark}: {y} vs {x}",
                     height=height,
+                    legend=dict(
+                        itemclick='toggle',
+                        itemdoubleclick='toggleothers',
+                        groupclick='toggleitem',
+                    )
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 telemetry_figures['profile', f'{x}-{y}'] = fig
@@ -460,17 +613,18 @@ def main(state=None):
                     )
 
                 boat_profile = pd.concat(
-                    boat_profiles, names=['name']
-                ).reset_index("name").rename_axis(
+                    boat_profiles, names=['name', 'leg']
+                ).reset_index(["name", 'leg']).rename_axis(
                     columns='Measurement'
                 ).set_index(
-                    ["Normalized Time", "name"]
+                    ["Normalized Time", "name", 'leg']
                 )[facets].stack().rename("value").reset_index()
                 fig = px.line(
                     boat_profile,
                     x="Normalized Time",
                     y="value",
                     color='name',
+                    line_dash='leg',
                     facet_row='Measurement',
                     # title=name
                 )
@@ -512,6 +666,7 @@ def main(state=None):
             pace_boat_finish = boat_times.iloc[-1].rename(
                 "Pace boat time") + pd.Timestamp(0)
             pace_boat_finish[:] = pace_boat_finish.min()
+
             cols = st.columns(2)
             with cols[0]:
                 st.write("Set pace boat time")

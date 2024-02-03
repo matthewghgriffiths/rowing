@@ -183,3 +183,54 @@ def norm_stroke_profile(stroke_profile, n_res):
     ).rename_axis(
         index=("Stroke Count", "Normalized Time")
     )
+
+
+def compare_piece_telemetry(telemetry_data, piece_data, gps_data, landmark_distances, window=0):
+    telemetry_distance_data = {}
+    for piece, distances in piece_data['Total Distance'].iterrows():
+        name = piece[1]
+        power = telemetry_data[name]['power']
+        if window:
+            time_power = power.set_index("Time").sort_index()
+            avg_power = time_power.rolling(
+                pd.Timedelta(seconds=window)
+            ).mean()
+            power = avg_power.reset_index()
+
+        gps = gps_data[name]
+        gps_adjusted_distance = np.interp(
+            gps.distance,
+            distances,
+            landmark_distances,
+            left=np.nan, right=np.nan
+        )
+        power_adjusted_distance = np.interp(
+            power['Time'].astype(int),
+            gps.time.astype(int),
+            gps_adjusted_distance,
+            left=np.nan, right=np.nan
+        )
+        power_distance = power.rename(columns={"Time": "Distance"})
+        power_distance['Distance'] = power_adjusted_distance
+        power_distance = power_distance[
+            power_distance.Distance.notna()
+        ].set_index("Distance")
+        power_distance.columns.names = 'Measurement', 'Position'
+        telemetry_distance_data[piece] = power_distance
+
+        # start_time = piece_times.min()
+        # finish_time = piece_times.max()
+        # piece_power = power[
+        #     power.Time.between(start_time, finish_time)
+        # ]
+        # piece_power.columns.names = 'Measurement', 'Position'
+        # epoch_times = (piece_times - start_time).dt.total_seconds()
+        # telemetry_plot_data[name] = (
+        #     piece_power, name, start_time, epoch_times)
+
+    compare_power = pd.concat(
+        telemetry_distance_data,
+        names=piece_data['Timestamp'].index.names
+    ).stack(1).reset_index()
+
+    return compare_power

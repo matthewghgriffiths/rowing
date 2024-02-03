@@ -440,7 +440,7 @@ def get_piece_gps_data(
     finish_landmark,
     landmark_distances,
 ):
-    positions = positions.loc[
+    positions = positions.reset_index(drop=True).loc[
         positions.distance.searchsorted(
             piece_distances[start_landmark]
         ) - 1:
@@ -456,4 +456,5 @@ def get_piece_gps_data(
     ] = np.interp(
         positions.distance, piece_distances, landmark_distances
     )
+
     return positions

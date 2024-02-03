@@ -1,3 +1,5 @@
+from re import finditer
+from tracemalloc import start
 import streamlit as st
 import io
 import zipfile
@@ -76,7 +78,8 @@ def parse_excel(file, use_names=True):
 @st.cache_data
 def parse_telemetry_excel(uploaded_files, use_names=True):
     uploaded_data = {
-        file.name.rsplit(".", 1)[0]: file.read().decode("utf-8")
+        file.name.rsplit(".", 1)[0]: file
+        # file.read().decode()
         for file in uploaded_files
     }
     data, errs = utils.map_concurrent(
@@ -143,6 +146,7 @@ def select_pieces(all_crossing_times):
     sel_times = all_crossing_times[
         all_crossing_times.dt.date.isin(select_dates)
     ].sort_index(level=(0, 4)).droplevel("location")
+
     landmark_distance = sel_times.reset_index(
         'distance'
     ).distance
@@ -151,6 +155,13 @@ def select_pieces(all_crossing_times):
     landmark_dist = landmark_distance.unstack(
         'landmark'
     ).dropna(axis=1).mean(0)
+
+    if landmark_dist.size < 2:
+        landmark_distance = sel_times.sort_values().reset_index("distance").distance
+        landmark_dist = landmark_distance.unstack(
+            'landmark').mean(0)
+        landmarks = landmark_distance.index.get_level_values(
+            "landmark").drop_duplicates()
 
     start, end = map(
         int, landmarks.get_indexer(
@@ -565,7 +576,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
     boat_profiles = {}
     crew_profiles = {}
     for piece, piece_times in piece_data['Timestamp'].iterrows():
-        name = piece[1]
+        name, leg = piece[1:3]
         profile = telemetry_data[name]['Periodic']
         start_time = piece_times.min()
         finish_time = piece_times.max()
@@ -573,7 +584,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
             profile.Time.dt.tz_localize(None).between(start_time, finish_time)
         ].set_index('Time').dropna(axis=1, how='all')
 
-        profiles[name] = profile = telemetry.norm_stroke_profile(
+        profiles[name, leg] = profile = telemetry.norm_stroke_profile(
             piece_profile, nres)
 
         gate_angle = profile.GateAngle
@@ -586,7 +597,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
         ).mean().reset_index().rename(
             {"": "Boat"}, axis=1, level=1
         )
-        boat_profiles[name] = boat_profile = mean_profile.xs(
+        boat_profiles[name, leg] = boat_profile = mean_profile.xs(
             "Boat", axis=1, level=1)
 
         profile = mean_profile[
@@ -599,7 +610,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
         ).rename_axis(
             index="Normalized Time"
         ).reset_index()
-        crew_profiles[name] = profile
+        crew_profiles[name, leg] = profile
 
     return profiles, boat_profiles, crew_profiles
 
@@ -660,6 +671,177 @@ def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
         griddash='solid',
     )
     fig.update_traces(visible=True)
+    return fig
+
+
+def plot_pace_boat(piece_data, landmark_distances, gps_data, height=600, col=None):
+    piece_distances = piece_data['Total Distance']
+    piece_timestamps = piece_data['Timestamp']
+    dists = np.arange(0, landmark_distances.max(), 0.005)
+
+    start_landmark = landmark_distances.idxmin()
+    finish_landmark = landmark_distances.idxmax()
+
+    piece_gps_data = {}
+    for piece in piece_distances.index:
+        positions = gps_data[piece[1]]
+        piece_gps_data[piece] = splits.get_piece_gps_data(
+            positions,
+            piece_distances.loc[piece],
+            piece_timestamps.loc[piece],
+            start_landmark,
+            finish_landmark,
+            landmark_distances
+        )
+
+    piece_compare_gps = pd.concat({
+        piece: sel_data.set_index(
+            "Distance Travelled"
+        ).apply(utils.interpolate_series, index=dists)
+        for piece, sel_data in piece_gps_data.items()
+    }, axis=1, names=piece_distances.index.names
+    ).rename_axis(
+        index='distance'
+    )
+    boat_times = piece_compare_gps.xs('timeElapsed', level=-1, axis=1)
+    pace_boat_finish = boat_times.iloc[-1].rename(
+        "Pace boat time") + pd.Timestamp(0)
+    pace_boat_finish[:] = pace_boat_finish.min()
+    pace_boat_finish = pd.concat([
+        boat_times.iloc[-1].rename("Finish time")
+        + pd.Timestamp(0),
+        pace_boat_finish,
+    ], axis=1)
+
+    if col is None:
+        col = st.empty()
+
+    with col:
+        st.write("Set pace boat time")
+        pace_boat_finish = st.data_editor(
+            pace_boat_finish.reset_index(),
+            disabled=boat_times.columns.names + ['Finish time'],
+            column_config={
+                "Pace boat time": st.column_config.TimeColumn(
+                    "Pace boat time",
+                    format="m:ss.S",
+                    step=1,
+                ),
+                "Finish time": st.column_config.TimeColumn(
+                    "Finish time",
+                    format="m:ss.S",
+                ),
+            },
+            key="pace boat time",
+        )
+
+    pace_boat_finish['Pace boat time'] -= pd.Timestamp(0)
+    pace_boat_finish = pace_boat_finish.set_index(
+        boat_times.columns.names)['Pace boat time']
+    pace_boat_time = pd.DataFrame(
+        pace_boat_finish.values[None, :] * dists[:, None] / dists[-1],
+        index=boat_times.index, columns=pace_boat_finish.index
+    )
+    time_behind = (
+        boat_times - pace_boat_time
+    ).unstack().dt.total_seconds().rename("time behind pace boat (s)").reset_index()
+
+    fig = px.line(
+        time_behind,
+        x='distance',
+        y='time behind pace boat (s)',
+        color='name',
+    )
+
+    for landmark, distance in landmark_distances.items():
+        fig.add_vline(
+            x=distance,
+            annotation_text=landmark,
+            annotation=dict(
+                textangle=-90
+            )
+        )
+
+    fig.update_yaxes(autorange="reversed")
+    fig.update_layout(height=height)
+
+    time_behind = time_behind.set_index(
+        "distance"
+    ).groupby(
+        ["name", "leg"]
+    )['time behind pace boat (s)'].apply(
+        utils.interpolate_series, index=landmark_distances
+    ).unstack()
+
+    return fig, time_behind
+
+
+@st.cache_data
+def make_telemetry_distance_figure(compare_power, landmark_distances, col, facet_col_wrap=4):
+    n_legs = compare_power.groupby(
+        ["name", "leg"]
+    ).size().groupby(level=0).size()
+
+    if col == 'Work PC':
+        WorkPC_cols = [
+            'Work PC Q1', 'Work PC Q2', 'Work PC Q3', 'Work PC Q4']
+        pc_work = compare_power[
+            ['name', 'leg', 'Distance', 'Position'] + WorkPC_cols
+        ].copy()
+        pc_work['piece'] = pc_work.name + np.select(
+            n_legs.loc[pc_work.name] == 1,
+            pc_work.leg.apply("".format),
+            pc_work.leg.apply(" leg={}".format)
+        )
+        pc_work['R'] = pc_work['piece'].str.cat(
+            pc_work.Position, sep="|"
+        )
+        pc_plot_work = pc_work.set_index(
+            ["Distance", "R"]
+        )[WorkPC_cols].stack().rename(col).reset_index()
+
+        fig = px.area(
+            pc_plot_work,
+            x="Distance",
+            y=col,
+            facet_col='R',
+            facet_col_wrap=facet_col_wrap,
+            color='Measurement',
+            facet_col_spacing=0.01,
+            facet_row_spacing=0.02,
+            # title=name,
+            # color_discrete_sequence=app.color_discrete_sequence,
+        )
+    else:
+        fig = go.Figure()
+        for (file, leg), data in compare_power.groupby(["name", "leg"]):
+            pos_power = data.dropna(
+                subset=col).groupby("Position")
+            for pos, pos_data in pos_power:
+                name = file if n_legs[file] == 1 else f"{file} {leg=}"
+                fig.add_trace(
+                    go.Scatter(
+                        x=pos_data["Distance"],
+                        y=pos_data[col],
+                        legendgroup=f"{file} {leg}",
+                        legendgrouptitle_text=name,
+                        name=pos,
+                        mode='lines',
+                    )
+                )
+        fig.update_layout(
+            xaxis_title="Distance (km)",
+            yaxis_title=col,
+        )
+
+    for landmark, distance in landmark_distances.items():
+        fig.add_vline(
+            x=distance,
+            annotation_text=landmark,
+            annotation=dict(
+                textangle=-90
+            )
+        )
     return fig
 
 
