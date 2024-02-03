@@ -3,7 +3,7 @@ import io
 import numpy as np
 import pandas as pd
 
-from rowing.analysis import files, geodesy
+from rowing.analysis import files, geodesy, splits
 
 FIELDS = [
     'Angle 0.7 F',
@@ -234,3 +234,31 @@ def compare_piece_telemetry(telemetry_data, piece_data, gps_data, landmark_dista
     ).stack(1).reset_index()
 
     return compare_power
+
+
+def get_interval_averages(piece_timestamps, telemetry_data):
+    avg_telem, interval_telem = {}, {}
+    for piece, timestamps in piece_timestamps.iterrows():
+        name = piece[1]
+        power = telemetry_data[name][
+            'power'
+        ].sort_values("Time").reset_index(drop=True)
+        avgP, intervalP = splits.get_interval_averages(
+            power.drop("Time", axis=1, level=0),
+            power.Time,
+            timestamps
+        )
+        for k in avgP.columns.remove_unused_levels().levels[0]:
+            avg_telem.setdefault(k, {})[name] = avgP[k].T
+        for k in intervalP.columns.remove_unused_levels().levels[0]:
+            interval_telem.setdefault(k, {})[name] = intervalP[k].T
+
+    piece_data = {}
+    for k, data in avg_telem.items():
+        piece_data[f"Average {k}"] = pd.concat(
+            data, names=['name', 'position'])
+    for k, data in interval_telem.items():
+        piece_data[f"Interval {k}"] = pd.concat(
+            data, names=['name', 'position'])
+
+    return piece_data

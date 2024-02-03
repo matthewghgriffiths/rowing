@@ -1,5 +1,6 @@
 from re import finditer
 from tracemalloc import start
+from matplotlib import legend
 import streamlit as st
 import io
 import zipfile
@@ -437,9 +438,10 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
             ),
             marker={
                 'size': 5,
-                # 'symbol': "airfield",
-                # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
+                'color': 'black',
             },
+            legendgroup='Landmarks',
+            legendgrouptitle_text='Landmarks',
             textposition='bottom right',
         ))
 
@@ -452,7 +454,6 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
             trace = go.Scattermapbox(
                 lon=arrow.longitude,
                 lat=arrow.latitude,
-                # hoverinfo = landmark_locs.index,
                 mode='lines',
                 name=landmark.landmark,
                 fill='toself',
@@ -462,6 +463,9 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
                 ),
                 marker={"color": color},
                 textposition='bottom right',
+                showlegend=False,
+                legendgroup='Landmarks',
+                legendgrouptitle_text='Landmarks',
             )
             fig.add_trace(trace)
 
@@ -477,14 +481,6 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
                 np.ptp(positions.longitude),
                 np.ptp(positions.latitude),
             ) * 111
-        # if new_landmarks:
-        #     lon = new_locations.longitude.mean()
-        #     lat = new_locations.latitude.mean()
-        #     if len(new_locations) > 1:
-        #         zoom = 15 - max(
-        #             np.ptp(new_locations.longitude),
-        #             np.ptp(new_locations.latitude),
-        #         ) * 111
 
         fig.update_layout(
             {"uirevision": True},
@@ -493,7 +489,13 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
                 'center': {'lon': lon, 'lat': lat},
                 'zoom': zoom
             },
-            showlegend=False,
+            showlegend=True,
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01
+            ),
             height=height,
             overwrite=True
         )
@@ -534,6 +536,7 @@ def make_gps_figure(gps_data, locations, index=None):
             lat=data.latitude,
             mode='lines',
             name=name,
+            showlegend=True,
         ))
     fig.add_trace(go.Scattermapbox(
         lon=locations.longitude,
@@ -548,6 +551,7 @@ def make_gps_figure(gps_data, locations, index=None):
             # 'icon': dict(iconUrl="https://api.iconify.design/maki-city-15.svg"),
         },
         textposition='bottom right',
+        showlegend=True,
     ))
     fig.update_layout(
         mapbox={
@@ -559,14 +563,15 @@ def make_gps_figure(gps_data, locations, index=None):
             'zoom': 10
         },
         legend=dict(
-            orientation="h",
             yanchor="top",
-            y=-.02,
-            xanchor="right",
-            x=1
+            y=0.99,
+            xanchor="left",
+            x=0.01
         ),
+        showlegend=True,
         height=height,
     )
+    fig.update_traces(showlegend=True)
     return fig
 
 
@@ -905,3 +910,67 @@ def figures_to_zipfile(figures, file_type, **kwargs):
 
     zipdata.seek(0)
     return zipdata
+
+
+def select_piece_startend(all_crossing_times, gps_data, locations):
+    piece_data, start_landmark, finish_landmark, intervals = select_pieces(
+        all_crossing_times
+    )
+    if piece_data is None:
+        st.write("No valid pieces could be found")
+    else:
+        if intervals:
+            sep = intervals/1e3
+            piece_gps = align_pieces(
+                piece_data, start_landmark, finish_landmark, gps_data, sep
+            )
+            interval_locations = pd.concat({
+                v: piece_gps.xs(v, level=-1, axis=1).mean(1)
+                for v in ["latitude", 'longitude', 'bearing']
+            }, axis=1).iloc[1:]
+            interval_locations.index = interval_locations.index.map(
+                "{:.2f} km".format)
+            start_finish = locations.loc[(
+                slice(None), [start_landmark, finish_landmark]), :]
+            new_locations = pd.concat([
+                start_finish,
+                # locations,
+                pd.concat({"intervals": interval_locations})
+            ]).rename_axis(index=locations.index.names)
+            crossing_times = get_crossing_times(
+                gps_data, locations=new_locations)
+            all_crossing_times = pd.concat(crossing_times, names=['name'])
+            sel_times = all_crossing_times.sort_index(
+                level=(4,)).droplevel('location')
+            piece_data = splits.get_piece_times(
+                sel_times, start_landmark, finish_landmark
+            )
+        return piece_data
+
+        piece_compare_gps = align_pieces(
+            piece_data, start_landmark, finish_landmark, gps_data, 0.005)
+
+        avg_telem, interval_telem = {}, {}
+        for piece, timestamps in piece_data['Timestamp'].iterrows():
+            name = piece[1]
+            power = telemetry_data[name][
+                'power'
+            ].sort_values("Time").reset_index(drop=True)
+            avgP, intervalP = splits.get_interval_averages(
+                power.drop("Time", axis=1, level=0),
+                power.Time,
+                timestamps
+            )
+            for k in avgP.columns.remove_unused_levels().levels[0]:
+                avg_telem.setdefault(k, {})[name] = avgP[k].T
+            for k in intervalP.columns.remove_unused_levels().levels[0]:
+                interval_telem.setdefault(k, {})[name] = intervalP[k].T
+
+        for k, data in avg_telem.items():
+            piece_data[f"Average {k}"] = pd.concat(
+                data, names=['name', 'position'])
+        for k, data in interval_telem.items():
+            piece_data[f"Interval {k}"] = pd.concat(
+                data, names=['name', 'position'])
+
+        show_piece_data(piece_data)
