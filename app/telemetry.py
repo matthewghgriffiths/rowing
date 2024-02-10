@@ -248,7 +248,7 @@ def main(state=None):
     logger.info("Plot piece data")
     telemetry_figures = {}
     with st.expander("Plot piece data", True):
-        cols = st.columns(3)
+        cols = st.columns((1, 1, 9))
         with cols[0]:
             all_plots = st.toggle(
                 'Make all plots',
@@ -256,14 +256,25 @@ def main(state=None):
                 key='Make all plots')
 
         if piece_data:
+            show_rowers = None
             with cols[1]:
+                toggle_athletes = st.toggle(
+                    "Filter athletes", key=f"toggleother"
+                )
+                with cols[2]:
+                    if toggle_athletes:
+                        cols2 = st.columns((3, 2, 2))
+                    else:
+                        cols2 = st.columns(2)
+
+            with cols2[-2]:
                 window = st.number_input(
                     "Select window to average over (s), set to 0 to remove smoothing",
                     value=10,
                     min_value=0,
                     step=5,
                 )
-            with cols[2]:
+            with cols2[-1]:
                 height = st.number_input(
                     "Set figures height",
                     100, 3000, default_height, step=50,
@@ -279,15 +290,37 @@ def main(state=None):
                 ["name", "leg"]
             ).size().groupby(level=0).size()
 
+            piece_data_filter = piece_data
+            if toggle_athletes:
+                with cols2[0]:
+                    piece_rowers = compare_power.groupby(
+                        ["Position", "name"]).size().index
+                    show_rowers = st.multiselect(
+                        "Select athletes to plot",
+                        options=piece_rowers.map("|".join),
+                        key="show_athletes",
+                    )
+                    if show_rowers:
+                        show_rowers = pd.MultiIndex.from_tuples([
+                            tuple(r.split("|", 2)) for r in show_rowers
+                        ], names=["Position", "name"])
+                        filter_rows = pd.MultiIndex.from_frame(
+                            compare_power[["Position", "name"]]
+                        ).isin(show_rowers)
+                        compare_power = compare_power[filter_rows]
+                        piece_data_filter = {
+                            k: data.reindex(show_rowers.swaplevel(0, 1))
+                            if data.index.nlevels == 2 and len(data.index.intersection(show_rowers.swaplevel(0, 1)))
+                            else data
+                            for k, data in piece_data.items()
+                        }
+
             telemetry_figures = {}
             tab_names = ["Pace Boat"] + list(telemetry.FIELDS)
             telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
             for col, tab in tqdm(telem_tabs.items()):
                 with tab:
-                    if col == "Pace Boat":
-                        cols = st.columns((1, 4))
-                    else:
-                        cols = st.columns((1, 2, 2))
+                    cols = st.columns((1, 7))
 
                     with cols[0]:
                         on = st.toggle('Make plot', value=all_plots,
@@ -311,15 +344,21 @@ def main(state=None):
 
                     elif on:
                         if col == 'Work PC':
+                            with cols[1]:
+                                cols2 = st.columns(2)
+
                             n_plots = len(
                                 compare_power[['name', 'leg', 'Position']].value_counts())
-                            with cols[1]:
+                            if show_rowers:
+                                n_plots = len(show_rowers)
+
+                            with cols2[0]:
                                 facet_col_wrap = st.number_input(
                                     "Select number of columns",
                                     value=4, min_value=1, step=1,
                                 )
                                 n_rows = np.ceil(n_plots / facet_col_wrap)
-                            with cols[2]:
+                            with cols2[1]:
                                 _height = st.number_input(
                                     "Set Work PC figure height",
                                     min_value=100,
@@ -330,15 +369,19 @@ def main(state=None):
 
                         fig = app.make_telemetry_distance_figure(
                             compare_power, landmark_distances, col,
-                            facet_col_wrap=facet_col_wrap
+                            facet_col_wrap=facet_col_wrap,
                         )
+
+                        itemclick = 'toggle'
+                        itemdoubleclick = "toggleothers"
+                        groupclick = 'toggleitem'
                         fig.update_layout(
                             title=f"{col}: {start_landmark} to {finish_landmark}",
                             height=_height,
                             legend=dict(
-                                itemclick='toggle',
-                                itemdoubleclick='toggleothers',
-                                groupclick='toggleitem',
+                                itemclick=itemclick,
+                                itemdoubleclick=itemdoubleclick,
+                                groupclick=groupclick,
                             )
                             # xaxis_title="Distance (km)",
                             # yaxis_title=col,
@@ -355,13 +398,15 @@ def main(state=None):
 
                     cols = st.columns(2)
                     with cols[0]:
-                        interval_stats = piece_data.get(f"Interval {col}")
+                        interval_stats = piece_data_filter.get(
+                            f"Interval {col}")
                         if interval_stats is not None:
                             st.subheader("Interval Averages")
                             st.write(interval_stats)
 
                     with cols[1]:
-                        interval_stats = piece_data.get(f"Average {col}")
+                        interval_stats = piece_data_filter.get(
+                            f"Average {col}")
                         if interval_stats is not None:
                             st.subheader("Piece Averages")
                             st.write(interval_stats)
@@ -440,7 +485,7 @@ def main(state=None):
                     fig.update_layout(
                         height=height
                     )
-                    st.plotly_chart(fig)
+                    st.plotly_chart(fig, use_container_width=True)
                     telemetry_figures[f"{x}-{y}", name] = fig
 
             with tabs[2]:
