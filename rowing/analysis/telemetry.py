@@ -1,4 +1,6 @@
 import io
+import zipfile
+import ast
 
 import numpy as np
 import pandas as pd
@@ -204,14 +206,16 @@ def compare_piece_telemetry(telemetry_data, piece_data, gps_data, landmark_dista
             landmark_distances,
             left=np.nan, right=np.nan
         )
+        power_epoch = power['Time'].astype(int)
         power_adjusted_distance = np.interp(
-            power['Time'].astype(int),
+            power_epoch,
             gps.time.astype(int),
             gps_adjusted_distance,
             left=np.nan, right=np.nan
         )
-        power_distance = power.rename(columns={"Time": "Distance"})
+        power_distance = power.copy()  # .rename(columns={"Time": "Distance"})
         power_distance['Distance'] = power_adjusted_distance
+        print(power_distance.Time.notna().mean())
         power_distance = power_distance[
             power_distance.Distance.notna()
         ].set_index("Distance")
@@ -262,3 +266,19 @@ def get_interval_averages(piece_timestamps, telemetry_data):
             data, names=['name', 'position'])
 
     return piece_data
+
+
+def load_zipfile(file):
+    telem_data = {}
+    with zipfile.ZipFile(file) as z:
+        for f in z.filelist:
+            name, key = f.filename.removesuffix(
+                ".parquet").split("/")
+            data = pd.read_parquet(
+                z.open(f.filename)
+            )
+            if data.columns.str.contains("\(").any():
+                data.columns = data.columns.map(ast.literal_eval)
+            telem_data.setdefault(name, {})[key] = data
+
+    return telem_data

@@ -100,16 +100,19 @@ def parse_telemetry_excel(uploaded_files, use_names=True):
 def parse_telemetry_zip(uploaded_files):
     telem_data = {}
     for file in uploaded_files:
-        with zipfile.ZipFile(file) as z:
-            for f in z.filelist:
-                name, key = f.filename.removesuffix(
-                    ".parquet").split("/")
-                data = pd.read_parquet(
-                    z.open(f.filename)
-                )
-                if data.columns.str.contains("\(").any():
-                    data.columns = data.columns.map(ast.literal_eval)
-                telem_data.setdefault(name, {})[key] = data
+        telem_data.update(
+            telemetry.load_zipfile(file)
+        )
+        # with zipfile.ZipFile(file) as z:
+        #     for f in z.filelist:
+        #         name, key = f.filename.removesuffix(
+        #             ".parquet").split("/")
+        #         data = pd.read_parquet(
+        #             z.open(f.filename)
+        #         )
+        #         if data.columns.str.contains("\(").any():
+        #             data.columns = data.columns.map(ast.literal_eval)
+        #         telem_data.setdefault(name, {})[key] = data
 
     return telem_data
 
