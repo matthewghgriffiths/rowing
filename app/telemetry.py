@@ -183,6 +183,9 @@ def main(state=None):
         crossing_times = app.get_crossing_times(gps_data, locations=locations)
         all_crossing_times = pd.concat(crossing_times, names=['name'])
 
+    if all_crossing_times.empty:
+        return
+
     logger.info("All Crossing Times")
     with st.expander("All Crossing times"):
         show_times = pd.concat({
@@ -212,24 +215,23 @@ def main(state=None):
 
     logger.info("Individual Crossing Times")
     with st.expander("Individual Crossing Times"):
-        if crossing_times:
-            tabs = st.tabs(crossing_times)
-            for tab, (name, crossings) in zip(tabs, crossing_times.items()):
-                with tab:
-                    show_crossings = pd.concat({
-                        "date": crossings.dt.normalize(),
-                        "time": crossings,
-                    }, axis=1)
-                    st.dataframe(
-                        show_crossings,
-                        column_config={
-                            "date": st.column_config.DateColumn("Date"),
-                            "time": st.column_config.TimeColumn(
-                                "Time", format="hh:mm:ss.SS"
-                            )
-                        }
-                    )
-                    app.download_csv(f"{name}-crossings.csv", show_crossings)
+        tabs = st.tabs(crossing_times)
+        for tab, (name, crossings) in zip(tabs, crossing_times.items()):
+            with tab:
+                show_crossings = pd.concat({
+                    "date": crossings.dt.normalize(),
+                    "time": crossings,
+                }, axis=1)
+                st.dataframe(
+                    show_crossings,
+                    column_config={
+                        "date": st.column_config.DateColumn("Date"),
+                        "time": st.column_config.TimeColumn(
+                            "Time", format="hh:mm:ss.SS"
+                        )
+                    }
+                )
+                app.download_csv(f"{name}-crossings.csv", show_crossings)
 
     logger.info("Select piece start end")
     with st.expander("Select Piece start/end"):
@@ -604,10 +606,11 @@ def main(state=None):
 
                 xldata.seek(0)
                 st.download_button(
-                    ":inbox_tray: Download telemetry_piece_data.xlsx",
+                    f":inbox_tray: Download telemetry-{start_landmark}-{finish_landmark}.xlsx",
                     xldata,
                     # type='primary',
-                    file_name="telemetry_piece_data.xlsx",
+                    file_name=f'telemetry-{start_landmark}-{finish_landmark}.xlsx'
+                    # file_name="telemetry_piece_data.xlsx",
                 )
 
         if telemetry_figures:
