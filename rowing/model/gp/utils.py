@@ -1,5 +1,6 @@
 
 from math import prod
+import yaml
 from functools import partial
 from typing import Dict, List, Tuple, Optional, Generator, NamedTuple
 
@@ -13,6 +14,28 @@ import haiku as hk
 
 from ...utils import map_concurrent
 from .linalg import vdot, get_pos_def, solve_triangular
+
+
+def norm_jax(x):
+    if x.shape == ():
+        return x.item()
+    return x.tolist()
+
+
+def is_list(x):
+    if isinstance(x, list):
+        return True
+    return False
+
+
+def dump_params(params, *args, **kwargs):
+    norm_params = jax.tree_map(norm_jax, params)
+    return yaml.safe_dump(norm_params, *args, **kwargs)
+
+
+def load_params(obj, *args, **kwargs):
+    norm_params = yaml.safe_load(obj, *args, **kwargs)
+    return jax.tree_map(jnp.array, norm_params, is_leaf=is_list)
 
 
 def transform(func):
@@ -34,6 +57,29 @@ def init_full(fill_value):
         return jnp.full(shape, fill_value, dtype)
 
     return full
+
+
+def get_full_kernel(self):
+    kernels = self.get_kernels()
+    return sum(kernels)
+
+
+def get_jitter_kernel(self):
+    K = self.get_full_kernel()
+    race_var = jnp.exp(hk.get_parameter(
+        "log_noise", [], init=jnp.zeros, dtype=jnp.float64))
+    K_noise = jnp.eye(len(K)) * race_var
+    return K + K_noise
+
+
+def gp_system(self):
+    K = self.get_jitter_kernel()
+    y = self.y
+    return GPSystem.from_gram(K, y)
+
+
+def loss(self):
+    return self.gp_system().loss()
 
 
 class GPSystem(NamedTuple):
@@ -85,6 +131,40 @@ class GPSystem(NamedTuple):
         y_loo = y - a / iKii
         return y_loo
 
+    def leave_groups_out(self, groups):
+        y = self.y
+        a = self.a
+        invK = self.inv_K()
+        y_lgo = np.zeros_like(a)
+        for i in groups:
+            ij = np.ix_(i, i)
+            y_lgo[i] = y[i] - np.linalg.inv(invK[ij]) @ a[i]
+
+        return y_lgo
+
+    def leave_groups_out_prediction(self, groups, K):
+        iK = self.inv_K()
+        KiK = K @ iK
+        y_pred = np.zeros_like(self.y)
+        k = np.arange(len(K))
+        for i in groups:
+            ii = np.ix_(i, i)
+            j = np.setdiff1d(k, i)
+            ij = np.ix_(i, j)
+
+            iKii = iK[ii]
+            yj = self.y[j]
+            y_pred[i] = (
+                KiK[ij] @ yj
+                - np.linalg.multi_dot([K[ii], iK[ij], yj])
+                - np.linalg.multi_dot([
+                    (KiK[ii] - K[ii] @ iKii),
+                    np.linalg.inv(iKii), iK[ij], yj
+                ])
+            )
+
+        return y_pred
+
     def predict(self, K):
         return K @ self.a
 
@@ -105,6 +185,68 @@ class GPSystem(NamedTuple):
             L, K.T, lower=True, trans=0
         )
         return Kcov - LdivK.T @ LdivK
+
+    def mean_loss(self):
+        return self.loss() / self.y.size
+
+    def mahalanobis(self):
+        return self.a @ self.y / self.a.size
+
+    def mse(self):
+        y_loo = self.leave_one_out()
+        return jnp.square(self.y - y_loo).mean()
+
+    def rmse(self):
+        return jnp.sqrt(self.mse())
+
+
+class OptModel:
+    def __init__(self, model, pbar=None, callback=True):
+        self.model = model
+        self.system = transform(model.gp_system)
+        self.loss = jax.jit(transform(self.model.loss).apply)
+
+        self.pbar = pbar
+        self._callback = callback
+        self.args_history = []
+        self.loss_history = []
+        self.rmse_history = []
+
+    def set_pbar(self, pbar):
+        self.pbar = pbar
+        return self
+
+    def __call__(self, params, *args,  **kwargs):
+        jax.debug.callback(
+            self.callback, params, *args, ordered=True, **kwargs)
+        return self.loss(params, *args, **kwargs)
+
+    def callback(self, *args, **kwargs):
+        if self._callback:
+            self.default_callback(*args, **kwargs)
+
+    def default_callback(self, *args, **kwargs):
+        try:
+            self.args_history.append(args)
+            system = self.system.apply(*args, **kwargs)
+
+            loss = float(system.mean_loss())
+            self.loss_history.append(loss)
+            mahalanobis = float(system.mahalanobis())
+            rmse = float(system.rmse())
+            self.rmse_history.append(rmse)
+
+            if self.pbar:
+                self.pbar.update(1)
+                self.pbar.set_postfix(
+                    loss=loss,
+                    rmse=rmse,
+                    Mahalanobis=mahalanobis,
+                )
+
+        except Exception as e:
+            if self.pbar:
+                self.pbar.set_postfix(EXCEPTION=e)
 
 
 def _2d(x):

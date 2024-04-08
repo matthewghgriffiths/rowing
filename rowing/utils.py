@@ -40,7 +40,7 @@ def interpolate_series(s, index, **kwargs):
         si = pd.Series(pd.to_datetime(np.interp(
             x,
             s.index,
-            (s - pd.Timestamp(0)).dt.total_seconds(),
+            (s.dt.tz_localize(None) - pd.Timestamp(0)).dt.total_seconds(),
             **kwargs
         ), unit='s'), index)
     elif pd.api.types.is_timedelta64_dtype(s):

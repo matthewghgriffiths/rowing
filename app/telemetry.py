@@ -235,364 +235,190 @@ def main(state=None):
 
     logger.info("Select piece start end")
     with st.expander("Select Piece start/end"):
-        piece_data, start_landmark, finish_landmark, intervals = app.select_pieces(
-            all_crossing_times
-        )
-        if piece_data is None:
+        piece_information = app.select_pieces(all_crossing_times)
+        if piece_information is None:
             st.write("No valid pieces could be found")
         else:
-            piece_data.update(
+            piece_information['piece_data'].update(
                 telemetry.get_interval_averages(
-                    piece_data['Timestamp'], telemetry_data)
+                    piece_information['piece_data']['Timestamp'],
+                    telemetry_data)
             )
-            app.show_piece_data(piece_data)
+            piece_information['gps_data'] = gps_data
+            piece_information['telemetry_data'] = telemetry_data
+            piece_information.update(app.make_stroke_profiles(
+                piece_information['telemetry_data'],
+                piece_information['piece_data']
+            ))
+            piece_information['piece_rowers'] = pd.MultiIndex.from_tuples([
+                (r, k)
+                for k, data in telemetry_data.items()
+                for r in data['power'].columns.levels[1]
+                if r
+            ], names=('Position', 'name'))
+
+            app.show_piece_data(piece_information['piece_data'])
 
     logger.info("Plot piece data")
     telemetry_figures = {}
     with st.expander("Plot piece data", True):
-        cols = st.columns((1, 1, 9))
-        with cols[0]:
-            all_plots = st.toggle(
-                'Make all plots',
-                value=state.get('Make all plots'),
-                key='Make all plots')
+        if piece_information:
+            window, show_rowers, all_plots, height = app.setup_plots(
+                piece_information['piece_rowers'], state, default_height=default_height)
+            piece_information = app.setup_plot_data(
+                piece_information, window, show_rowers)
 
-        if piece_data:
-            show_rowers = None
-            with cols[1]:
-                toggle_athletes = st.toggle(
-                    "Filter athletes", key=f"toggleother"
-                )
-                with cols[2]:
-                    if toggle_athletes:
-                        cols2 = st.columns((3, 2, 2))
-                    else:
-                        cols2 = st.columns(2)
-
-            with cols2[-2]:
-                window = st.number_input(
-                    "Select window to average over (s), set to 0 to remove smoothing",
-                    value=10,
-                    min_value=0,
-                    step=5,
-                )
-            with cols2[-1]:
-                height = st.number_input(
-                    "Set figures height",
-                    100, 3000, default_height, step=50,
-                )
-
-            piece_distances = piece_data['Total Distance']
-            landmark_distances = piece_data['Distance Travelled'].mean()[
-                piece_distances.columns
-            ].sort_values()
-            compare_power = telemetry.compare_piece_telemetry(
-                telemetry_data, piece_data, gps_data, landmark_distances, window=int(window))
-            n_legs = compare_power.groupby(
-                ["name", "leg"]
-            ).size().groupby(level=0).size()
-
-            piece_data_filter = piece_data
-            if toggle_athletes:
-                with cols2[0]:
-                    piece_rowers = compare_power.groupby(
-                        ["Position", "name"]).size().index
-                    show_rowers = st.multiselect(
-                        "Select athletes to plot",
-                        options=piece_rowers.map("|".join),
-                        key="show_athletes",
-                    )
-                    if show_rowers:
-                        show_rowers = pd.MultiIndex.from_tuples([
-                            tuple(r.split("|", 2)) for r in show_rowers
-                        ], names=["Position", "name"])
-                        filter_rows = pd.MultiIndex.from_frame(
-                            compare_power[["Position", "name"]]
-                        ).isin(show_rowers)
-                        compare_power = compare_power[filter_rows]
-                        piece_data_filter = {
-                            k: data.reindex(show_rowers.swaplevel(0, 1))
-                            if data.index.nlevels == 2 and len(data.index.intersection(show_rowers.swaplevel(0, 1)))
-                            else data
-                            for k, data in piece_data.items()
-                        }
-
-            telemetry_figures = {}
             tab_names = ["Pace Boat"] + list(telemetry.FIELDS)
             telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
-            for col, tab in tqdm(telem_tabs.items()):
+            for col, tab in telem_tabs.items():
                 with tab:
                     cols = st.columns((1, 7))
-
                     with cols[0]:
                         on = st.toggle('Make plot', value=all_plots,
                                        key=col + ' make plot')
 
-                    _height = height
-                    facet_col_wrap = 4
-                    if col == "Pace Boat" and on:
-                        fig, time_behind = app.plot_pace_boat(
-                            piece_data,
-                            landmark_distances,
-                            gps_data,
-                            height=_height,
-                            col=cols[1],
+                    if on:
+                        figures, tables = app.plot_piece_col(
+                            col, piece_information,
+                            default_height=default_height,
+                            key=col, input_container=cols[1]
                         )
-                        st.plotly_chart(fig, use_container_width=True)
-                        st.subheader("Time behind pace boat")
-                        st.dataframe(time_behind)
-                        telemetry_figures[
-                            col, f"{start_landmark} to {finish_landmark}"] = fig
-
-                    elif on:
-                        if col == 'Work PC':
-                            with cols[1]:
-                                cols2 = st.columns(2)
-
-                            n_plots = len(
-                                compare_power[['name', 'leg', 'Position']].value_counts())
-                            if show_rowers:
-                                n_plots = len(show_rowers)
-
-                            with cols2[0]:
-                                facet_col_wrap = st.number_input(
-                                    "Select number of columns",
-                                    value=4, min_value=1, step=1,
-                                )
-                                n_rows = np.ceil(n_plots / facet_col_wrap)
-                            with cols2[1]:
-                                _height = st.number_input(
-                                    "Set Work PC figure height",
-                                    min_value=100,
-                                    # 3000,
-                                    value=int(height * n_rows // 2),
-                                    step=50,
-                                )
-
-                        fig = app.make_telemetry_distance_figure(
-                            compare_power, landmark_distances, col,
-                            facet_col_wrap=facet_col_wrap,
-                        )
-
-                        itemclick = 'toggle'
-                        itemdoubleclick = "toggleothers"
-                        groupclick = 'toggleitem'
-                        fig.update_layout(
-                            title=f"{col}: {start_landmark} to {finish_landmark}",
-                            height=_height,
-                            legend=dict(
-                                itemclick=itemclick,
-                                itemdoubleclick=itemdoubleclick,
-                                groupclick=groupclick,
-                            )
-                            # xaxis_title="Distance (km)",
-                            # yaxis_title=col,
-                        )
-
-                        st.plotly_chart(fig, use_container_width=True)
-                        telemetry_figures[
-                            col, f"{start_landmark} to {finish_landmark}"] = fig
-
-                        st.write(
-                            "Click on legend to toggle traces, "
-                            "double click to select only one piece"
-                        )
-
-                    cols = st.columns(2)
-                    with cols[0]:
-                        interval_stats = piece_data_filter.get(
-                            f"Interval {col}")
-                        if interval_stats is not None:
-                            st.subheader("Interval Averages")
-                            st.write(interval_stats)
-
-                    with cols[1]:
-                        interval_stats = piece_data_filter.get(
-                            f"Average {col}")
-                        if interval_stats is not None:
-                            st.subheader("Piece Averages")
-                            st.write(interval_stats)
+                        for c, fig in figures.items():
+                            st.plotly_chart(fig, use_container_width=True)
+                        for t, table in tables.items():
+                            st.subheader(t)
+                            st.dataframe(table, use_container_width=True)
 
     with st.expander("Plot Stroke Profiles", True):
         if st.toggle(
             'Make profile plots',
             value=state.get('Make profile plots'),
             key='Make profile plots'
-        ) and piece_data:
-            profiles, boat_profiles, crew_profiles = app.make_stroke_profiles(
-                telemetry_data, piece_data
-            )
-
-            crew_profile = pd.concat(
-                crew_profiles, names=['name', 'leg']
-            ).reset_index(['name', 'leg'])
-            crew_profile['Rower'] = (
-                # crew_profile.Position + "|" + crew_profile.File
-                crew_profile.name + "|" + crew_profile.Position
-            )
-            n_legs = crew_profile.groupby(
-                ["name", "leg"]
-            ).size().groupby(level=0).size()
-
+        ) and piece_information:
             tabs = st.tabs(
                 ["Rower Profiles", "Boat Profile", "Grouped Profiles"])
             with tabs[0]:
-                cols = st.columns(4)
-                with cols[0]:
-                    x = st.selectbox(
-                        "Select x-axis",
-                        ['GateAngle', 'Normalized Time', 'GateForceX',
-                            'GateAngleVel', "GateAngle0"]
-                    )
-                with cols[1]:
-                    y = st.selectbox(
-                        "Select y-axis",
-                        ['GateForceX', 'GateAngle', 'GateAngleVel',
-                            "GateAngle0", 'Normalized Time']
-                    )
-                with cols[2]:
-                    height = st.number_input(
-                        "Set figure height",
-                        key='rower profile fig height',
-                        min_value=100,
-                        max_value=None,
-                        value=default_height,
-                        step=100,
-                    )
-                with cols[3]:
-                    ymin = float(min(
-                        profile[y].min() for profile in crew_profiles.values()
-                    ))
-                    ymax = float(max(
-                        profile[y].max() for profile in crew_profiles.values()
-                    ))
-                    yr = float(ymax - ymin)
-                    yrange = st.slider(
-                        "Set y lims",
-                        ymin - yr/10, ymax + yr /
-                        10, (ymin - yr/10, ymax + yr/10)
-                    )
+                figures, tables = app.plot_rower_profiles(
+                    piece_information, default_height=default_height)
 
-                for (name, leg), profile in crew_profiles.items():
-                    fig = px.line(
-                        profile,
-                        x=x,
-                        y=y,
-                        color='Position',
-                        title=name
-                    )
-                    fig.update_yaxes(
-                        range=yrange
-                    )
-                    fig.update_layout(
-                        height=height
-                    )
+                for c, fig in figures.items():
                     st.plotly_chart(fig, use_container_width=True)
-                    telemetry_figures[f"{x}-{y}", name] = fig
-
-            with tabs[2]:
-                cols = st.columns(3)
-                with cols[0]:
-                    x = st.selectbox(
-                        "Select x-axis",
-                        ['GateAngle', 'Normalized Time', 'GateForceX',
-                            'GateAngleVel', "GateAngle0"],
-                        key="Select x-axis2",
-                    )
-                with cols[1]:
-                    y = st.selectbox(
-                        "Select y-axis",
-                        ['GateForceX', 'GateAngle', 'GateAngleVel',
-                            "GateAngle0", 'Normalized Time'],
-                        key="Select y-axis2",
-                    )
-                with cols[2]:
-                    height = st.number_input(
-                        "Set figure height",
-                        key='rower profile fig height2',
-                        min_value=100,
-                        max_value=None,
-                        value=default_height,
-                        step=100,
-                    )
-
-                fig = go.Figure()
-                for (file, leg), piece_profile in crew_profile.groupby(["name", "leg"]):
-                    for pos, profile in piece_profile.groupby("Position"):
-                        name = file if n_legs[file] == 1 else f"{file} {leg=}"
-                        fig.add_trace(
-                            go.Scatter(
-                                x=profile[x],
-                                y=profile[y],
-                                legendgroup=f"{name} {leg}",
-                                legendgrouptitle_text=name,
-                                name=pos,
-                                mode='lines',
-                            )
-                        )
-
-                fig.update_layout(
-                    title=f"{start_landmark} to {finish_landmark}: {y} vs {x}",
-                    height=height,
-                    legend=dict(
-                        itemclick='toggle',
-                        itemdoubleclick='toggleothers',
-                        groupclick='toggleitem',
-                    )
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                telemetry_figures['profile', f'{x}-{y}'] = fig
+                for t, table in tables.items():
+                    st.subheader(t)
+                    st.dataframe(table, use_container_width=True)
 
             with tabs[1]:
-                cols = st.columns(2)
+                figures, tables = app.plot_boat_profile(
+                    piece_information, default_height=default_height)
+                for c, fig in figures.items():
+                    st.plotly_chart(fig, use_container_width=True)
+                for t, table in tables.items():
+                    st.subheader(t)
+                    st.dataframe(table, use_container_width=True)
+
+            with tabs[2]:
+                figures, tables = app.plot_crew_profile(
+                    piece_information, default_height=default_height)
+                for c, fig in figures.items():
+                    st.plotly_chart(fig, use_container_width=True)
+                for t, table in tables.items():
+                    st.subheader(t)
+                    st.dataframe(table, use_container_width=True)
+
+    with st.expander("Report"):
+
+        report = st.container()
+
+        st.subheader("Add panels")
+        window, show_rowers, n_views, height = app.setup_plots(
+            piece_information['piece_rowers'], state,
+            key='report_',
+            toggle=False, nview=True, default_height=default_height
+        )
+        piece_information = app.setup_plot_data(
+            piece_information, window, show_rowers)
+
+        with report:
+            for i in range(n_views):
+                key = f"report_{i}_"
+
+                pop, title = st.columns((1, 6))
+                with pop:
+                    inputs = st.popover("Select Panel")
+                cols = [inputs] * 3
+                # with st.popover("Select Panel"):
+                #     cols = st.columns((1, 1, 4))
+
                 with cols[0]:
-                    facets = st.multiselect(
-                        "Select facets",
-                        [
-                            'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'
-                        ],
-                        default=[
-                            'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'
-                        ],
-                    )
-                with cols[1]:
-                    height = st.number_input(
-                        "Set figure height",
-                        min_value=100,
-                        max_value=None,
-                        value=len(facets) * 200,
-                        step=100,
+                    plot_type = st.selectbox(
+                        "What would you like to plot?",
+                        key=key + "select plot",
+                        options=[
+                            "Piece profile",
+                            "Stroke profile"
+                        ]
                     )
 
-                boat_profile = pd.concat(
-                    boat_profiles, names=['name', 'leg']
-                ).reset_index(["name", 'leg']).rename_axis(
-                    columns='Measurement'
-                ).set_index(
-                    ["Normalized Time", "name", 'leg']
-                )[facets].stack().rename("value").reset_index()
-                fig = px.line(
-                    boat_profile,
-                    x="Normalized Time",
-                    y="value",
-                    color='name',
-                    line_dash='leg',
-                    facet_row='Measurement',
-                    # title=name
-                )
-                fig.update_yaxes(matches=None, showticklabels=True)
-                fig.update_layout(height=height)
-                st.plotly_chart(fig, use_container_width=True)
-                telemetry_figures['profile', 'boats'] = fig
+                if plot_type == "Piece profile":
+                    with cols[1]:
+                        piece_type = st.selectbox(
+                            "What data would you like to plot?",
+                            key=key + "select piece",
+                            options=["Pace Boat"] + list(telemetry.FIELDS)
+                        )
+                    figures, tables = app.plot_piece_col(
+                        piece_type, piece_information, default_height=height, key=key,
+                        input_container=cols[-1]
+                    )
+
+                elif plot_type == "Stroke profile":
+                    with cols[1]:
+                        stroke_type = st.selectbox(
+                            "What data would you like to plot?",
+                            key=key + "select stroke",
+                            options=[
+                                "Rower profile",
+                                "Crew profiles",
+                                "Boat profile",
+                            ]
+                        )
+
+                    if stroke_type == "Rower profile":
+                        figures, tables = app.plot_rower_profiles(
+                            piece_information, default_height=height, key=key,
+                            input_container=cols[-1])
+                    elif stroke_type == "Crew profiles":
+                        figures, tables = app.plot_crew_profile(
+                            piece_information, default_height=height, key=key,
+                            input_container=cols[-1])
+                    elif stroke_type == "Boat profile":
+                        figures, tables = app.plot_boat_profile(
+                            piece_information, default_height=height, key=key,
+                            input_container=cols[-1])
+
+                with title:
+                    st.subheader(plot_type)
+
+                for c, fig in figures.items():
+                    st.plotly_chart(fig, use_container_width=True)
+                for t, table in tables.items():
+                    st.subheader(t)
+                    st.dataframe(table, use_container_width=True)
+
+            report_state = {
+                k: v for k, v in st.session_state.items()
+                if k.startswith("report_")
+            }
+            print(report_state)
 
     logger.info("Download data")
     with st.expander("Download Data"):
         cols = st.columns(4)
-        if piece_data:
+        if piece_information:
             with cols[0], st.spinner("Generating excel file"):
                 xldata = io.BytesIO()
                 with pd.ExcelWriter(xldata) as xlf:
-                    for name, data in piece_data.items():
+                    for name, data in piece_information['piece_data'].items():
                         save_data = data.copy()
                         for c, vals in data.items():
                             if pd.api.types.is_datetime64_any_dtype(vals.dtype):
@@ -605,6 +431,8 @@ def main(state=None):
                         save_data.to_excel(xlf, name.replace("/", " per "))
 
                 xldata.seek(0)
+                start_landmark = piece_information['start_landmark']
+                finish_landmark = piece_information['finish_landmark']
                 st.download_button(
                     f":inbox_tray: Download telemetry-{start_landmark}-{finish_landmark}.xlsx",
                     xldata,

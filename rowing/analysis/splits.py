@@ -33,6 +33,9 @@ _LOCATION_DATA = {
     'tideway': _DATA_PATH / 'tideway_locations.tsv',
     'henley': _DATA_PATH / 'henley_locations.tsv',
     'dorney': _DATA_PATH / 'dorney_locations.tsv',
+    'cerla': _DATA_PATH / 'Cerla_locations.tsv',
+    'Shiplake': _DATA_PATH / 'Shiplake_locations.tsv',
+    'Wycliffe': _DATA_PATH / 'Wycliffe_locations.tsv',
 }
 
 

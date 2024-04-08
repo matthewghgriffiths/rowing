@@ -151,79 +151,23 @@ def main(state=None):
 
     with st.expander("Compare Piece Profile"):
         if piece_data:
-            piece_distances = piece_data['Total Distance']
-            piece_timestamps = piece_data['Timestamp']
-            landmark_distances = piece_data['Distance Travelled'].mean()[
-                piece_distances.columns]
-            dists = np.arange(0, landmark_distances.max(), 0.005)
-
-            piece_gps_data = {}
-            for piece in piece_distances.index:
-                positions = gpx_data[piece[1]].copy()
-                positions.time = positions.time.dt.tz_localize(None)
-                piece_gps_data[piece] = splits.get_piece_gps_data(
-                    positions,
-                    piece_distances.loc[piece],
-                    piece_timestamps.loc[piece].dt.tz_localize(None),
-                    start_landmark,
-                    finish_landmark,
-                    landmark_distances
-                )
-
-            piece_compare_gps = pd.concat({
-                piece: sel_data.set_index(
-                    "Distance Travelled"
-                ).apply(utils.interpolate_series, index=dists)
-                for piece, sel_data in piece_gps_data.items()
-            }, axis=1, names=piece_distances.index.names
-            ).rename_axis(
-                index='distance'
-            )
-            boat_times = piece_compare_gps.xs('timeElapsed', level=-1, axis=1)
-            pace_boat_finish = boat_times.iloc[-1].rename(
-                "Pace boat time") + pd.Timestamp(0)
-            pace_boat_finish[:] = pace_boat_finish.min()
-
             cols = st.columns(2)
-            with cols[0]:
-                st.write("Set pace boat time")
-                pace_boat_finish = st.data_editor(
-                    pace_boat_finish.reset_index(),
-                    disabled=boat_times.columns.names,
-                    column_config={
-                        "Pace boat time": st.column_config.TimeColumn(
-                            "Pace boat time",
-                            format="m:ss.S",
-                            step=1,
-                        ),
-                    }
-                )
             with cols[1]:
                 height = st.number_input(
-                    "Set figure height",
+                    "Set profile figure height",
                     100, 3000, 600, step=50,
                     key="height piece profile",
                 )
-
-            pace_boat_finish['Pace boat time'] -= pd.Timestamp(0)
-            pace_boat_finish = pace_boat_finish.set_index(
-                boat_times.columns.names)['Pace boat time']
-            pace_boat_time = pd.DataFrame(
-                pace_boat_finish.values[None, :] * dists[:, None] / dists[-1],
-                index=boat_times.index, columns=pace_boat_finish.index
-            )
-            time_behind = (
-                boat_times - pace_boat_time
-            ).unstack().dt.total_seconds().rename("time behind pace boat (s)").reset_index()
-
-            fig = px.line(
-                time_behind,
-                x='distance',
-                y='time behind pace boat (s)',
-                color='file',
+            fig, time_behind = app.plot_pace_boat(
+                piece_data,
+                piece_data['Distance Travelled'].mean()[
+                    piece_data['Total Distance'].columns],
+                gpx_data,
+                col=cols[0],
+                name='file',
             )
             fig.update_yaxes(autorange="reversed")
-            fig.update_layout(height=height)
+            fig.update_layout(height=600)
             st.plotly_chart(fig, use_container_width=True)
 
     with st.spinner("Processing fastest times"):

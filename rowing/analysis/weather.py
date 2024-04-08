@@ -16,6 +16,7 @@ import requests
 from rowing.analysis import splits, utils
 
 TIME_STR = "%Y-%m-%d %H%M%S"
+DAY_STR = "%Y-%m-%d"
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,23 @@ def loc_time_key(latitude, longitude, time):
     return (f"{lat:.4f},{lon:.4f}", time.strftime(TIME_STR))
 
 
+def loc_date_key(latitude, longitude, date):
+    lat = np.round(latitude, 4)
+    lon = np.round(longitude, 4)
+    date = pd.Timestamp(date)
+    return (f"{lat:.4f},{lon:.4f}", date.strftime(DAY_STR))
+
+
 def parse_history_path(path):
     path = Path(path)
     time = datetime.datetime.strptime(path.stem, TIME_STR)
+    lat, lon = map(float, path.parent.name.split(","))
+    return lat, lon, time
+
+
+def parse_day_path(path):
+    path = Path(path)
+    time = datetime.datetime.strptime(path.stem, DAY_STR)
     lat, lon = map(float, path.parent.name.split(","))
     return lat, lon, time
 
@@ -42,6 +57,7 @@ def count(gen):
 
 class WeatherClient(utils.CachedClient):
     history_url = "https://api.openweathermap.org/data/3.0/onecall/timemachine"
+    day_summary_url = "https://api.openweathermap.org/data/3.0/onecall/day_summary"
     reverse_url = "http://api.openweathermap.org/geo/1.0/reverse"
 
     def __init__(
@@ -70,8 +86,22 @@ class WeatherClient(utils.CachedClient):
     def all_weather_history(self):
         return (self.path / "history").glob("**/*.json")
 
+    def all_daily_history(self):
+        return (self.path / "daily").glob("**/*.json")
+
+    def history_points(self):
+        return map(parse_history_path, self.weather_history())
+
+    def day_points(self):
+        return map(parse_day_path, self.day_history())
+
     def weather_history(self):
         for f in self.all_weather_history():
+            if os.stat(f).st_size > 2:
+                yield f
+
+    def day_history(self):
+        for f in self.all_daily_history():
             if os.stat(f).st_size > 2:
                 yield f
 
@@ -93,7 +123,16 @@ class WeatherClient(utils.CachedClient):
         ]
         return pd.json_normalize(history)
 
-    def get_weather_history(self, latitude, longitude, time):
+    def load_weather_history(self, latitude, longitude, time, **kwargs):
+        key = ("history",) + loc_time_key(latitude, longitude, time)
+        data = self.cached(
+            key, self.download_weather_history, latitude, longitude, time, **kwargs
+        )
+        data.update(data.pop("data", [{}])[0])
+        data.update(data.pop("weather", [{}])[0])
+        return data
+
+    def get_weather_history(self, latitude, longitude, time, touch=False):
         key = ("history",) + loc_time_key(latitude, longitude, time)
         path = self.local_cache.get_path(key, self.path)
         if path.exists():
@@ -104,19 +143,11 @@ class WeatherClient(utils.CachedClient):
 
             return data
 
-        path.parent.mkdir(exist_ok=True, parents=True)
-        with open(path, "w") as f:
-            json.dump({}, f)
+        if touch:
+            path.parent.mkdir(exist_ok=True, parents=True)
+            with open(path, "w") as f:
+                json.dump({}, f)
         return {}
-
-    def load_weather_history(self, latitude, longitude, time, **kwargs):
-        key = ("history",) + loc_time_key(latitude, longitude, time)
-        data = self.cached(
-            key, self.download_weather_history, latitude, longitude, time, **kwargs
-        )
-        data.update(data.pop("data")[0])
-        data.update(data.pop("weather")[0])
-        return data
 
     def download_weather_history(self, latitude, longitude, time, **params):
         timestamp = utils.to_timestamp(time, unit="1s")
@@ -126,9 +157,43 @@ class WeatherClient(utils.CachedClient):
             "dt": timestamp,
             "appid": self.password
         }
-        logger.debug("downloading data at %.4f, %.4f for %s",
-                     latitude, longitude, time)
+        logger.debug(
+            "downloading data at %.4f, %.4f for %s", latitude, longitude, time)
         r = requests.get(self.history_url, params=params)
+        r.raise_for_status()
+        return r.json()
+
+    def get_day_weather(self, latitude, longitude, time, touch=False):
+        key = ("daily",) + loc_date_key(latitude, longitude, time)
+        path = self.local_cache.get_path(key, self.path)
+        if path.exists():
+            data = self.read_path(path)
+            return data
+
+        if touch:
+            path.parent.mkdir(exist_ok=True, parents=True)
+            with open(path, "w") as f:
+                json.dump({}, f)
+        return {}
+
+    def load_day_weather(self, latitude, longitude, date, **kwargs):
+        key = ("daily",) + loc_date_key(latitude, longitude, date)
+        data = self.cached(
+            key, self.download_day_weather, latitude, longitude, date, **kwargs
+        )
+        return data
+
+    def download_day_weather(self, latitude, longitude, date, **params):
+        date = pd.to_datetime(date).strftime("%Y-%m-%d")
+        params = {
+            "lat": latitude,
+            "lon": longitude,
+            "date": date,
+            "appid": self.password
+        }
+        logger.debug(
+            "downloading data at %.4f, %.4f for %s", latitude, longitude, date)
+        r = requests.get(self.day_summary_url, params=params)
         r.raise_for_status()
         return r.json()
 
@@ -139,6 +204,15 @@ class WeatherClient(utils.CachedClient):
         weather_data, errors = self.map_concurrent(
             self.get_weather_history,
             list(points)
+        )
+        return pd.json_normalize([data for data in weather_data if data])
+
+    def get_day_histories(self, points=None):
+        points = (
+            map(parse_day_path, self.day_history())
+        )
+        weather_data, errors = self.map_concurrent(
+            self.get_day_weather, list(points)
         )
         return pd.json_normalize([data for data in weather_data if data])
 
