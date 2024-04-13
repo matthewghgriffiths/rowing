@@ -112,18 +112,34 @@ def parse_powerline_data(split_data, use_names=True):
     split_data['Crew List'] = crew_list = crew_data.set_index("Position").Name
     crew_list[crew_list.isna()] = crew_list.index[crew_list.isna()]
 
-    start_time = pd.to_datetime(
-        gps_info.UTC,
-        exact=False,
-        format="%d %b %Y %H:%M:%S (%Z)"
-    )
+    for fmt in [
+        "%d %b %Y %H:%M:%S (%Z)",
+        "%d %b %Y %H%M%S (%Z)"
+    ]:
+        try:
+            start_time = pd.to_datetime(
+                gps_info.UTC,
+                exact=False,
+                format=fmt
+            )
+            break
+        except ValueError:
+            pass
+    else:
+        start_time = pd.to_datetime(
+            gps_info.UTC,
+            # exact=False,
+            format="mixed",
+            dayfirst=True,
+            errors='coerce'
+        )
+
     start_date = pd.Timestamp(start_time.date())
     lat, lon = gps_info.Lat, gps_info.Lon
     lat_scale = (geodesy._AVG_EARTH_RADIUS_KM * 1000 * np.pi/180)
     long_scale = lat_scale * np.cos(np.deg2rad(lat))
 
     t_shift = (gps_data['UTC Time'].Boat - gps_data.Time).max()
-
     split_data["Periodic"]['Time'] = pd.to_datetime(pd.to_timedelta(
         split_data['Periodic'].Time, unit='milli'
     ) + start_time)

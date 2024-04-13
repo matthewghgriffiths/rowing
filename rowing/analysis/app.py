@@ -62,6 +62,8 @@ def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
         sep=sep
     )
     if errs:
+        for k, err in errs.items():
+            raise err
         logging.error(errs)
 
     return data
@@ -758,7 +760,6 @@ def plot_pace_boat(piece_data, landmark_distances, gps_data, height=600, input_c
 
     with input_container or st.container():
         st.write("Set pace boat time")
-        print(pace_boat_finish.min())
         st.text_input(
             "Set pace boat time",
             value=None,
@@ -983,9 +984,10 @@ def telemetry_to_zipfile(telemetry_data):
     return zipdata
 
 
-def setup_plots(piece_rowers, state, default_height=600, key='', toggle=True, nview=False, input_container=None):
-    with input_container or st.container():
-        cols = st.columns((1, 1, 9))
+def setup_plots(piece_rowers, state, default_height=600, key='', toggle=True, nview=False, cols=None, input_container=None):
+    if not cols:
+        with input_container or st.container():
+            cols = st.columns((1, 1, 9))
 
     with cols[0]:
         all_plots = None

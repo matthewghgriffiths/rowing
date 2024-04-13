@@ -6,6 +6,8 @@ from functools import partial
 from pathlib import Path
 import os
 import sys
+import yaml
+import json
 
 import io
 import zipfile
@@ -329,10 +331,28 @@ def main(state=None):
 
         report = st.container()
 
-        st.subheader("Add panels")
+        st.subheader("Report settings")
+
+        template_col, *settings_cols = st.columns((1, 1, 1, 7))
+        with template_col:
+            template_container = st.popover("Report template")
+
+        with template_container:
+            template = st.file_uploader(
+                "Upload report template",
+                type=['yaml', 'json'],
+            )
+            if template:
+                template_data = yaml.safe_load(template)
+                for k0, vs in template_data.items():
+                    for k1, v in vs.items():
+                        k = ".".join([k0, k1])
+                        st.session_state[k] = v
+
         window, show_rowers, n_views, height = app.setup_plots(
             piece_information['piece_rowers'], state,
-            key='report_',
+            key='report_setup.',
+            cols=settings_cols,
             toggle=False, nview=True, default_height=default_height
         )
         piece_information = app.setup_plot_data(
@@ -340,7 +360,7 @@ def main(state=None):
 
         with report:
             for i in range(n_views):
-                key = f"report_{i}_"
+                key = f"report_{i}."
 
                 pop, title = st.columns((1, 6))
                 with pop:
@@ -349,31 +369,35 @@ def main(state=None):
                 # with st.popover("Select Panel"):
                 #     cols = st.columns((1, 1, 4))
 
+                figures = {}
+
                 with cols[0]:
                     plot_type = st.selectbox(
                         "What would you like to plot?",
                         key=key + "select plot",
                         options=[
                             "Piece profile",
-                            "Stroke profile"
+                            "Stroke profile",
+                            "Interval averages",
+                            "Piece averages"
                         ]
                     )
 
                 if plot_type == "Piece profile":
                     with cols[1]:
-                        piece_type = st.selectbox(
+                        plot_data_type = st.selectbox(
                             "What data would you like to plot?",
                             key=key + "select piece",
                             options=["Pace Boat"] + list(telemetry.FIELDS)
                         )
                     figures, tables = app.plot_piece_col(
-                        piece_type, piece_information, default_height=height, key=key,
+                        plot_data_type, piece_information, default_height=height, key=key,
                         input_container=cols[-1]
                     )
 
                 elif plot_type == "Stroke profile":
                     with cols[1]:
-                        stroke_type = st.selectbox(
+                        plot_data_type = st.selectbox(
                             "What data would you like to plot?",
                             key=key + "select stroke",
                             options=[
@@ -383,33 +407,68 @@ def main(state=None):
                             ]
                         )
 
-                    if stroke_type == "Rower profile":
+                    if plot_data_type == "Rower profile":
                         figures, tables = app.plot_rower_profiles(
                             piece_information, default_height=height, key=key,
                             input_container=cols[-1])
-                    elif stroke_type == "Crew profiles":
+                    elif plot_data_type == "Crew profiles":
                         figures, tables = app.plot_crew_profile(
                             piece_information, default_height=height, key=key,
                             input_container=cols[-1])
-                    elif stroke_type == "Boat profile":
+                    elif plot_data_type == "Boat profile":
                         figures, tables = app.plot_boat_profile(
                             piece_information, default_height=height, key=key,
                             input_container=cols[-1])
 
+                elif plot_type == "Interval averages":
+                    with cols[1]:
+                        plot_data_type = st.selectbox(
+                            "What data would you like to show?",
+                            key=key + "select piece",
+                            options=list(telemetry.FIELDS)
+                        )
+                        print(piece_information['piece_data_filter'])
+                        tables = {
+                            f"Interval {plot_data_type}": piece_information['piece_data_filter'].get(
+                                f"Interval {plot_data_type}")
+                        }
+                        print(tables)
+
+                elif plot_type == "Piece averages":
+                    with cols[1]:
+                        plot_data_type = st.selectbox(
+                            "What data would you like to show?",
+                            key=key + "select piece",
+                            options=list(telemetry.FIELDS)
+                        )
+                        tables = {
+                            f"Average {plot_data_type}": piece_information['piece_data_filter'].get(
+                                f"Average {plot_data_type}")
+                        }
+
                 with title:
-                    st.subheader(plot_type)
+                    st.subheader(f"{plot_type}: {plot_data_type}")
 
                 for c, fig in figures.items():
+                    st.subheader(c)
                     st.plotly_chart(fig, use_container_width=True)
                 for t, table in tables.items():
                     st.subheader(t)
                     st.dataframe(table, use_container_width=True)
 
-            report_state = {
-                k: v for k, v in st.session_state.items()
-                if k.startswith("report_")
-            }
-            print(report_state)
+        with template_container:
+            report_state = {}
+            for k, v in st.session_state.items():
+                if k.startswith("report"):
+                    k0, k1 = k.split(".", maxsplit=1)
+                    report_state.setdefault(k0, {})[k1] = v
+
+            report_settings = yaml.safe_dump(report_state)
+            st.download_button(
+                ":inbox_tray: Download telemetry_report_template.yaml",
+                report_settings,
+                "telemetry_report_template.yaml",
+            )
 
     logger.info("Download data")
     with st.expander("Download Data"):
