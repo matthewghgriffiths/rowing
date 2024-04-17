@@ -61,7 +61,7 @@ def main(params=None):
 
             threads = st.number_input(
                 "number of threads to use", min_value=1, max_value=20,
-                value=state.get("threads", 6),
+                value=4,
                 step=1
             )
             threads = int(threads)
