@@ -188,8 +188,7 @@ def main(state=None):
     if all_crossing_times.empty:
         return
 
-    logger.info("All Crossing Times")
-    with st.expander("All Crossing times"):
+    with st.expander("Crossing times"):
         show_times = pd.concat({
             "date": all_crossing_times.dt.normalize(),
             "time": all_crossing_times,
@@ -212,11 +211,9 @@ def main(state=None):
             landmark_times.min().sort_values().index
         ]
         st.write(landmark_times)
-
         app.download_csv("all-crossings.csv", show_times)
 
-    logger.info("Individual Crossing Times")
-    with st.expander("Individual Crossing Times"):
+        st.subheader("By file")
         tabs = st.tabs(crossing_times)
         for tab, (name, crossings) in zip(tabs, crossing_times.items()):
             with tab:
@@ -333,21 +330,29 @@ def main(state=None):
 
         st.subheader("Report settings")
 
-        template_col, *settings_cols = st.columns((1, 1, 1, 7))
+        template_col, *settings_cols = st.columns((1, 1, 1, 4))
         with template_col:
             template_container = st.popover("Report template")
 
         with template_container:
-            template = st.file_uploader(
-                "Upload report template",
-                type=['yaml', 'json'],
-            )
-            if template:
-                template_data = yaml.safe_load(template)
-                for k0, vs in template_data.items():
+            if st.button("use default"):
+                for k0, vs in app.DEFAULT_REPORT.items():
                     for k1, v in vs.items():
                         k = ".".join([k0, k1])
                         st.session_state[k] = v
+            else:
+                template = st.file_uploader(
+                    "Upload report template",
+                    type=['yaml', 'json'],
+                )
+                if template:
+                    template_data = yaml.safe_load(template)
+                    print(json.dumps(template_data, indent=4))
+
+                    for k0, vs in template_data.items():
+                        for k1, v in vs.items():
+                            k = ".".join([k0, k1])
+                            st.session_state[k] = v
 
         window, show_rowers, n_views, height = app.setup_plots(
             piece_information['piece_rowers'], state,
@@ -410,15 +415,15 @@ def main(state=None):
                     if plot_data_type == "Rower profile":
                         figures, tables = app.plot_rower_profiles(
                             piece_information, default_height=height, key=key,
-                            input_container=cols[-1])
+                            cols=cols)
                     elif plot_data_type == "Crew profiles":
                         figures, tables = app.plot_crew_profile(
                             piece_information, default_height=height, key=key,
-                            input_container=cols[-1])
+                            cols=cols)
                     elif plot_data_type == "Boat profile":
                         figures, tables = app.plot_boat_profile(
                             piece_information, default_height=height, key=key,
-                            input_container=cols[-1])
+                            cols=cols)
 
                 elif plot_type == "Interval averages":
                     with cols[1]:
@@ -427,12 +432,10 @@ def main(state=None):
                             key=key + "select piece",
                             options=list(telemetry.FIELDS)
                         )
-                        print(piece_information['piece_data_filter'])
                         tables = {
                             f"Interval {plot_data_type}": piece_information['piece_data_filter'].get(
                                 f"Interval {plot_data_type}")
                         }
-                        print(tables)
 
                 elif plot_type == "Piece averages":
                     with cols[1]:

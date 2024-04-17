@@ -30,6 +30,72 @@ color_discrete_sequence = [
     "#d5dae5",
 ]
 
+DEFAULT_REPORT = {
+    "report_0": {
+        "select piece": "Pace Boat",
+        "select plot": "Piece profile"
+    },
+    "report_1": {
+        "select piece": "Rower Swivel Power",
+        "select plot": "Piece profile"
+    },
+    "report_2": {
+        "select piece": "MinAngle",
+        "select plot": "Piece profile"
+    },
+    "report_3": {
+        "select piece": "MaxAngle",
+        "select plot": "Piece profile"
+    },
+    "report_4": {
+        "select piece": "CatchSlip",
+        "select plot": "Piece profile"
+    },
+    "report_5": {
+        "select piece": "FinishSlip",
+        "select plot": "Piece profile"
+    },
+    "report_6": {
+        "Select x-axis": "GateAngle",
+        "Select y-axis": "GateForceX",
+        "rower profile figure height": 600,
+        "select plot": "Stroke profile",
+        "select stroke": "Rower profile"
+    },
+    "report_7": {
+        "Select x-axis": "GateAngle",
+        "Select y-axis": "GateAngleVel",
+        "rower profile figure height": 600,
+        "select plot": "Stroke profile",
+        "select stroke": "Rower profile"
+    },
+    "report_8": {
+        "Select x-axis": "Normalized Time",
+        "Select y-axis": "GateForceX",
+        "rower profile figure height": 600,
+        "select plot": "Stroke profile",
+        "select stroke": "Rower profile"
+    },
+    "report_9": {
+        "select plot": "Stroke profile",
+        "select stroke": "Boat profile",
+        "select_boat_facets": [
+            "Speed",
+            "Accel",
+            "Roll Angle",
+            "Pitch Angle",
+            "Yaw Angle"
+        ],
+        "select_boat_heigh": 1000
+    },
+    "report_setup": {
+        "figure_height": 600,
+        "nview": 10,
+        "toggleother": False,
+        "window": 10
+    }
+}
+
 
 @st.cache_data
 def parse_gpx(file):
@@ -280,19 +346,19 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
             with cols[0]:
                 st.markdown("<br>", unsafe_allow_html=True)
                 count = st.empty()
-                if st.button("Add piece landmark"):
-                    st.session_state.npick_distance += 1
-                    # st.experimental_rerun()
-                if st.button("Remove piece landmark"):
-                    st.session_state.npick_distance -= 1
-                    # st.experimental_rerun()
+                n_pick = st.number_input(
+                    "Number of landmarks",
+                    min_value=0,
+                    value=0,
+                    step=1,
+                    key='npick_distance'
+                )
                 with count:
-                    npick = st.session_state.get("npick_distance", 0)
                     st.write(
-                        f"\nSetting {npick} landmarks from pieces")
+                        f"\nSetting {n_pick} landmarks from pieces")
 
             with cols[1]:
-                for i in range(st.session_state.get("npick_distance", 0)):
+                for i in range(n_pick):
                     cols = st.columns(3)
                     with cols[0]:
                         name = st.selectbox(
@@ -987,7 +1053,7 @@ def telemetry_to_zipfile(telemetry_data):
 def setup_plots(piece_rowers, state, default_height=600, key='', toggle=True, nview=False, cols=None, input_container=None):
     if not cols:
         with input_container or st.container():
-            cols = st.columns((1, 1, 9))
+            cols = st.columns((1, 1, 5))
 
     with cols[0]:
         all_plots = None
@@ -1217,12 +1283,13 @@ def plot_piece_data(piece_information, show_rowers, all_plots, height):
     return piece_figures, piece_tables
 
 
-def plot_rower_profiles(piece_information, default_height=600, key="rower_", input_container=None):
+def plot_rower_profiles(piece_information, default_height=600, key="rower_", input_container=None, cols=None):
     crew_profiles = piece_information['crew_profiles']
 
-    input_container = input_container or st.container()
-    with input_container:
-        cols = st.columns(3)
+    if not cols:
+        input_container = input_container or st.container()
+        with input_container:
+            cols = st.columns(3)
 
     with cols[0]:
         x = st.selectbox(
@@ -1282,15 +1349,16 @@ def plot_rower_profiles(piece_information, default_height=600, key="rower_", inp
     return figures, {}
 
 
-def plot_crew_profile(piece_information, default_height=600, key='', input_container=None):
+def plot_crew_profile(piece_information, default_height=600, key='', input_container=None, cols=None):
     crew_profile = piece_information['crew_profile']
     n_legs = piece_information['n_legs']
     start_landmark = piece_information['start_landmark']
     finish_landmark = piece_information['finish_landmark']
 
-    input_container = input_container or st.container()
-    with input_container:
-        cols = st.columns(3)
+    if not cols:
+        input_container = input_container or st.container()
+        with input_container:
+            cols = st.columns(3)
 
     with cols[0]:
         x = st.selectbox(
@@ -1345,66 +1413,54 @@ def plot_crew_profile(piece_information, default_height=600, key='', input_conta
     return {f'{x}-{y}': fig}, {}
 
 
-def plot_boat_profile(piece_information, default_height=600, key="boat_", input_container=None):
-    crew_profile = piece_information['crew_profile']
-    start_landmark = piece_information['start_landmark']
-    finish_landmark = piece_information['finish_landmark']
-    n_legs = piece_information['n_legs']
+def plot_boat_profile(piece_information, default_height=600, key="boat_", input_container=None, cols=None):
+    boat_profiles = piece_information['boat_profiles']
 
-    with input_container or st.container():
-        cols = st.columns(3)
+    if not cols:
+        with input_container or st.container():
+            cols = st.columns(3)
 
     with cols[0]:
-        x = st.selectbox(
-            "Select x-axis",
-            ['GateAngle', 'Normalized Time', 'GateForceX',
-                'GateAngleVel', "GateAngle0"],
-            key=key + "Select x-axis",
+        facets = st.multiselect(
+            "Select facets",
+            [
+                'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'
+            ],
+            default=[
+                'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'
+            ],
+            key=key + "select_boat_facets"
         )
     with cols[1]:
-        y = st.selectbox(
-            "Select y-axis",
-            ['GateForceX', 'GateAngle', 'GateAngleVel',
-                "GateAngle0", 'Normalized Time'],
-            key=key + "Select y-axis",
-        )
-    with cols[2]:
         height = st.number_input(
             "Set figure height",
-            key=key + "Set figure height",
             min_value=100,
             max_value=None,
-            value=default_height,
+            value=len(facets) * 200,
             step=100,
+            key=key + "select_boat_heigh"
         )
 
-    fig = go.Figure()
-    for (file, leg), piece_profile in crew_profile.groupby(["name", "leg"]):
-        for pos, profile in piece_profile.groupby("Position"):
-            name = file if n_legs[file] == 1 else f"{file} {leg=}"
-            fig.add_trace(
-                go.Scatter(
-                    x=profile[x],
-                    y=profile[y],
-                    legendgroup=f"{name} {leg}",
-                    legendgrouptitle_text=name,
-                    name=pos,
-                    mode='lines',
-                )
-            )
-
-    fig.update_layout(
-        title=f"{start_landmark} to {finish_landmark}: {y} vs {x}",
-        height=height,
-        legend=dict(
-            itemclick='toggle',
-            itemdoubleclick='toggleothers',
-            groupclick='toggleitem',
-        )
+    boat_profile = pd.concat(
+        boat_profiles, names=['name', 'leg']
+    ).reset_index(["name", 'leg']).rename_axis(
+        columns='Measurement'
+    ).set_index(
+        ["Normalized Time", "name", 'leg']
+    )[facets].stack().rename("value").reset_index()
+    fig = px.line(
+        boat_profile,
+        x="Normalized Time",
+        y="value",
+        color='name',
+        line_dash='leg',
+        facet_row='Measurement',
+        # title=name
     )
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_yaxes(matches=None, showticklabels=True)
+    fig.update_layout(height=height)
 
-    return {'boats': fig}, {}
+    return {'Boat profile': fig}, {}
 
 
 def plot_piece_col(col, piece_information, default_height=600, key='piece', input_container=None):
