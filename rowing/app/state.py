@@ -38,8 +38,8 @@ def as_json(val):
 
 
 STATE = {
-    k: json.loads(v[0])
-    for k, v in st.experimental_get_query_params().items()
+    k: v[0]
+    for k, v in st.query_params.items()
 }
 
 get = STATE.get
@@ -65,7 +65,7 @@ def update_query_params():
     update_params = {
         k: v for k, v in items if v is not None
     }
-    st.experimental_set_query_params(**update_params)
+    st.query_params.update(**update_params)
 
 
 def get_state():
@@ -77,5 +77,5 @@ def reset_button(label='reset'):
         st.session_state.clear()
         st.cache_resource.clear()
         clear()
-        st.experimental_set_query_params()
+        st.query_params()
         st.experimental_rerun()

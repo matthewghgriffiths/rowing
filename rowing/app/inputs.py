@@ -201,6 +201,7 @@ def set_plotly_inputs(
     x_cols=None,
     y_cols=None,
     color_cols=None,
+    symbol_cols=None,
     facet_cols=None,
     facet_rows=None,
     category_orders=None,
@@ -208,7 +209,7 @@ def set_plotly_inputs(
     max_unique=8,
     **kwargs
 ):
-    cols = st.columns(5)
+    cols = st.columns(6)
     numeric_columns = fields.filter_numerical_columns(data)
     cat_columns = fields.filter_categorical_columns(
         data, max_unique=max_unique)
@@ -217,6 +218,7 @@ def set_plotly_inputs(
         "x": numeric_columns if x_cols is None else x_cols,
         "y": numeric_columns if y_cols is None else y_cols,
         "color": cat_columns if color_cols is None else color_cols,
+        "symbol": cat_columns if symbol_cols is None else symbol_cols,
         "facet_col": np.r_[None, cat_columns] if facet_cols is None else facet_cols,
         "facet_row": np.r_[None, cat_columns] if facet_rows is None else facet_rows,
     }
@@ -224,7 +226,8 @@ def set_plotly_inputs(
     col_labels = {
         "x": "Choose x",
         "y": "Choose y",
-        "color": "Label",
+        "color": "Colour",
+        "symbol": "Symbol",
         "facet_col": "Choose columns",
         "facet_row": "Choose rows"
     }
