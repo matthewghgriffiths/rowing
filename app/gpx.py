@@ -119,12 +119,12 @@ def main(state=None):
                 app.download_csv(f"{name}-crossings.csv", show_crossings)
 
     with st.expander("Piece selecter"):
-        piece_data, start_landmark, finish_landmark, intervals = app.select_pieces(
+        piece_information = app.select_pieces(
             all_crossing_times)
-        if piece_data is None:
+        if piece_information is None:
             st.write("No valid pieces could be found")
         else:
-            app.show_piece_data(piece_data)
+            app.show_piece_data(piece_information['piece_data'])
 
     with st.spinner("Processing split timings"):
         location_timings = app.get_location_timings(
@@ -150,7 +150,9 @@ def main(state=None):
                 )
 
     with st.expander("Compare Piece Profile"):
-        if piece_data:
+        if piece_information:
+            piece_data = piece_information['piece_data']
+
             cols = st.columns(2)
             with cols[1]:
                 height = st.number_input(
@@ -163,11 +165,11 @@ def main(state=None):
                 piece_data['Distance Travelled'].mean()[
                     piece_data['Total Distance'].columns],
                 gpx_data,
-                col=cols[0],
+                input_container=cols[0],
                 name='file',
             )
             fig.update_yaxes(autorange="reversed")
-            fig.update_layout(height=600)
+            fig.update_layout(height=height)
             st.plotly_chart(fig, use_container_width=True)
 
     with st.spinner("Processing fastest times"):
