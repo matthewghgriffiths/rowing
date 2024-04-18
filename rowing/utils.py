@@ -760,6 +760,8 @@ def timeout(seconds):
         try:
             queue.put(func(*args, **kwargs))
         except Exception as exc:
+            logger.exception(exc, exc_info=True, stack_info=True)
+            traceback.print_exception(exc)
             errorq.put(exc)
 
     def decorator(func):
