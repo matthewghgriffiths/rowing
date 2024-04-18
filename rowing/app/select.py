@@ -97,6 +97,9 @@ def get_races_livedata(races, max_workers=10):
     live_data, intermediates, lane_info = live.get_races_livetracks(
         races.index, max_workers=max_workers, load_livetracker=load_livetracker
     )
+    if live_data.empty:
+        return live_data, intermediates, lane_info
+
     live_data = live_data.join(
         races[[
             fields.race_Date, fields.Race, fields.race_event,

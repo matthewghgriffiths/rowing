@@ -225,22 +225,28 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
         estimate_livetracker_times,
         race_livetracks, max_workers=max_workers, **kwargs
     )
-    logger.info("estimate_livetracker_times errors: %s", errors)
-    intermediates = pd.concat(
-        {race_id: inters for race_id, (_, inters) in results.items()},
-        axis=1
-    )
-    races_live_data = pd.concat(
-        {race_id: live_data for race_id, (live_data, _) in results.items()},
-        axis=0
-    ).reset_index(drop=True)
-    lane_info = pd.concat(
-        {
-            race_id: data[2] for race_id, data in race_livetracks.items()
-        },
-        axis=0
-    ).reset_index(drop=True)
-    return races_live_data, intermediates, lane_info
+    for race_id, exc in errors.items():
+        logger.error("estimate_livetracker_times race_id=%s: %s", race_id, exc)
+
+    if results:
+        intermediates = pd.concat(
+            {race_id: inters for race_id, (_, inters) in results.items()},
+            axis=1
+        )
+        races_live_data = pd.concat(
+            {race_id: live_data for race_id,
+                (live_data, _) in results.items()},
+            axis=0
+        ).reset_index(drop=True)
+        lane_info = pd.concat(
+            {
+                race_id: data[2] for race_id, data in race_livetracks.items()
+            },
+            axis=0
+        ).reset_index(drop=True)
+        return races_live_data, intermediates, lane_info
+    else:
+        return (pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
 
 
 class RealTimeLivetracker:
