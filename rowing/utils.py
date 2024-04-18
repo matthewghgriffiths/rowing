@@ -782,6 +782,10 @@ def timeout(seconds):
                     for msg in traceback.format_exception(exc):
                         logger.error(msg)
 
+                    for msg in traceback.format_tb(exc.__traceback__):
+                        logger.error(msg)
+                        print(msg)
+
                     traceback.print_exception(exc)
                     raise exc
                 except queue.Empty:
