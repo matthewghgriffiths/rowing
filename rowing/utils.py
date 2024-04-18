@@ -11,6 +11,7 @@ import threading
 import queue
 from multiprocessing import Process, Queue
 from functools import wraps
+import traceback
 
 from concurrent.futures import (
     ThreadPoolExecutor, as_completed,
@@ -777,6 +778,8 @@ def timeout(seconds):
             else:
                 try:
                     exc = errorq.get(block=False)
+                    logger.error(exc, exc_info=True)
+                    # logger.exception(traceback.format_exc())
                     raise exc
                 except queue.Empty:
                     return q.get()
