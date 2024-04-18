@@ -779,7 +779,7 @@ def timeout(seconds):
                 try:
                     exc = errorq.get(block=False)
                     logger.error(exc, exc_info=True)
-                    traceback.print_exc(exc)
+                    traceback.print_exception(exc)
                     raise exc
                 except queue.Empty:
                     return q.get()
