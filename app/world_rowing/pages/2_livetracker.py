@@ -126,6 +126,9 @@ def main(params=None):
         live_data, intermediates, lane_info = select.get_races_livedata(
             races, max_workers=threads)
 
+    if live_data.empty:
+        return state.get_state()
+
     with filter_live:
         live_data = select.filter_livetracker(live_data)
 
