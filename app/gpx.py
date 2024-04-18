@@ -56,7 +56,9 @@ def main(state=None):
             st.cache_resource.clear()
 
     uploaded_files = st.file_uploader(
-        "Upload GPX files", accept_multiple_files=True
+        "Upload GPX files",
+        accept_multiple_files=True,
+        type=['gpx'],
     )
 
     gpx_data, errors = utils.map_concurrent(

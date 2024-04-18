@@ -127,7 +127,8 @@ def main(state=None):
         with tabs[2]:
             uploaded_files = st.file_uploader(
                 "Upload Data Export from PowerLine",
-                accept_multiple_files=True
+                accept_multiple_files=True,
+                type=['xlsx', 'xls'],
             )
             telemetry_data.update(
                 app.parse_telemetry_excel(

@@ -338,10 +338,6 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
         if not gps_data:
             st.write("no gps data loaded")
         else:
-            if 'npick_distance' not in st.session_state:
-                st.session_state.setdefault("npick_distance", 0)
-                # st.session_state.npick_distance = 0
-
             cols = st.columns((1, 5))
             with cols[0]:
                 st.markdown("<br>", unsafe_allow_html=True)
