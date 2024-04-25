@@ -77,5 +77,4 @@ def reset_button(label='reset'):
         st.session_state.clear()
         st.cache_resource.clear()
         clear()
-        st.query_params()
         st.experimental_rerun()
