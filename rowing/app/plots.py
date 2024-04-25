@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from plotly.validators.scatter.marker import SymbolValidator
 
 from rowing.world_rowing import fields
 
@@ -18,6 +19,11 @@ FORMATS = {
         "tickformat": "%-M:%S",
     }
 }
+
+SYMBOLS = [
+    s for s in SymbolValidator().values[2::3]
+    if not s.endswith("open") or s.endswith("dot")
+]
 
 
 def live_race_plot_data(live_race, *args, **kwargs):
