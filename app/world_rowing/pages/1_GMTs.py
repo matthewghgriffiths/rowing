@@ -15,13 +15,13 @@ st.set_page_config(
     layout='wide'
 )
 
+DIRPATH = Path(__file__).resolve().parent
+LIBPATH = str(DIRPATH.parent.parent.parent)
+
 try:
     from rowing.app import state, inputs, select, plots
     from rowing.world_rowing import fields
-
 except ImportError:
-    DIRPATH = Path(__file__).resolve().parent
-    LIBPATH = str(DIRPATH.parent)
     realpaths = [os.path.realpath(p) for p in sys.path]
     if LIBPATH not in realpaths:
         sys.path.append(LIBPATH)
@@ -116,6 +116,7 @@ def main(params=None):
         fields.raceBoatIntermediates_ResultTime: "|%-M:%S.%L",
         fields.GMT: "|%-M:%S.%L",
     }
+    plot_inputs['symbol_sequence'] = plots.SYMBOLS
     fig = px.scatter(**plot_inputs)
     fig_params['xaxes'] = facets_axes.get(plot_inputs['x'], {})
     fig_params['yaxes'] = facets_axes.get(plot_inputs['y'], {})
