@@ -59,7 +59,9 @@ st.markdown(
     """
 )
 st.image(
-    "https://chart.googleapis.com/chart"
-    "?cht=qr&chl=https%3A%2F%2Fworldrowing.streamlit.app"
-    "&chs=360x360&choe=UTF-8&chld=L|0"
+    "https://qrcode.tec-it.com/API/QRCode"
+    "?data=https%3A%2F%2Fworldrowing.streamlit.app"
+    # "&backcolor=%23ffffff"
+    "&size=small"
+    "&quietzone=1&errorcorrection=H"
 )

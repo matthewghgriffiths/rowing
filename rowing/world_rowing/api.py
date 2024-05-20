@@ -171,6 +171,7 @@ COMPETITION_TYPES = {
     'European Rowing Championships': 'European Rowing Championships',
     'Adaptive World Rowing Championships': 'World Rowing Championships',
     'World Rowing Championships  International Competitions': 'World Rowing Championships  International Competitions',
+    'World Rowing Olympic and Paralympic Qualification regatta': 'World Rowing Olympic and Paralympic Qualification regatta'
 }
 
 WBT_TYPES = {
@@ -364,12 +365,13 @@ def parse_records(endpoints, records):
     return records.rename(columns=fields.renamer(prefix))
 
 
-def get_events(competition_id=None, cached=True):
+def get_events(competition_id=None, cached=True, **kwargs):
     competition_id = competition_id or get_most_recent_competition().competition_id
     return get_worldrowing_records(
         "event",
-        cached=True,
+        cached=cached,
         filter=(("competitionId", competition_id),),
+        **kwargs,
         # sort=(("Date", "asc"),),
     )
 
@@ -477,7 +479,6 @@ def extract_results(races):
 
 
 def get_competitions(year=None, fisa=True, has_results=True, flat_water=True, cached=True, **kwargs):
-
     kwargs['filter'] = tuple(dict(kwargs.get('filter', ())).items())
     if year is not False:
         kwargs['filter'] += ('Year', year or datetime.date.today().year),
@@ -491,8 +492,12 @@ def get_competitions(year=None, fisa=True, has_results=True, flat_water=True, ca
         kwargs.get('include', "CompetitionType").split(",")
         + "competitionType,venue".split(",")
     ))
+
     competitions = get_worldrowing_records(
         "competition", cached=cached, **kwargs)
+    if competitions.empty:
+        return competitions
+
     competitions[fields.WBTCompetitionType] = \
         competitions[fields.competition_competitionType].replace(
         COMPETITION_TYPES
@@ -504,6 +509,29 @@ def get_competitions(year=None, fisa=True, has_results=True, flat_water=True, ca
         competitions = competitions[is_flat_water]
 
     return competitions
+
+
+def get_live_competitions(fisa=True, has_results=True, filter=None, filterOptions=None, cached=True, **kwargs):
+    now = datetime.datetime.now()
+    yesterday = now - datetime.timedelta(days=1)
+    filter = filter or {}
+    filter.update({
+        "StartDate": now.isoformat(),
+        "EndDate": yesterday.isoformat(),
+    })
+    filterOptions = filterOptions or {}
+    filterOptions.update({
+        "StartDate": 'lessThanEqualTo',
+        "EndDate": 'greaterThanEqualTo',
+    })
+    return get_competitions(
+        filter=filter,
+        filterOptions=filterOptions,
+        fisa=fisa,
+        has_results=has_results,
+        cached=cached,
+        **kwargs
+    )
 
 
 def get_this_years_competitions(fisa=True, has_results=True):
@@ -528,20 +556,40 @@ def get_most_recent_competition(fisa=True):
     return competition
 
 
-def get_live_races(fisa=True, competition=None):
-    if competition is None:
-        competition = get_most_recent_competition(fisa)
+# def get_live_races(fisa=True, competition=None):
+#     if competition is None:
+#         competition = get_most_recent_competition(fisa)
 
-    return get_worldrowing_records(
-        "race",
-        cached=False,
-        filter=(
-            ("event.competitionId", competition.competition_id),
-            ('raceStatus.displayName', 'LIVE'),
-        ),
-        include='event.competition,raceStatus',
-        sort=(("eventId", "asc"), ("Date", "asc")),
-    )
+#     return get_worldrowing_records(
+#         "race",
+#         cached=False,
+#         filter=(
+#             ("event.competitionId", competition.competition_id),
+#             ('raceStatus.displayName', 'LIVE'),
+#         ),
+#         include='event.competition,raceStatus',
+#         sort=(("eventId", "asc"), ("Date", "asc")),
+#     )
+
+
+def get_live_races(fisa=True, competition=None):
+    competitions = get_live_competitions(fisa=fisa, has_results=True)
+    if len(competitions):
+        races = pd.concat([
+            get_worldrowing_records(
+                "race",
+                cached=False,
+                filter=(
+                    ("event.competitionId", competition.competition_id),
+                    ('raceStatus.displayName', 'LIVE'),
+                ),
+                include='event.competition,raceStatus',
+                sort=(("eventId", "asc"), ("Date", "asc")),
+            )
+            for _, competition in competitions.iterrows()
+        ])
+        return races
+    return pd.DataFrame([])
 
 
 def get_live_race(fisa=True, competition=None):
@@ -594,11 +642,16 @@ def get_last_races(n=1, fisa=True, competition=None):
 
 
 def get_next_races(n=1, fisa=True, competition=None):
-    if competition is None:
-        competition = get_most_recent_competition(fisa)
-    races = get_races(competition.competition_id)
-    to_race = races[fields.race_Date] > pd.Timestamp.now()
-    return races.loc[to_race].sort_values(fields.race_Date).iloc[:n]
+    competitions = get_live_competitions(fisa=fisa, has_results=True)
+    if len(competitions):
+        races = pd.concat([
+            get_races(competition.competition_id)
+            for _, competition in competitions.iterrows()
+        ])
+        to_race = races[fields.race_Date] > pd.Timestamp.now()
+        return races.loc[to_race].sort_values(fields.race_Date).iloc[:n]
+
+    return competitions
 
 
 def show_next_races(n=10, fisa=True, competition=None):

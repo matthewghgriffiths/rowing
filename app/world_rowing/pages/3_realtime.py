@@ -26,8 +26,8 @@ logger = logging.getLogger()
 
 st.set_page_config(
     page_title="World Rowing Realtime Livetracker",
-    layout='wide'
-    # page_icon="👋",
+    layout='wide',
+    # page_icon=":rowing:",
 )
 
 
