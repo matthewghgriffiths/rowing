@@ -34,9 +34,11 @@ def get_athlete_kernel():
     return kernels.SumKernel(
         # kernels.IntSEKernel(name="athlete_intse_0"),
         # kernels.IntSEKernel(name="athlete_int_kernel2"),
-        # kernels.SEKernel(name="athlete_se_0"),
+        kernels.SEKernel(name="athlete_se_0"),
         # kernels.SEKernel(name="athlete_se_1"),
-        kernels.Matern32(name="athlete_matern32"),
+        # kernels.Matern12(name="athlete_matern12"),
+        # kernels.Matern32(name="athlete_matern32"),
+        kernels.Matern52(name="athlete_matern52"),
         kernels.Bias(name='athlete_bias')
     )
 
@@ -89,14 +91,21 @@ class RaceModel(NamedTuple):
     hours: jax.Array
     W_venue: jax.Array
     W_boatclass: jax.Array
+    W_lane: jax.Array
     gram_venue: jax.Array
     gram_boatclass: jax.Array
+    gram_lane: jax.Array
     race_kernel: GetKernel = get_race_kernel
+    lane_kernel: Optional[GetKernel] = None
     metadata: Optional[Dict] = None
 
     def get_kernels(self):
         times = self.hours
         K_race_times = self.race_kernel().K(times, times) * self.gram_venue
+        if self.lane_kernel:
+            K_race_times += self.lane_kernel().K(times, times) * \
+                self.gram_venue * self.gram_lane
+
         K_boatclass = boatclass_kernel(self.gram_boatclass)
 
         return K_race_times, K_boatclass
@@ -213,6 +222,10 @@ class PerformanceModel(NamedTuple):
         }
         weights['athlete'] = seats.seat_weight.unstack(
             level=1, fill_value=0).loc[boat_order, athlete_order]
+        weights['lane'] = (
+            results.Lane -
+            results.groupby("race_id").Lane.mean().loc[results.race_id].values
+        ).loc[boat_order].to_frame()
 
         Ws = {k: jnp.array(df.values) for k, df in weights.items()}
         grams = {k: W @ W.T for k, W in Ws.items()}
@@ -235,8 +248,10 @@ class PerformanceModel(NamedTuple):
             hours=hours,
             W_boatclass=Ws["Boat Class"],
             W_venue=Ws['race_event_competition_venueId'],
+            W_lane=Ws['lane'],
             gram_venue=grams['race_event_competition_venueId'],
             gram_boatclass=grams['Boat Class'],
+            gram_lane=grams['lane'],
         )
         athlete_model = AthleteModel(
             years=years,
@@ -262,12 +277,15 @@ class CompetitionModel(NamedTuple):
     W_venue: np.ndarray
     W_athlete: np.ndarray
     W_boatclass: np.ndarray
+    W_lane: np.ndarray
     y: np.ndarray
     gram_venue: np.ndarray
     gram_athlete: np.ndarray
     gram_boatclass: np.ndarray
-    athlete_kernel: Callable[[], kernels.AbstractKernel] = get_athlete_kernel
-    race_kernel: Callable[[], kernels.AbstractKernel] = get_race_kernel
+    gram_lane: np.ndarray
+    athlete_kernel: GetKernel = get_athlete_kernel
+    race_kernel: GetKernel = get_race_kernel
+    lane_kernel: Optional[GetKernel] = get_race_kernel
     metadata: Optional[Dict] = None
 
     get_full_kernel = gp_utils.get_full_kernel
@@ -299,6 +317,11 @@ class CompetitionModel(NamedTuple):
         }
         weights['athlete'] = seats.seat_weight.unstack(
             level=1, fill_value=0).loc[boat_order, athlete_order]
+        # Make lanes 0 mean per race.
+        weights['lane'] = (
+            results.Lane -
+            results.groupby("race_id").Lane.mean().loc[results.race_id].values
+        ).loc[boat_order].to_frame()
 
         Ws = {k: jnp.array(df.values) for k, df in weights.items()}
         grams = {k: W @ W.T for k, W in Ws.items()}
@@ -323,10 +346,12 @@ class CompetitionModel(NamedTuple):
             W_venue=Ws['race_event_competition_venueId'],
             W_athlete=Ws["athlete"],
             W_boatclass=Ws["Boat Class"],
+            W_lane=Ws['lane'],
             y=results.PGMT.values,
             gram_venue=grams['race_event_competition_venueId'],
             gram_athlete=grams['athlete'],
             gram_boatclass=grams['Boat Class'],
+            gram_lane=grams['lane'],
             metadata={
                 "weights": weights,
             },
@@ -341,6 +366,9 @@ class CompetitionModel(NamedTuple):
         years = self.years - self.year0
 
         K_race_times = self.race_kernel().K(times, times) * self.gram_venue
+        if self.lane_kernel:
+            K_race_times += self.lane_kernel().K(times, times) * \
+                self.gram_venue * self.gram_lane
         K_athlete_times = self.athlete_kernel().K(years, years) * self.gram_athlete
         K_boatclass = boatclass_var * self.gram_boatclass
 
@@ -383,7 +411,7 @@ def filter_results(
     senior_data,
     years=None, keep_phases=None, min_races=None,
     min_racesize=None, min_pgmt=None, max_pgmt=1,
-    **kwargs,
+    keep_athletes=None, **kwargs,
 ):
     results = senior_data['results']
     athletes = senior_data['athletes']
@@ -424,7 +452,9 @@ def filter_results(
         ]).sort_index()
 
         update = sel_seats.groupby(level=1).size() < min_races
-        filtered.update(sel_seats.groupby(level=1).size() < min_races)
+        filtered.update(update)
+        if keep_athletes is not None:
+            filtered[keep_athletes] = False
         if not update.any():
             break
 
