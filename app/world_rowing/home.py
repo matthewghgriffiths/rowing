@@ -45,7 +45,13 @@ st.markdown(
 
     ### [3. Realtime](/realtime)
     Allows the folling of the livetracker data from a race in realtime.
-                
+
+    ### [4. Results](/results)
+    Shows a summary of the results of a competition
+
+    ### [5. Entries](/entries)
+    Shows a summary of the entries to a competition
+                    
 
     ## Notes
 

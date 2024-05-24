@@ -10,7 +10,7 @@ import plotly.express as px
 import pandas as pd
 
 st.set_page_config(
-    page_title="PGMTs",
+    page_title="Entries",
     layout='wide'
 )
 
@@ -39,7 +39,7 @@ def main(params=None):
     st.title("Entries")
     st.write(
         """
-        Allows loading, filtering and visualisation of results and PGMTs from a FISA competition.
+        Summary of the entries to a competition
         """
     )
 
