@@ -65,6 +65,54 @@ def get_boat_classes():
     return api.get_boat_classes()
 
 
+@st.cache_data(persist=False, ttl=600)
+def get_entries(competition_id):
+    events = api.get_events(
+        competition_id, include="boats.boatAthletes.person")
+    boats = pd.concat({
+        e: pd.json_normalize(boats)
+        for e, boats in events.set_index(["Event"]).event_boats.items()
+    }, names=['event']).reset_index(level=0).reset_index(drop=True)
+    comp_athletes = pd.concat({
+        e: pd.json_normalize(athletes)
+        for e, athletes in boats.set_index("id").boatAthletes.items()
+    }, names=['boat_id']).reset_index(drop=True)
+
+    comp_athletes['Position'] = comp_athletes.athletePosition
+    comp_athletes.loc[
+        comp_athletes.athletePosition == 'b',
+        'Position'
+    ] = '1'
+    comp_athletes.loc[
+        comp_athletes.athletePosition == 's',
+        'Position'
+    ] = boats.set_index("id").boatAthletes.loc[
+        comp_athletes.boatId
+    ].map(len).replace({
+        5: 4, 9: 8
+    }).values[
+        comp_athletes.athletePosition == 's',
+    ].astype(str)
+    comp_athletes.loc[
+        comp_athletes.athletePosition == 'c',
+        'Position'
+    ] = 'cox'
+
+    comp_boat_athletes = comp_athletes.reset_index().rename(
+        columns={
+            # 'athletePosition': 'Position',
+            'person.DisplayName': 'Athlete',
+        }
+    ).join(
+        boats.set_index('id').rename(columns={
+            'event': 'Event',
+            'DisplayName': 'Boat',
+        }),
+        on='boatId', rsuffix='_'
+    )
+    return comp_boat_athletes
+
+
 @st.cache_data(persist=True)
 def get_competition_boat_classes(competition_id):
     logger.debug("get_competition_boat_classes(%s)", competition_id)

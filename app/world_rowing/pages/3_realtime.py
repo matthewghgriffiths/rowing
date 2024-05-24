@@ -101,8 +101,9 @@ def main(params=None):
         )
 
         with show_intermediates:
-            plots.show_lane_intermediates(
-                live_race.lane_info, live_race.intermediates)
+            if not live_race.lane_info.empty:
+                plots.show_lane_intermediates(
+                    live_race.lane_info, live_race.intermediates)
 
         if fig is not None:
             with fig_plot:

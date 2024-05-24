@@ -1,0 +1,110 @@
+import streamlit as st
+
+import sys
+import os
+from pathlib import Path
+
+import logging
+
+import plotly.express as px
+import pandas as pd
+
+st.set_page_config(
+    page_title="PGMTs",
+    layout='wide'
+)
+
+DIRPATH = Path(__file__).resolve().parent
+LIBPATH = str(DIRPATH.parent.parent.parent)
+
+try:
+    from rowing.app import state, inputs, select, plots
+    from rowing.world_rowing import fields, api
+except ImportError:
+    realpaths = [os.path.realpath(p) for p in sys.path]
+    if LIBPATH not in realpaths:
+        sys.path.append(LIBPATH)
+
+    from rowing.app import state, inputs, select, plots
+    from rowing.world_rowing import fields, api
+
+
+logger = logging.getLogger(__name__)
+
+
+def main(params=None):
+
+    state.update(params or {})
+
+    st.title("Entries")
+    st.write(
+        """
+        Allows loading, filtering and visualisation of results and PGMTs from a FISA competition.
+        """
+    )
+
+    with st.sidebar:
+        height = int(st.number_input(
+            "Table Height",
+            min_value=100,
+            value=1000,
+            step=100
+        ))
+        inputs.clear_cache()
+
+    with st.expander("Select Competition"):
+        competition = select.select_competition()
+        competition_id = competition.competition_id
+        competition_type = competition.WBTCompetitionType
+        state.set("CompetitionId", competition_id)
+        st.write(
+            f"loading Results for {competition.competition}, type: {competition_type}"
+        )
+
+    with st.spinner("Downloading entries"):
+        comp_boat_athletes = select.get_entries(competition_id)
+
+    event_entries = comp_boat_athletes.groupby('Event').apply(
+        lambda data: data.Boat.drop_duplicates().reset_index(drop=True)
+    ).unstack(fill_value='')
+    event_entries.columns += 1
+
+    st.subheader("Entries Summary")
+    st.dataframe(
+        event_entries
+    )
+
+    if not st.toggle("Entries By Event"):
+        boat_athlete_pos = comp_boat_athletes.set_index(
+            ['Event', "Boat", "Position"]
+        ).Athlete.unstack(fill_value='')
+        st.dataframe(
+            boat_athlete_pos,
+            column_config={
+                p: st.column_config.TextColumn(
+                    width='medium'
+                )
+                for p in boat_athlete_pos.columns
+            },
+            height=height
+        )
+    else:
+        for event, event_boats in comp_boat_athletes.groupby('Event'):
+            with st.expander(event, False):
+                boat_athlete_pos = event_boats.set_index(
+                    ["Boat", "Position"]
+                ).Athlete.unstack(fill_value='')
+                st.dataframe(
+                    boat_athlete_pos,
+                    use_container_width=True,
+                    column_config={
+                        p: st.column_config.TextColumn(
+                            width='small'
+                        )
+                        for p in boat_athlete_pos.columns
+                    }
+                )
+
+
+if __name__ == "__main__":
+    main()
