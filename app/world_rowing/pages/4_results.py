@@ -119,12 +119,22 @@ def main(params=None):
         )
         expand_all = st.toggle("expand all", False)
 
+        if st.button("Reload results"):
+            st.cache_data.clear()
+            select.api.clear_cache()
+
     if groupby:
         groups = full_results.groupby(groupby)
         for key, key_results in groups:
             race_results = key_results.drop_duplicates(
                 ["Race", "Distance", column_order]
             ).set_index(["Race", "Distance", column_order])
+
+            st.table(race_results[
+                ['Boat'] + show_values
+            ].apply("\n".join, axis=1).unstack(
+                fill_value=''
+            ))
 
             table = race_results[
                 ['Boat'] + show_values
@@ -138,7 +148,6 @@ def main(params=None):
                     by=order_by,
                     ascending=ascending
                 ).index
-                print(order)
                 table = table.loc[order]
 
             with st.expander(",".join(map(str, key)), expanded=expand_all):
@@ -177,6 +186,10 @@ def main(params=None):
             )
 
     with st.expander("Downloadable Results"):
+        st.write(
+            "Click the top left of the table to download "
+            "the results as a csv"
+        )
         st.dataframe(full_results)
 
 

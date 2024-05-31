@@ -147,7 +147,8 @@ BOATCLASSES = {
     'eaf690e9-cc36-45bc-b59f-6d510c16daf7': 'CMix4x+',
     'f1123970-de2b-462e-89a5-f74e0b447939': 'LW8+',
     'f7576033-2298-4549-ad10-cdbfc78417b0': 'CJM1x',
-    'ff2aa19c-db81-4c8e-a523-b7a3ef50ce31': 'JW4-'
+    'ff2aa19c-db81-4c8e-a523-b7a3ef50ce31': 'JW4-',
+    'f8537158-5795-11ee-8bd7-0a6348fc80c7': 'PR3 CMix2x',
 }
 
 RACE_PHASES = {
@@ -193,13 +194,19 @@ def _rsc_phase_names():
     phase_name = {
         'FNL-': "Final",
         'HEAT': "Heat",
+        'RND': "Heat",
         'REP-': "Repechage",
         'SFNL': "Semifinal",
         'PREL': "Preliminary",
-        'QFNL': "Quarterfinal"
+        'QFNL': "Quarterfinal",
+        'TTRL': 'Timetrial',
+        'SEED': 'Seeding',
     }
-    default_codes = {f"000{i + 1}00": "" for i in range(26)}
-    final_codes = {f"000{i + 1}00": " " + chr(i + 65) for i in range(26)}
+    default_codes = {f"000{i + 1}00": "" for i in range(10)}
+    default_codes.update({f"000{i + 1}": "" for i in range(10)})
+    final_codes = {f"000{i + 1}00": " " + chr(i + 65) for i in range(10)}
+    final_codes.update({
+        f"000{i + 1}": " " + chr(i + 65) for i in range(10)})
     semi_codes = {
         f"000{2 * i + 1}00": " " + chr(2 * i + 65) + "/" + chr(2 * i + 66)
         for i in range(13)
@@ -208,9 +215,27 @@ def _rsc_phase_names():
         (f"000{2 * i + 2}00", " " + chr(2 * i + 65) + "/" + chr(2 * i + 66))
         for i in range(13)
     )
+    semi_codes.update(
+        (f"000{2 * i + 1}", " " + chr(2 * i + 65) + "/" + chr(2 * i + 66))
+        for i in range(13)
+    )
+    semi_codes.update(
+        (f"000{2 * i + 2}", " " + chr(2 * i + 65) + "/" + chr(2 * i + 66))
+        for i in range(13)
+    )
+    semi_codes['005100'] = " A/B rerow"
+    rep_codes = default_codes.copy()
+    rep_codes.update(
+        {f"005{i + 1}00": "" for i in range(9)}
+    )
+    rnd_codes = {
+        f"{i + 1}000{j+1}00": "" for i in range(3) for j in range(9)
+    }
     phase_codes = {
         'FNL-': final_codes,
         'SFNL': semi_codes,
+        'REP-': rep_codes,
+        "RND": rnd_codes
     }
     return {
         p + c: name + code
@@ -462,9 +487,10 @@ def extract_results(races):
     race_intermediates[fields.raceBoatIntermediates_ResultTime] = \
         read_times(race_intermediates[fields.raceBoatIntermediates_ResultTime])
 
-    inter_distances = race_intermediates[fields.raceBoatIntermediates_distance]
-    race_intermediates[fields.Distance] = \
-        inter_distances.str.extract("([0-9]+)")[0].astype(int)
+    inter_distances = race_intermediates[
+        fields.raceBoatIntermediates_distance
+    ].str.extract("([0-9]+)")[0].astype(float)
+    race_intermediates[fields.Distance] = inter_distances
 
     race_distances = race_intermediates[(
         race_intermediates[fields.raceBoats_ResultTime]
@@ -474,6 +500,12 @@ def extract_results(races):
     race_intermediates[fields.race_distance] = race_distances.reindex(
         race_intermediates[fields.raceBoats_raceId]
     ).values
+
+    race_intermediates = race_intermediates.dropna(
+        subset=[fields.Distance]
+    )
+    race_intermediates[fields.Distance] = race_intermediates[
+        fields.Distance].astype(int)
 
     return race_intermediates
 

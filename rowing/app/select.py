@@ -571,15 +571,17 @@ def select_competition_results(
     results = results.join(
         results.groupby('Race').Distance.max().rename('Finish Distance'),
         on='Race'
-    )
+    ).reset_index()
+
     results = results.join(
         results.loc[
             results['Finish Distance'] == results.Distance,
-            ['Intermediate Time', 'Intermediate Position']
+            [fields.crew, 'Race', 'Intermediate Time', 'Intermediate Position']
         ].rename(columns={
             'Intermediate Time': "Finish Time",
             'Intermediate Position': 'Finish Position',
-        })
+        }).set_index([fields.crew, 'Race']),
+        on=[fields.crew, 'Race'], how='inner'
     )
     if results.empty and stop_if_empty:
         st.write("no results loaded")
@@ -587,7 +589,7 @@ def select_competition_results(
 
     return results.drop_duplicates(
         subset=['Boat', 'Distance', 'Race']
-    )
+    ).set_index(fields.crew)
 
 
 LIVE_COLS = [

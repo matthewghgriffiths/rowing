@@ -103,8 +103,17 @@ class RaceModel(NamedTuple):
         times = self.hours
         K_race_times = self.race_kernel().K(times, times) * self.gram_venue
         if self.lane_kernel:
-            K_race_times += self.lane_kernel().K(times, times) * \
-                self.gram_venue * self.gram_lane
+            gram_lane = jnp.where(
+                jnp.isfinite(self.gram_lane), self.gram_lane, 0
+            )
+            K_lane = jnp.where(
+                jnp.isfinite(self.gram_lane),
+                self.lane_kernel().K(times, times)
+                * self.gram_venue
+                * gram_lane,
+                0
+            )
+            K_race_times += K_lane
 
         K_boatclass = boatclass_kernel(self.gram_boatclass)
 
