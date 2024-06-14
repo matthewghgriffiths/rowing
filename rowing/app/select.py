@@ -658,3 +658,47 @@ def set_livetracker_PGMT(live_data):
     live_data[fields.PGMT] = distance / pace_distance
 
     return live_data, PGMT
+
+
+def last_race_results(n=10):
+    races = api.get_last_races(n)
+    race_boats = pd.json_normalize(
+        sum(races.Boat, [])
+    ).join(
+        races.set_index('race_id').Race, on='raceId'
+    )
+    boat_name = race_boats.set_index(
+        'id'
+    )[
+        ['DisplayName', 'Race', 'Lane']
+    ].drop_duplicates().rename(
+        columns={'DisplayName': "Boat"})
+    intermediates = pd.json_normalize(
+        sum(race_boats.raceBoatIntermediates, [])
+    )
+    if not intermediates.empty:
+        intermediates = intermediates.join(boat_name, on='raceBoatId')
+        intermediates['Distance'] = intermediates[
+            'distance.DisplayName'].str.extract("([\d]+)")[0].astype(int)
+        intermediates['Time'] = pd.to_timedelta(
+            intermediates['ResultTime']).apply(utils.format_timedelta)
+        intermediates['Intermediate'] = ''
+
+    return races, race_boats, intermediates
+
+
+def unstack_intermediates(intermediates, col='Time'):
+    table = pd.concat([
+        intermediates.groupby(
+            ['Race', 'Lane', 'Intermediate']
+        ).Boat.first().reset_index(),
+        intermediates[
+            ['Race', 'Lane', 'Distance', col]
+        ].rename(columns={
+            "Distance": "Intermediate",
+            col: "Boat",
+        })
+    ]).groupby(
+        ["Race", "Intermediate", "Lane"]
+    ).Boat.first().unstack().sort_index(ascending=False).fillna("")
+    return table.rename(index=str)

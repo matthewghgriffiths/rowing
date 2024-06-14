@@ -249,7 +249,7 @@ def compare_piece_telemetry(telemetry_data, piece_data, gps_data, landmark_dista
 def get_interval_averages(piece_timestamps, telemetry_data):
     avg_telem, interval_telem = {}, {}
     for piece, timestamps in piece_timestamps.iterrows():
-        name = piece[1]
+        _, name, leg = piece
         power = telemetry_data[name][
             'power'
         ].sort_values("Time").reset_index(drop=True)
@@ -259,17 +259,17 @@ def get_interval_averages(piece_timestamps, telemetry_data):
             timestamps
         )
         for k in avgP.columns.remove_unused_levels().levels[0]:
-            avg_telem.setdefault(k, {})[name] = avgP[k].T
+            avg_telem.setdefault(k, {})[name, leg] = avgP[k].T
         for k in intervalP.columns.remove_unused_levels().levels[0]:
-            interval_telem.setdefault(k, {})[name] = intervalP[k].T
+            interval_telem.setdefault(k, {})[name, leg] = intervalP[k].T
 
     piece_data = {}
     for k, data in avg_telem.items():
         piece_data[f"Average {k}"] = pd.concat(
-            data, names=['name', 'position'])
+            data, names=['name', 'leg', 'position'])
     for k, data in interval_telem.items():
         piece_data[f"Interval {k}"] = pd.concat(
-            data, names=['name', 'position'])
+            data, names=['name', 'leg', 'position'])
 
     return piece_data
 

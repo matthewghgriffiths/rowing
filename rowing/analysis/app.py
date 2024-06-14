@@ -32,51 +32,64 @@ color_discrete_sequence = [
 
 DEFAULT_REPORT = {
     "report_0": {
+        "pace boat time input": None,
         "select piece": "Pace Boat",
         "select plot": "Piece profile"
     },
     "report_1": {
-        "select piece": "Rower Swivel Power",
+        "select piece": "AvgBoatSpeed",
         "select plot": "Piece profile"
     },
     "report_2": {
-        "select piece": "MinAngle",
+        "select piece": "Rating",
         "select plot": "Piece profile"
     },
     "report_3": {
-        "select piece": "MaxAngle",
+        "select piece": "Rower Swivel Power",
         "select plot": "Piece profile"
     },
     "report_4": {
-        "select piece": "CatchSlip",
+        "select piece": "MinAngle",
         "select plot": "Piece profile"
     },
     "report_5": {
-        "select piece": "FinishSlip",
+        "select piece": "MaxAngle",
         "select plot": "Piece profile"
     },
     "report_6": {
+        "select piece": "CatchSlip",
+        "select plot": "Piece profile"
+    },
+    "report_7": {
+        "select piece": "FinishSlip",
+        "select plot": "Piece profile"
+    },
+    "report_8": {
+        "select piece": "Effective",
+        "select plot": "Piece profile"
+    },
+    "report_9": {
         "Select x-axis": "GateAngle",
         "Select y-axis": "GateForceX",
         "rower profile figure height": 600,
         "select plot": "Stroke profile",
         "select stroke": "Rower profile"
     },
-    "report_7": {
+    "report_10": {
         "Select x-axis": "GateAngle",
         "Select y-axis": "GateAngleVel",
         "rower profile figure height": 600,
         "select plot": "Stroke profile",
         "select stroke": "Rower profile"
     },
-    "report_8": {
+    "report_11": {
         "Select x-axis": "Normalized Time",
         "Select y-axis": "GateForceX",
         "rower profile figure height": 600,
         "select plot": "Stroke profile",
         "select stroke": "Rower profile"
     },
-    "report_9": {
+    "report_12": {
         "select plot": "Stroke profile",
         "select stroke": "Boat profile",
         "select_boat_facets": [
@@ -89,8 +102,8 @@ DEFAULT_REPORT = {
         "select_boat_heigh": 1000
     },
     "report_setup": {
-        "figure_height": 600,
-        "nview": 10,
+        "figure_height": 1000,
+        "nview": 13,
         "toggleother": False,
         "window": 10
     }
@@ -821,15 +834,18 @@ def plot_pace_boat(piece_data, landmark_distances, gps_data, height=600, input_c
     ], axis=1).reset_index()
 
     with input_container or st.container():
-        st.write("Set pace boat time")
-        st.text_input(
-            "Set pace boat time",
-            value=None,
-            # step=1,
-            # format="m:ss.S"
-            placeholder="m:ss.S",
-            key=key+"pace boat time input",
-        )
+        cols = st.columns(2)
+        with cols[0]:
+            st.write("Set pace boat time")
+        with cols[1]:
+            st.text_input(
+                "Set pace boat time",
+                value=None,
+                # step=1,
+                # format="m:ss.S"
+                placeholder="m:ss.S",
+                key=key+"pace boat time input",
+            )
 
     pace_boat_finish['Pace boat time'] -= pd.Timestamp(0)
     pace_boat_finish = pace_boat_finish.set_index(
@@ -852,7 +868,8 @@ def plot_pace_boat(piece_data, landmark_distances, gps_data, height=600, input_c
         time_behind,
         x='distance',
         y='time behind pace boat (s)',
-        color="piece",
+        color="name",
+        line_dash='leg',
     )
 
     for landmark, distance in landmark_distances.items():
@@ -1331,7 +1348,7 @@ def plot_rower_profiles(piece_information, default_height=600, key="rower_", inp
             x=x,
             y=y,
             color='Position',
-            title=name
+            title=f"{name}, leg={leg}"
         )
         # fig.update_yaxes(
         #     range=yrange
@@ -1339,7 +1356,7 @@ def plot_rower_profiles(piece_information, default_height=600, key="rower_", inp
         fig.update_layout(
             height=height
         )
-        figures[f"{name}: {x}-{y}"] = fig
+        figures[f"{name}, leg={leg}: {x}-{y}"] = fig
         # st.plotly_chart(fig, use_container_width=True)
 
     return figures, {}

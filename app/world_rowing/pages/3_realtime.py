@@ -13,12 +13,14 @@ DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent.parent)
 try:
     from rowing.app import select, state, plots
+    from rowing.world_rowing import api
 except ImportError:
     realpaths = [os.path.realpath(p) for p in sys.path]
     if LIBPATH not in realpaths:
         sys.path.append(LIBPATH)
 
     from rowing.app import select, state, plots
+    from rowing.world_rowing import api
 
 
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +63,20 @@ def main(params=None):
             clear = st.button("clear cache")
             if clear:
                 st.cache_data.clear()
+
+    with st.expander("Last Races"):
+        n_races = st.number_input(
+            "Load how many races?", 0, value=0, step=1)
+        if n_races > 0:
+            races, race_boats, intermediates = select.last_race_results(
+                n_races)
+            if not intermediates.empty:
+                table = select.unstack_intermediates(intermediates)
+                race_order = races.sort_values("Race Start").Race
+                order = race_order[
+                    race_order.isin(table.index.levels[0])]
+                st.dataframe(
+                    table.loc[order], height=(len(table) + 1) * 35 + 3)
 
     kwargs = {}
     race_expander = st.expander("Select race", True)

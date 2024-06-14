@@ -26,7 +26,7 @@ app_telemetry = importlib.import_module("app.telemetry", "..")
 TIMEOUT = 120
 
 
-@timeout(TIMEOUT)
+# @timeout(TIMEOUT)
 def run_streamlit(main, params):
     try:
         main(params)

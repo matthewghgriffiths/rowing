@@ -45,12 +45,6 @@ def main(state=None):
     # GPX data processing
     """
     with st.sidebar:
-        st.subheader("QR Code")
-        st.image(
-            "https://chart.googleapis.com/chart"
-            "?cht=qr&chl=https%3A%2F%2Frowing-gps.streamlit.app"
-            "&chs=360x360&choe=UTF-8&chld=L|0"
-        )
         if st.button("Reset State"):
             st.session_state.clear()
             st.cache_resource.clear()
@@ -85,7 +79,7 @@ def main(state=None):
             gpx_data, locations=locations)
 
     with st.expander("All Crossing times"):
-        all_crossing_times = pd.concat(crossing_times, names=['file'])
+        all_crossing_times = pd.concat(crossing_times, names=['name'])
         show_times = pd.concat({
             "date": all_crossing_times.dt.normalize(),
             "time": all_crossing_times,
@@ -155,7 +149,7 @@ def main(state=None):
         if piece_information:
             piece_data = piece_information['piece_data']
 
-            cols = st.columns(2)
+            cols = st.columns((2, 1))
             with cols[1]:
                 height = st.number_input(
                     "Set profile figure height",
@@ -168,7 +162,7 @@ def main(state=None):
                     piece_data['Total Distance'].columns],
                 gpx_data,
                 input_container=cols[0],
-                name='file',
+                name='name',
             )
             fig.update_yaxes(autorange="reversed")
             fig.update_layout(height=height)

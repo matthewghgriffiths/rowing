@@ -458,7 +458,11 @@ def main(state=None):
                     st.plotly_chart(fig, use_container_width=True)
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(table, use_container_width=True)
+                    st.dataframe(
+                        table,
+                        height=(len(table) + 1) * 35 + 3,
+                        use_container_width=True
+                    )
 
         with template_container:
             report_state = {}

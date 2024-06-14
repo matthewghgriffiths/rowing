@@ -372,8 +372,7 @@ def get_piece_times(crossing_times, start_landmark, finish_landmark):
         start_landmark, level=landmark).droplevel(distance)
     finish_times = crossing_times.xs(
         finish_landmark, level=landmark).droplevel(distance)
-    print(finish_times)
-    print(crossing_times)
+
     times = pd.concat({
         "Elapsed time": crossing_times - start_times,
         "Time left": finish_times - crossing_times,
