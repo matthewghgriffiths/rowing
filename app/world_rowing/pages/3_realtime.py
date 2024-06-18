@@ -69,14 +69,32 @@ def main(params=None):
             "Load how many races?", 0, value=0, step=1)
         if n_races > 0:
             races, race_boats, intermediates = select.last_race_results(
-                n_races)
+                n_races, cached=False)
+            race_name = races['Boat Class'] + ": " + races['Phase']
+            race_name.index = races.Race
+            races['Race'] = races['Race'].replace(race_name)
             if not intermediates.empty:
+                intermediates['Race'] = intermediates[
+                    'Race'].replace(race_name)
                 table = select.unstack_intermediates(intermediates)
+                table.index.names = ['Race', 'Inter']
                 race_order = races.sort_values("Race Start").Race
                 order = race_order[
                     race_order.isin(table.index.levels[0])]
+
                 st.dataframe(
-                    table.loc[order], height=(len(table) + 1) * 35 + 3)
+                    table.loc[order],
+                    height=(len(table) + 1) * 35 + 3,
+                    use_container_width=True,
+                    column_config={
+                        "Race": st.column_config.TextColumn(
+                            width="small",
+                        ),
+                        "Intermediate": st.column_config.TextColumn(
+                            width="small",
+                        )
+                    }
+                )
 
     kwargs = {}
     race_expander = st.expander("Select race", True)

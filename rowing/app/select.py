@@ -376,9 +376,9 @@ def wait_for_next_race(n=5):
                 for t in range(10, -1, -1):
                     countdown.metric("Refresh in", f"{t} s")
                     time.sleep(1)
-                st.experimental_rerun()
+                st.rerun()
         if st.button("refresh"):
-            st.experimental_rerun()
+            st.rerun()
 
     st.write(
         "no live race could be loaded, "
@@ -410,10 +410,10 @@ def select_live_race(replay=False, **kwargs):
             st.write("no live race could be loaded")
             if st.checkbox("refresh until next"):
                 time.sleep(10)
-                st.experimental_rerun()
+                st.rerun()
 
             if st.button("refresh"):
-                st.experimental_rerun()
+                st.rerun()
             st.stop()
 
     return race
@@ -660,8 +660,8 @@ def set_livetracker_PGMT(live_data):
     return live_data, PGMT
 
 
-def last_race_results(n=10):
-    races = api.get_last_races(n)
+def last_race_results(n=10, cached=False):
+    races = api.get_last_races(n, cached=cached)
     race_boats = pd.json_normalize(
         sum(races.Boat, [])
     ).join(

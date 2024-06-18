@@ -46,7 +46,7 @@ def modal_button(label1, label2, key=None, mode=False):
     st.session_state[key] = mode
     if rerun:
         state.update_query_params()
-        st.experimental_rerun()
+        st.rerun()
 
     return mode
 

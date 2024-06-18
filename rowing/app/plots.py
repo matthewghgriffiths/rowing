@@ -362,9 +362,9 @@ def show_lane_info(lane_info):
 def show_lane_intermediates(lane_info, intermediates):
     cols = st.columns(2)
     with cols[0]:
-        if lane_info is not None and not lane_info.empty:
+        if lane_info is not None and lane_info.size:
             show_lane_info(lane_info)
 
     with cols[1]:
-        if intermediates is not None and not intermediates.empty:
+        if intermediates is not None and intermediates.size:
             show_intermediates(intermediates)

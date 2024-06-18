@@ -82,6 +82,10 @@ def main(params=None):
             key='results',
         )
 
+        if st.button("Reload results"):
+            st.cache_data.clear()
+            select.api.clear_cache()
+
     st.subheader("View PGMTs")
 
     st.dataframe(fields.to_streamlit_dataframe(results))

@@ -130,12 +130,6 @@ def main(params=None):
                 ["Race", "Distance", column_order]
             ).set_index(["Race", "Distance", column_order])
 
-            st.table(race_results[
-                ['Boat'] + show_values
-            ].apply("\n".join, axis=1).unstack(
-                fill_value=''
-            ))
-
             table = race_results[
                 ['Boat'] + show_values
             ].apply('<br>'.join, axis=1).unstack(
