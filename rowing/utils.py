@@ -31,30 +31,51 @@ _pyodide = "pyodide" in sys.modules
 logger = logging.getLogger(__name__)
 
 
+def interpolate_datetime(s, index, **kwargs):
+    s0 = s.min()
+    return interpolate_timedelta(s - s0, index, **kwargs) + s0
+
+
+def interpolate_timedelta(s, index, **kwargs):
+    return pd.Series(
+        pd.to_timedelta(
+            np.interp(
+                index, s.index, s.dt.total_seconds(), **kwargs
+            ),
+            unit='s'),
+        index
+    )
+
+
 def interpolate_series(s, index, **kwargs):
+
     if isinstance(index, pd.Series):
         x = index.values
-        index = index.index
+        index0 = index.index
     else:
-        x = index
-    if pd.api.types.is_datetime64_any_dtype(s):
-        si = pd.Series(pd.to_datetime(np.interp(
-            x,
-            s.index,
-            (s.dt.tz_localize(None) - pd.Timestamp(0)).dt.total_seconds(),
-            **kwargs
-        ), unit='s'), index)
-    elif pd.api.types.is_timedelta64_dtype(s):
-        si = pd.Series(pd.to_timedelta(np.interp(
-            x,
-            s.index,
-            s.dt.total_seconds(),
-            **kwargs
-        ), unit='s'), index)
+        x = index0 = index
+
+    if pd.api.types.is_datetime64_any_dtype(s.index):
+        i0 = s.index[0]
+        s0 = s.copy()
+        s0.index = (s.index - i0)
+        x0 = pd.DatetimeIndex(index) - i0
+        si = interpolate_series(s0, x0, **kwargs)
+        si.index = index0
+    elif pd.api.types.is_timedelta64_dtype(s.index):
+        s0 = s.copy()
+        s0.index = s.index.total_seconds()
+        x0 = pd.TimedeltaIndex(index).total_seconds()
+        si = interpolate_series(s0, x0, **kwargs)
     else:
-        si = pd.Series(
-            np.interp(x, s.index, s, **kwargs), index
-        )
+        if pd.api.types.is_datetime64_any_dtype(s):
+            si = interpolate_datetime(s, index, **kwargs)
+        elif pd.api.types.is_timedelta64_dtype(s):
+            si = interpolate_timedelta(s, index, **kwargs)
+        else:
+            si = pd.Series(np.interp(x, s.index, s, **kwargs))
+
+    si.index = index0
     si.index.name = si.index.name or s.index.name
     return si
 

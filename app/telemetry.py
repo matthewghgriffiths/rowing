@@ -143,16 +143,6 @@ def main(state=None):
             telemetry_data.update(
                 app.parse_telemetry_zip(uploaded_files)
             )
-            # st.spinner("Processing Zip Files")
-            #     for file in uploaded_files:
-            #         with zipfile.ZipFile(file) as z:
-            #             for f in z.filelist:
-            #                 name, key = f.filename.removesuffix(
-            #                     ".parquet").split("/")
-            #                 data = pd.read_parquet(
-            #                     z.open(f.filename)
-            #                 )
-            #                 telemetry_data.setdefault(name, {})[key] = data
 
         gps_data = {
             k: split_data['positions'] for k, split_data in telemetry_data.items()
@@ -180,6 +170,87 @@ def main(state=None):
     logger.info("Show map")
     with st.expander("Show map"):
         fig = app.draw_gps_data(gps_data, locations)
+
+    logger.info("Show heat map")
+    with st.expander("Show heat map"):
+        cols = st.columns((4, 4, 2))
+        with cols[-1]:
+            with st.popover("heat map settings") as heat_map_settings:
+                dists = st.number_input(
+                    "marker spacing (m)", min_value=1, value=5
+                ) / 1000
+                height = st.number_input(
+                    "Heatmap height (px)", min_value=100, step=50, value=default_height
+                )
+                marker_size = st.number_input(
+                    "Marker size", min_value=1, value=10
+                )
+                map_style = st.selectbox(
+                    "map style",
+                    ["open-street-map", "carto-positron", "carto-darkmatter"],
+                    key='heatmap_style'
+                )
+                colorscales = px.colors.named_colorscales()
+                colorscale = st.selectbox(
+                    "heatmap color scale",
+                    colorscales,
+                    index=colorscales.index('viridis'),
+                )
+                cmin = st.number_input(
+                    "Color scale min (clear for autoscaling)", value=None)
+                cmid = st.number_input(
+                    "Color scale mid (clear for autoscaling)", value=None)
+                cmax = st.number_input(
+                    "Color scale max (clear for autoscaling)", value=None)
+
+        c0 = 'AvgBoatSpeed'
+        c1 = 'Boat'
+        file_col = {}
+        for k, data in telemetry_data.items():
+            data = data['power']
+            with cols[0]:
+                _options = [
+                    'Angle 0.7 F', 'Angle Max F', 'Average Power', 'AvgBoatSpeed',
+                    'CatchSlip', 'Dist/Stroke', 'Drive Start T', 'Drive Time',
+                    'Effective', 'FinishSlip', 'Length', 'Max Force PC', 'MaxAngle',
+                    'MinAngle', 'Rating', 'Recovery Time', 'Rower Swivel Power',
+                    'StrokeNumber', 'SwivelPower''Work PC Q1', 'Work PC Q2',
+                    'Work PC Q3', 'Work PC Q4'
+                ]
+                options = data.columns.levels[0].intersection(_options)
+                index = (
+                    int(options.get_indexer_for([c0])[0]) if c0 in options else 0)
+                c0 = st.selectbox(
+                    f"choose data type to plot for {k}",
+                    options=options,
+                    index=index
+                )
+
+            with cols[1]:
+                options = data[c0].columns
+                index = (
+                    int(options.get_indexer_for([c1])[0]) if c1 in options else 0)
+                c1 = st.selectbox(
+                    f"choose data to plot for {k}",
+                    options=options,
+                    index=index
+                )
+
+            file_col[k] = (c0, c1)
+
+        fig = app.make_gps_heatmap(
+            telemetry_data, dists, file_col, marker_size=marker_size, map_style=map_style, height=height)
+        fig.update_coloraxes(
+            cmin=cmin,
+            cmid=cmid,
+            cmax=cmax,
+            colorscale=colorscale,
+            showscale=True,
+            colorbar=dict(
+                outlinewidth=0,
+            )
+        )
+        st.plotly_chart(fig, use_container_width=True, theme=None)
 
     logger.info("Crossing Times")
     with st.spinner("Processing Crossing Times"):

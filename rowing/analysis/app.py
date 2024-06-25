@@ -205,7 +205,10 @@ def get_crossing_times(gpx_data, locations=None, thresh=0.5):
     )
     if errors:
         logging.error(errors)
-    return crossing_times
+
+    return {
+        k: d for k, d in crossing_times.items() if not d.empty
+    }
 
 
 @st.cache_data
@@ -631,15 +634,6 @@ def make_gps_figure(gps_data, locations, index=None):
         )
 
     fig = go.Figure()
-    data = locations
-    for name, data in gps_data.items():
-        fig.add_trace(go.Scattermapbox(
-            lon=data.longitude,
-            lat=data.latitude,
-            mode='lines',
-            name=name,
-            showlegend=True,
-        ))
     fig.add_trace(go.Scattermapbox(
         lon=locations.longitude,
         lat=locations.latitude,
@@ -655,6 +649,15 @@ def make_gps_figure(gps_data, locations, index=None):
         textposition='bottom right',
         showlegend=True,
     ))
+    data = locations
+    for name, data in gps_data.items():
+        fig.add_trace(go.Scattermapbox(
+            lon=data.longitude,
+            lat=data.latitude,
+            mode='lines',
+            name=name,
+            showlegend=True,
+        ))
     fig.update_layout(
         mapbox={
             'style': map_style,
@@ -1558,3 +1561,69 @@ def plot_piece_col(col, piece_information, default_height=600, key='piece', inpu
 
     return figures, tables
     # return {(col, f"{start_landmark} to {finish_landmark}"): fig}
+
+
+@st.cache_data
+def interpolate_power(telemetry_data, dists=0.005, n_iter=10):
+    power_gps_data = {}
+    for k, data in telemetry_data.items():
+        gps = data['positions']
+        power = data['power']
+
+        power_gps = gps.set_index('time')[
+            ['longitude', 'latitude']
+        ].apply(
+            utils.interpolate_series, index=power.Time
+        )
+        power_gps = power.join(
+            pd.concat({"boat": power_gps}, axis=1).swaplevel(0, 1, axis=1)
+        )
+        power_gps_data[k] = geodesy.interp_dataframe(
+            power_gps, dists, n_iter=n_iter)
+
+    return power_gps_data
+
+
+@st.cache_data
+def make_gps_heatmap(telemetry_data, dists, file_col, marker_size=5, map_style='open-street-map', height=600):
+
+    power_gps_data = interpolate_power(telemetry_data, dists)
+
+    fig = go.Figure()
+    for k, data in power_gps_data.items():
+        c = file_col[k]
+        fig.add_trace(
+            go.Scattermapbox(
+                lon=data.longitude.squeeze(),
+                lat=data.latitude.squeeze(),
+                mode='lines+markers',
+                marker=dict(
+                    color=data[c].squeeze(),
+                    coloraxis="coloraxis",
+                    size=marker_size
+                ),
+                showlegend=True,
+                name="|".join((k,) + c),
+            )
+        )
+
+    fig.update_layout(
+        mapbox={
+            'style': map_style,
+            'center': {
+                'lon': data.longitude.squeeze().mean(),
+                'lat': data.latitude.squeeze().mean(),
+            },
+            'zoom': 12
+        },
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        ),
+        showlegend=True,
+        height=height,
+    )
+
+    return fig

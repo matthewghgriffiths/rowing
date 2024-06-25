@@ -6,7 +6,10 @@ based off https://www.movable-type.co.uk/scripts/latlong-vectors.html
 from typing import NamedTuple
 
 import numpy as np
-from numpy import sin, cos, arctan2, sqrt, pi, radians
+from numpy import isscalar, sin, cos, arctan2, sqrt, pi, radians
+
+import pandas as pd
+from rowing import utils
 
 _AVG_EARTH_RADIUS_KM = 6371.0088
 
@@ -267,3 +270,27 @@ def make_arrow_base(pos, arrowlength=0.3, arrowhead=0.1, arrowangle=20, base_wid
         np.array([p.latitude for p in points]),
         np.array([p.longitude for p in points])
     )
+
+
+def interp_dataframe(data, dists, n_iter=10):
+    data = data.copy()
+    data['distance'] = haversine_km(data, data.shift()).fillna(0).cumsum()
+
+    if np.isscalar(dists):
+        dists = np.arange(data.distance.min(), data.distance.max(), dists)
+
+    x = dists = np.asarray(dists)
+
+    for _ in range(n_iter):
+        data_interp = data.set_index('distance').apply(
+            utils.interpolate_series,
+            index=x
+        )
+        d = haversine_km(
+            data_interp, data_interp.shift()
+        ).squeeze().fillna(0).cumsum()
+        x = (dists + x - d)
+
+    data_interp.index = d
+    data_interp.index.name = 'distance'
+    return data_interp.loc[~ d.duplicated().values]
