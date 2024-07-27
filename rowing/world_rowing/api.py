@@ -576,8 +576,8 @@ def get_last_years_competitions(fisa=True, has_results=True):
     return get_competitions(year=year - 1, fisa=fisa, has_results=has_results)
 
 
-def get_most_recent_competition(fisa=True):
-    comps = get_this_years_competitions(fisa=fisa)
+def get_most_recent_competition(fisa=True, has_results=True):
+    comps = get_this_years_competitions(fisa=fisa, has_results=has_results)
     started = comps[fields.competition_StartDate] < datetime.datetime.now()
     if not started.any():
         comps = get_last_years_competitions(fisa=fisa)
@@ -613,14 +613,23 @@ def get_live_races(fisa=False, competition=None):
                 cached=False,
                 filter=(
                     ("event.competitionId", competition.competition_id),
-                    ('raceStatus.displayName', 'LIVE'),
+                    # ('raceStatus.displayName', 'LIVE'),
                 ),
                 include='event.competition,raceStatus',
                 sort=(("eventId", "asc"), ("Date", "asc")),
             )
             for _, competition in competitions.iterrows()
         ])
-        return races
+        if races.empty:
+            return races
+        return races[
+            ~ races[fields.race_raceStatus].isin({
+                "Official",
+                "UNOFFICIAL",
+                "unofficial",
+                "Scheduled",
+            })
+        ].sort_values(fields.race_Date)
     return pd.DataFrame([])
 
 

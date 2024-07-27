@@ -181,7 +181,7 @@ COMPETITION_COL = [
 ]
 
 
-def select_competition(current=True, start_date=None, end_date=None):
+def select_competition(current=True, start_date=None, end_date=None, fisa=False):
     logger.debug("select_competition(current=%s)", current)
     st.write(
         """
@@ -197,7 +197,8 @@ def select_competition(current=True, start_date=None, end_date=None):
 
     if current:
         competition_id = st.text_input(
-            "Competition id:", api.get_most_recent_competition().competition_id
+            "Competition id:", api.get_most_recent_competition(
+                fisa=fisa).competition_id
         )
         competition = api.get_worldrowing_record(
             "competition", competition_id, include="competitionType,venue"
@@ -668,8 +669,8 @@ def set_livetracker_PGMT(live_data):
     return live_data, PGMT
 
 
-def last_race_results(n=10, cached=False):
-    races = api.get_last_races(n, cached=cached)
+def last_race_results(n=10, fisa=True, cached=False):
+    races = api.get_last_races(n, fisa=fisa, cached=cached)
     race_boats = pd.json_normalize(
         sum(races.Boat, [])
     ).join(

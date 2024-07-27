@@ -69,7 +69,7 @@ def main(params=None):
             "Load how many races?", 0, value=0, step=1)
         if n_races > 0:
             races, race_boats, intermediates = select.last_race_results(
-                n_races, cached=False)
+                n_races, fisa=False, cached=False)
             race_name = races['Boat Class'] + ": " + races['Phase']
             race_name.index = races.Race
             races['Race'] = races['Race'].replace(race_name)
