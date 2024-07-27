@@ -588,7 +588,7 @@ def get_most_recent_competition(fisa=True):
     return competition
 
 
-# def get_live_races(fisa=True, competition=None):
+# def get_live_races(fisa=False, competition=None):
 #     if competition is None:
 #         competition = get_most_recent_competition(fisa)
 
