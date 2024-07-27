@@ -30,6 +30,14 @@ from rowing.world_rowing import api, utils, fields
 from rowing.model.gp import kernels, utils as gp_utils
 
 
+def year_to_date(year):
+    y0 = np.floor(year).astype(int)
+    start_date = pd.to_datetime(dict(year=y0, month=1, day=1))
+    end_date = pd.to_datetime(dict(year=y0 + 1, month=1, day=1))
+    date = (start_date + (end_date - start_date) * (year % 1))
+    return date
+
+
 def get_athlete_kernel():
     return kernels.SumKernel(
         # kernels.IntSEKernel(name="athlete_intse_0"),
@@ -99,6 +107,9 @@ class RaceModel(NamedTuple):
     lane_kernel: Optional[GetKernel] = None
     metadata: Optional[Dict] = None
 
+    get_full_kernel = gp_utils.get_full_kernel
+    get_jitter_kernel = gp_utils.get_jitter_kernel
+
     def get_kernels(self):
         times = self.hours
         K_race_times = self.race_kernel().K(times, times) * self.gram_venue
@@ -108,9 +119,7 @@ class RaceModel(NamedTuple):
             )
             K_lane = jnp.where(
                 jnp.isfinite(self.gram_lane),
-                self.lane_kernel().K(times, times)
-                * self.gram_venue
-                * gram_lane,
+                self.lane_kernel().K(times, times) * self.gram_venue * gram_lane,
                 0
             )
             K_race_times += K_lane

@@ -53,7 +53,11 @@ def main(params=None):
         inputs.clear_cache()
 
     with st.expander("Select Competition"):
-        competition = select.select_competition()
+        today = pd.Timestamp.today()
+        competition = select.select_competition(
+            start_date=today + pd.Timedelta("180d"),
+            end_date=today - pd.Timedelta("180d"),
+        )
         competition_id = competition.competition_id
         competition_type = competition.WBTCompetitionType
         state.set("CompetitionId", competition_id)
@@ -63,6 +67,11 @@ def main(params=None):
 
     with st.spinner("Downloading entries"):
         comp_boat_athletes = select.get_entries(competition_id)
+
+    if comp_boat_athletes is None:
+        st.write(
+            f"No events could be loaded for {competition.competition}")
+        st.stop()
 
     event_entries = comp_boat_athletes.groupby('Event').apply(
         lambda data: data.Boat.drop_duplicates().reset_index(drop=True)

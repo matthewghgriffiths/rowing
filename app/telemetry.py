@@ -194,7 +194,7 @@ def main(state=None):
                 colorscale = st.selectbox(
                     "heatmap color scale",
                     colorscales,
-                    index=colorscales.index('viridis'),
+                    index=colorscales.index('plasma'),
                 )
                 cmin = st.number_input(
                     "Color scale min (clear for autoscaling)", value=None)

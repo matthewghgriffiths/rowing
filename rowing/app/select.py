@@ -69,6 +69,9 @@ def get_boat_classes():
 def get_entries(competition_id):
     events = api.get_events(
         competition_id, include="boats.boatAthletes.person")
+    if events.empty:
+        return
+
     boats = pd.concat({
         e: pd.json_normalize(boats)
         for e, boats in events.set_index(["Event"]).event_boats.items()
@@ -178,7 +181,7 @@ COMPETITION_COL = [
 ]
 
 
-def select_competition(current=True):
+def select_competition(current=True, start_date=None, end_date=None):
     logger.debug("select_competition(current=%s)", current)
     st.write(
         """
@@ -205,18 +208,23 @@ def select_competition(current=True):
             competition[fields.competition_StartDate]) < datetime.datetime.now()
     else:
         today = datetime.date.today()
-        start_date = pd.to_datetime(state.get("competition.start_date", today))
+        start_date = pd.to_datetime(
+            start_date or state.get("competition.start_date", today),
+            errors='coerce')
         end_date = pd.to_datetime(
-            state.get("competition.end_date",
-                      today - datetime.timedelta(days=365*2))
+            end_date or state.get("competition.end_date"),
+            errors='coerce'
         )
+        start_date = today if pd.isna(start_date) else start_date
+        end_date = (
+            today - datetime.timedelta(days=365*2) if pd.isna(end_date) else end_date)
         date_input = st.date_input(
             "Select date range to load",
             value=[end_date, start_date]
         )
         if len(date_input) == 2:
-            end_date, start_date = date_input[0].isoformat(
-            ), date_input[1].isoformat()
+            end_date = date_input[0].isoformat()
+            start_date = date_input[1].isoformat()
             state.set("competition.end_date", end_date)
             state.set("competition.start_date", start_date)
 

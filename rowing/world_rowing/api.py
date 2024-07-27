@@ -604,7 +604,7 @@ def get_most_recent_competition(fisa=True):
 #     )
 
 
-def get_live_races(fisa=True, competition=None):
+def get_live_races(fisa=False, competition=None):
     competitions = get_live_competitions(fisa=fisa, has_results=True)
     if len(competitions):
         races = pd.concat([
