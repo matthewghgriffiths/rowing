@@ -400,7 +400,7 @@ def select_live_race(replay=False, **kwargs):
 
             race = inputs.select_dataframe(races, fields.Race)
     else:
-        races = api.get_live_races()
+        races = api.get_live_races(fisa=False)
         if races.empty:
             wait_for_next_race(n=5)
             st.stop()
