@@ -627,7 +627,7 @@ def get_live_races(fisa=False, competition=None):
                 "Official",
                 "UNOFFICIAL",
                 "unofficial",
-                "Scheduled",
+                # "Scheduled",
             })
         ].sort_values(fields.race_Date)
     return pd.DataFrame([])
