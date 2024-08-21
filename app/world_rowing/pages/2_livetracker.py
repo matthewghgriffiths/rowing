@@ -134,12 +134,15 @@ def main(params=None):
     with filter_live:
         live_data = select.filter_livetracker(live_data)
 
+    if live_data.empty:
+        return state.get_state()
+
     st.subheader("Show livetracker")
 
-    live_data, PGMT = select.set_livetracker_PGMT(live_data)
+    live_data, PGMT = select.set_livetracker_paceboat(live_data)
     facets = [
-        fields.PGMT,
-        fields.distance_from_pace,
+        fields.PGMT_paceboat,
+        fields.distance_from_paceboat,
         fields.split,
         fields.live_raceBoatTracker_strokeRate,
     ]
@@ -147,6 +150,9 @@ def main(params=None):
     with st.spinner("Generating livetracker plot"):
         args = plots.melt_livetracker_times(live_data, 100)
         fig = plots.make_livetracker_plot(facets, *args)
+        fig_params['layout']['title'] = dict(
+            text=f"Paceboat speed = {PGMT:.1%}",
+        )
         fig = plots.update_figure(fig, **fig_params)
         st.plotly_chart(fig, use_container_width=True)
 

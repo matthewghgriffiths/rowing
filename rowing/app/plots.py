@@ -182,8 +182,8 @@ def melt_livetracker_times(live_data, filter_distance=100):
         filter_distance=filter_distance,
         format={
             fields.avg_speed: ":0.1f",
-            fields.distance_from_pace: ":0.1f",
-            fields.PGMT: ':.1%',
+            fields.distance_from_paceboat: ":0.1f",
+            fields.PGMT_paceboat: ':.1%',
             fields.split: "|%-M:%S.%L",
             fields.avg_split: "|%-M:%S.%L",
             fields.lane_ResultTime: "|%-M:%S.%L",
@@ -235,11 +235,13 @@ def facet_properties(
             facet_axes[facet]['tickformat'] = fmt
 
     facet_axes.setdefault(fields.PGMT, {})['tickformat'] = ',.1%'
+    facet_axes.setdefault(fields.PGMT_paceboat, {})['tickformat'] = ',.1%'
     facet_axes.setdefault(fields.split, {})['tickformat'] = "%-M:%S"
     facet_axes.setdefault(fields.avg_split, {})['tickformat'] = "%-M:%S"
     facet_axes.setdefault(fields.lane_ResultTime, {})['tickformat'] = "%-M:%S"
 
     for col in [
+        fields.distance_from_paceboat,
         fields.distance_from_pace,
         fields.live_raceBoatTracker_distanceFromLeader,
         fields.split,

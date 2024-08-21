@@ -673,6 +673,26 @@ def set_livetracker_PGMT(live_data):
     return live_data, PGMT
 
 
+def set_livetracker_paceboat(live_data, pace_percent=None):
+    gmt_speed = (
+        live_data[fields.race_distance]
+        / live_data[fields.GMT].dt.total_seconds()
+    )
+    gmt_distance = live_data[fields.live_time] * gmt_speed
+
+    distance = live_data[fields.live_raceBoatTracker_distanceTravelled]
+    if not pace_percent:
+        pace_percent = (distance / gmt_distance)[
+            distance == live_data[fields.race_distance]
+        ].max()
+
+    pace_distance = gmt_distance * pace_percent
+    live_data[fields.distance_from_paceboat] = pace_distance - distance
+    live_data[fields.PGMT_paceboat] = distance / pace_distance
+
+    return live_data, pace_percent
+
+
 def last_race_results(n=10, fisa=True, cached=False):
     races = api.get_last_races(n, fisa=fisa, cached=cached)
     race_boats = pd.json_normalize(

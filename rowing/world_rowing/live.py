@@ -138,7 +138,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     intermediate_distances = []
     intermediate_times = pd.DataFrame([])
     if not intermediates.empty:
-        intermediate_times = intermediates[
+        intermediate_times = intermediates.dropna(how='all', axis=1)[
             fields.intermediates_ResultTime].apply(lambda s: s.dt.total_seconds())
         intermediate_distances = intermediate_times.index.values
 

@@ -145,6 +145,9 @@ race_event_boatClassId = 'race_event_boatClassId'
 race_event_competition = 'competition'
 race_event_competitionId = 'race_event_competitionId'
 
+distance_from_paceboat = "Distance from Pace Boat"
+PGMT_paceboat = "% Pace Boat Speed"
+
 
 dtype_checks = {
     is_timedelta64_dtype: "timedelta",
