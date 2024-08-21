@@ -61,7 +61,7 @@ def parse_livetracker_data(data):
         fields.live_raceBoatTracker_metrePerSecond
     ].items():
         live_data[fields.split, boat] = pd.to_timedelta(
-            500 / speed, unit='s'
+            500 / speed.replace(0, np.nan), unit='s'
         )
 
     return live_data

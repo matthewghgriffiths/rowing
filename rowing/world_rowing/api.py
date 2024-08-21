@@ -472,40 +472,42 @@ def extract_results(races):
         races[fields.race_raceBoats].map(pd.json_normalize).values
     ).reset_index(drop=True).rename(columns=fields.renamer('raceBoats'))
 
-    race_intermediates = pd.concat(
-        race_results[fields.raceBoats_raceBoatIntermediates].map(
-            pd.json_normalize).values,
-    ).reset_index(drop=True).rename(
+    race_intermediates = pd.json_normalize(
+        race_results[fields.raceBoats_raceBoatIntermediates].sum()
+    ).rename(
         columns=fields.renamer('raceBoatIntermediates')
     )
-    race_intermediates = race_intermediates.join(
-        race_results.set_index(fields.raceBoats_id),
-        on=fields.raceBoatIntermediates_raceBoatId
-    )
-    race_intermediates[fields.raceBoats_ResultTime] = \
-        read_times(race_intermediates[fields.raceBoats_ResultTime])
-    race_intermediates[fields.raceBoatIntermediates_ResultTime] = \
-        read_times(race_intermediates[fields.raceBoatIntermediates_ResultTime])
 
-    inter_distances = race_intermediates[
-        fields.raceBoatIntermediates_distance
-    ].str.extract("([0-9]+)")[0].astype(float)
-    race_intermediates[fields.Distance] = inter_distances
+    if not race_intermediates.empty:
+        race_intermediates = race_intermediates.join(
+            race_results.set_index(fields.raceBoats_id),
+            on=fields.raceBoatIntermediates_raceBoatId
+        )
+        race_intermediates[fields.raceBoats_ResultTime] = \
+            read_times(race_intermediates[fields.raceBoats_ResultTime])
+        race_intermediates[fields.raceBoatIntermediates_ResultTime] = \
+            read_times(
+                race_intermediates[fields.raceBoatIntermediates_ResultTime])
 
-    race_distances = race_intermediates[(
-        race_intermediates[fields.raceBoats_ResultTime]
-        == race_intermediates[fields.raceBoatIntermediates_ResultTime]
-    )].groupby(fields.raceBoats_raceId)[fields.Distance].max()
+        inter_distances = race_intermediates[
+            fields.raceBoatIntermediates_distance
+        ].str.extract("([0-9]+)")[0].astype(float)
+        race_intermediates[fields.Distance] = inter_distances
 
-    race_intermediates[fields.race_distance] = race_distances.reindex(
-        race_intermediates[fields.raceBoats_raceId]
-    ).values
+        race_distances = race_intermediates[(
+            race_intermediates[fields.raceBoats_ResultTime]
+            == race_intermediates[fields.raceBoatIntermediates_ResultTime]
+        )].groupby(fields.raceBoats_raceId)[fields.Distance].max()
 
-    race_intermediates = race_intermediates.dropna(
-        subset=[fields.Distance]
-    )
-    race_intermediates[fields.Distance] = race_intermediates[
-        fields.Distance].astype(int)
+        race_intermediates[fields.race_distance] = race_distances.reindex(
+            race_intermediates[fields.raceBoats_raceId]
+        ).values
+
+        race_intermediates = race_intermediates.dropna(
+            subset=[fields.Distance]
+        )
+        race_intermediates[fields.Distance] = race_intermediates[
+            fields.Distance].astype(int)
 
     return race_intermediates
 

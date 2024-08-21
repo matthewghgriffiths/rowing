@@ -406,6 +406,7 @@ def select_live_race(replay=False, **kwargs):
             if races.empty:
                 st.write("no live races could be loaded")
                 st.stop()
+                raise st.runtime.scriptrunner.StopException()
 
             race = inputs.select_dataframe(races, fields.Race)
     else:
@@ -415,6 +416,7 @@ def select_live_race(replay=False, **kwargs):
             st.stop()
 
         race = inputs.select_dataframe(races, fields.Race)
+
         if race is None:
             st.write("no live race could be loaded")
             if st.checkbox("refresh until next"):
@@ -423,7 +425,6 @@ def select_live_race(replay=False, **kwargs):
 
             if st.button("refresh"):
                 st.rerun()
-            st.stop()
 
     return race
 
@@ -568,6 +569,9 @@ def select_competition_results(
     events = get_events(competition_id)
     results = api.extract_results(races)
     boat_classes = get_boat_classes()
+
+    if results.empty:
+        return
 
     merged_results = api.merge_competition_results(
         results, races, events, boat_classes, gmts)

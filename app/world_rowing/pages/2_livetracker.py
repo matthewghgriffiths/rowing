@@ -109,8 +109,10 @@ def main(params=None):
         state.set("expander.filter_races", True)
         state.update_query_params()
         st.rerun()
+        raise st.runtime.scriptrunner.StopException()
 
     competition_id = races[fields.race_event_competitionId].iloc[0]
+
     with select_gmts:
         gmts = select.set_competition_gmts(competition_id)
         races = races.set_index("race_id").join(

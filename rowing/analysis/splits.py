@@ -270,7 +270,7 @@ def find_best_times(positions, distance, cols=None):
             break
         n = n1
 
-    best_times = pd.to_timedelta(dist_times[best], 'S')
+    best_times = pd.to_timedelta(dist_times[best], 's')
     best_timesplits = pd.DataFrame.from_dict({
         'time': best_times,
         'split': best_times / distance / 2

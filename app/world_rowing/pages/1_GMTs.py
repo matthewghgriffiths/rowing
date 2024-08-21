@@ -86,6 +86,11 @@ def main(params=None):
             st.cache_data.clear()
             select.api.clear_cache()
 
+    if results is None:
+        st.write("No results could be loaded")
+        st.stop()
+        raise st.runtime.scriptrunner.StopException()
+
     st.subheader("View PGMTs")
 
     st.dataframe(fields.to_streamlit_dataframe(results))
@@ -132,13 +137,19 @@ def main(params=None):
     st.subheader("View Intermediates")
 
     with st.expander("Filter Intermediate Results"):
-        intermediate_results = select.select_competition_results(
+        res = select.select_competition_results(
             competition_id, gmts,
             default=[fields.Phase,],
             Phase=['Final A'],
             filters=False,
             key='intermediate_results'
-        ).groupby([
+        )
+        if res is None:
+            st.write("No results could be loaded")
+            st.stop()
+            raise st.runtime.scriptrunner.StopException()
+
+        intermediate_results = res.groupby([
             fields.Race, fields.raceBoats, fields.Distance
         ]).first().unstack(-1)
 

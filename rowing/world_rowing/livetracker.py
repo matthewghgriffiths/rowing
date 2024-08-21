@@ -624,10 +624,10 @@ def calc_behind(live_time_data, gmt_speed=None, PGMT=1):
 
 def get_current_data(live_data):
     current_data = live_data.iloc[[-1]].copy()
-    current_data.PGMT = current_data.PGMT.applymap("{:.1%}".format)
+    current_data.PGMT = current_data.PGMT.map("{:.1%}".format)
     current_data['time elapsed'] = current_data.time.max(
         1).map(utils.format_totalseconds)
-    current_data.time = current_data.time.applymap(utils.format_totalseconds)
+    current_data.time = current_data.time.map(utils.format_totalseconds)
     return current_data.set_index('time elapsed').astype('string').T.unstack(1)
 
 

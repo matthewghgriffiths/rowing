@@ -346,7 +346,7 @@ plotly_formatters = {
 
 def to_plotly_dataframe(data):
     plotly_data = format_datatype(data, **plotly_formatters)
-    plotly_data = plotly_data.applymap(
+    plotly_data = plotly_data.map(
         lambda x: plotly_formatters.get(
             infer_dtype([x]), identity
         )(x)

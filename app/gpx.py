@@ -7,11 +7,11 @@ import sys
 
 import logging
 
-import numpy as np
+# import numpy as np
 import pandas as pd
 
-import plotly.graph_objects as go
-import plotly.express as px
+# import plotly.graph_objects as go
+# import plotly.express as px
 
 try:
     from rowing import utils
@@ -136,7 +136,7 @@ def main(state=None):
                     ["", 'leg', 'landmark', 'distance']
                 ).rename_axis(
                     ["", 'leg', 'landmark', 'distance'], axis=1
-                ).applymap(
+                ).map(
                     utils.format_timedelta, hours=True
                 ).replace("00:00:00.00", "").T
                 st.dataframe(upload_timings)
@@ -189,7 +189,7 @@ def main(state=None):
                 )
                 app.download_csv(
                     f"{name}-fastest.csv",
-                    times.applymap(
+                    times.map(
                         utils.format_timedelta, hours=True
                     ).replace("00:00:00.00", "")
                 )
@@ -200,7 +200,7 @@ def main(state=None):
             for name, crossings in crossing_times.items():
                 crossings = crossings.rename("time").dt.tz_localize(None)
                 crossings.to_frame().to_excel(
-                    xlf, f"{name}-crossings"
+                    xlf, sheet_name=f"{name}-crossings"
                 )
 
             for name, timings in location_timings.items():
@@ -210,7 +210,7 @@ def main(state=None):
                     ["", 'leg', 'landmark', 'distance']
                 ).rename_axis(
                     ["", 'leg', 'landmark', 'distance'], axis=1
-                ).applymap(
+                ).map(
                     utils.format_timedelta, hours=True
                 ).replace("00:00:00.00", "").T
                 upload_timings.to_excel(
@@ -218,7 +218,7 @@ def main(state=None):
                 )
 
             for name, times in best_times.items():
-                times.applymap(
+                times.map(
                     utils.format_timedelta, hours=True
                 ).replace("00:00:00.00", "").to_excel(
                     xlf, f"{name}-fastest"

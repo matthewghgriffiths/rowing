@@ -378,7 +378,7 @@ def show_lane_intermediates(lane_info, intermediates):
                         return ""
 
                 st.dataframe(
-                    intermediates[fields.intermediates_Rank].applymap(
+                    intermediates[fields.intermediates_Rank].map(
                         to_int_str),
                     use_container_width=True
                 )
