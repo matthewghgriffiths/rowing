@@ -1,4 +1,5 @@
 
+import time
 import streamlit as st
 
 import logging
@@ -45,8 +46,6 @@ def main(params=None):
         """
     )
 
-    state.reset_button()
-
     with st.sidebar:
         with st.expander("Settings"):
             realtime_sleep = st.number_input(
@@ -76,25 +75,27 @@ def main(params=None):
             if not intermediates.empty:
                 intermediates['Race'] = intermediates[
                     'Race'].replace(race_name)
-                table = select.unstack_intermediates(intermediates)
-                table.index.names = ['Race', 'Inter']
                 race_order = races.sort_values("Race Start").Race
-                order = race_order[
-                    race_order.isin(table.index.levels[0])]
+                order = race_order[race_order.isin(
+                    intermediates['Race'])].drop_duplicates()
 
-                st.dataframe(
-                    table.loc[order],
-                    height=(len(table) + 1) * 35 + 3,
-                    use_container_width=True,
-                    column_config={
-                        "Race": st.column_config.TextColumn(
-                            width="small",
-                        ),
-                        "Intermediate": st.column_config.TextColumn(
-                            width="small",
-                        )
-                    }
-                )
+                for race in order:
+                    race_inter = select.unstack_intermediates(
+                        intermediates[intermediates['Race'] == race]
+                    )
+                    st.markdown(f"#### {race}")
+                    st.dataframe(
+                        race_inter,
+                        use_container_width=True,
+                        column_config={
+                            "Race": st.column_config.TextColumn(
+                                width="small",
+                            ),
+                            "Intermediate": st.column_config.TextColumn(
+                                width="small",
+                            )
+                        }
+                    )
 
     kwargs = {}
     race_expander = st.expander("Select race", True)
@@ -109,6 +110,8 @@ def main(params=None):
         st.subheader("Loading race: ")
         st.write(race)
 
+    state.reset_button()
+
     st.subheader("Livetracker")
 
     live_race = select.get_live_race_data(
@@ -120,6 +123,14 @@ def main(params=None):
     )
     show_intermediates = st.empty()
     completed = st.progress(0., "Distance completed")
+
+    if "distance_completed" in st.session_state:
+        last_dist = st.session_state["distance_completed"]
+        last_time = st.session_state["last_time_update"]
+    else:
+        last_dist = st.session_state["distance_completed"] = 0
+        last_time = st.session_state["last_time_update"] = time.time()
+
     fig_plot = st.empty()
 
     pbar = tqdm(live_race.gen_data(
@@ -129,9 +140,17 @@ def main(params=None):
     ))
     for fig, *_ in pbar:
         pbar.set_postfix(distance=live_race.distance)
+        if live_race.distance == last_dist:
+            elapsed = time.time() - last_time
+        else:
+            st.session_state["distance_completed"] = last_dist = live_race.distance
+            st.session_state["last_time_update"] = last_time = time.time()
+            elapsed = 0
+
         completed.progress(
             live_race.distance / live_race.race_distance,
-            f"Distance completed: {live_race.distance}m/{live_race.race_distance}m"
+            f"Distance completed: {live_race.distance}m/{live_race.race_distance}m, "
+            f"{elapsed:0.1f}s out of date"
         )
 
         with show_intermediates:
@@ -139,15 +158,15 @@ def main(params=None):
                 plots.show_lane_intermediates(
                     live_race.lane_info, live_race.intermediates)
 
-        if fig is not None:
-            with fig_plot:
+        with fig_plot:
+            if fig is not None:
                 fig = plots.update_figure(fig, **fig_params)
                 st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.write("no live data could be loaded")
+            else:
+                st.write("no live data could be loaded")
 
     select.wait_for_next_race(n=5)
-    state.update_query_params()
+    # state.update_query_params()
     return state.get_state()
 
 

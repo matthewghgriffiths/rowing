@@ -710,4 +710,5 @@ def unstack_intermediates(intermediates, col='Time'):
     ]).groupby(
         ["Race", "Intermediate", "Lane"]
     ).Boat.first().unstack().sort_index(ascending=False).fillna("")
+    table.index.names = ['Race', 'Inter']
     return table.rename(index=str)

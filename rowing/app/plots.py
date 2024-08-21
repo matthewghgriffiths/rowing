@@ -325,6 +325,12 @@ def show_lane_info(lane_info):
     st.dataframe(
         lane_info,
         column_config={
+            "Boat": st.column_config.TextColumn(
+                width="small",
+            ),
+            "Lane": st.column_config.TextColumn(
+                width="small",
+            ),
             pos_col: st.column_config.ProgressColumn(
                 pos_col,
                 min_value=0,
@@ -360,11 +366,36 @@ def show_lane_info(lane_info):
 
 
 def show_lane_intermediates(lane_info, intermediates):
-    cols = st.columns(2)
-    with cols[0]:
-        if lane_info is not None and lane_info.size:
+    with st.container():
+        if intermediates is not None and intermediates.size:
+            if fields.intermediates_Rank in intermediates:
+                st.markdown("#### Intermediate Position")
+
+                def to_int_str(val):
+                    try:
+                        return str(int(val))
+                    except:
+                        return ""
+
+                st.dataframe(
+                    intermediates[fields.intermediates_Rank].applymap(
+                        to_int_str),
+                    use_container_width=True
+                )
+
+            if fields.intermediates_ResultTime in intermediates:
+                st.markdown("#### Intermediate time")
+                st.dataframe(
+                    fields.to_streamlit_dataframe(
+                        intermediates[fields.intermediates_ResultTime]
+                    ),
+                    use_container_width=True
+                )
+
+        if lane_info is not None and lane_info.size and 'Speed' in lane_info.columns:
+            st.markdown("#### Live data")
             show_lane_info(lane_info)
 
-    with cols[1]:
-        if intermediates is not None and intermediates.size:
-            show_intermediates(intermediates)
+    # with cols[1]:
+    #     if intermediates is not None and intermediates.size:
+    #         show_intermediates(intermediates)
