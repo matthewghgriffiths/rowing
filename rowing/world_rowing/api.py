@@ -453,12 +453,12 @@ def get_races(competition_id=None, cached=True, athletes=False):
     return parse_races(races)
 
 
-def get_race(race_id, **kwargs):
+def get_race(race_id, athletes=False, **kwargs):
     kwargs.setdefault(
         "sort", (("eventId", "asc"), ("Date", "asc"))
     )
     kwargs.setdefault(
-        "include", INCLUDE_RACE
+        "include", INCLUDE_RACE_ATHLETES if athletes else INCLUDE_RACE,
     )
     data = get_worldrowing_data(
         "race", race_id, **kwargs
@@ -629,6 +629,7 @@ def get_live_races(fisa=False, competition=None):
                 "Official",
                 "UNOFFICIAL",
                 "unofficial",
+                "Cancelled",
                 # "Scheduled",
             })
         ].sort_values(fields.race_Date)
@@ -676,12 +677,24 @@ get_most_recent_race = get_last_race_started
 
 
 def get_last_races(n=1, fisa=True, competition=None, cached=False):
+    races = None
     if competition is None:
-        competition = get_most_recent_competition(fisa)
-    races = get_races(competition.competition_id, cached=cached)
+        competitions = get_live_competitions(fisa=fisa)
+        if len(competitions):
+            races = pd.concat([
+                get_races(competition.competition_id, cached=cached)
+                for _, competition in competitions.iterrows()
+            ])
+        else:
+            competition = get_most_recent_competition(fisa)
+
+    if races is None:
+        races = get_races(competition.competition_id, cached=cached)
     if not races.empty:
         started = races.race_DateString < datetime.datetime.now().astimezone()
-        return races.loc[started].sort_values("race_DateString").iloc[-n:]
+        return races.drop_duplicates(
+            subset=['Race', 'race_id']
+        ).loc[started].sort_values("race_DateString").iloc[-n:]
 
 
 def get_next_races(n=1, fisa=True, competition=None):
@@ -827,6 +840,44 @@ def get_intermediate_results(
         results.set_index(["raceId", "raceBoatId", "id"], inplace=True)
         results.ResultTime = pd.to_timedelta(results.ResultTime)
     return results
+
+
+def get_race_intermediates(race_id, race_distance='d2000m'):
+    intermediates = get_intermediate_results(race_id=race_id)
+    if intermediates.empty:
+        return intermediates
+
+    results = get_race_results(race_id=race_id)
+    results['distance'] = race_distance
+
+    full_intermediates = pd.concat([intermediates.droplevel(1), results])
+    full_intermediates['Distance'] = full_intermediates['distance'].str.extract(
+        "(\d+)")[0].astype(int)
+
+    full_inters = full_intermediates.groupby(
+        ['Distance', 'Country']
+    ).first().unstack()
+    return full_inters
+
+
+def get_race_athletes(race_id):
+    race = get_race(
+        race_id, include=(
+            'event.competition,raceStatus,racePhase,'
+            'raceBoats.raceBoatIntermediates.distance,'
+            'event,raceBoats.raceBoatAthletes,'
+            'raceBoats.raceBoatAthletes.person'
+        ))
+    race_boats = pd.json_normalize(race.Boat)
+    race_boat_athletes = pd.json_normalize(
+        race_boats.raceBoatAthletes.sum()
+    ).join(
+        race_boats.set_index('id').DisplayName.rename("Boat"),
+        on='raceBoatId'
+    )
+    return race_boat_athletes.set_index(
+        ['Boat', 'boatPosition']
+    )['person.DisplayName'].unstack()
 
 
 WBT_RECORDS = {

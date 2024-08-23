@@ -1,10 +1,12 @@
 
 import streamlit as st
+import numpy as np
 import pandas as pd
 import plotly.express as px
 from plotly.validators.scatter.marker import SymbolValidator
 
 from rowing.world_rowing import fields
+from rowing import utils
 
 FORMATS = {
     "default": {
@@ -56,7 +58,7 @@ def melt_livetracker(
     lanes = livetracker.columns.levels[1] if lanes is None else lanes
 
     stacked = livetracker.stack(
-        1
+        1, future_stack=True
     ).reindex(
         pd.MultiIndex.from_product([livetracker.index, lanes])
     ).droplevel(0).reset_index().dropna(
@@ -387,12 +389,16 @@ def show_lane_intermediates(lane_info, intermediates):
 
             if fields.intermediates_ResultTime in intermediates:
                 st.markdown("#### Intermediate time")
-                st.dataframe(
-                    fields.to_streamlit_dataframe(
-                        intermediates[fields.intermediates_ResultTime]
-                    ),
+                show_intermediates(
+                    intermediates[fields.intermediates_ResultTime],
                     use_container_width=True
                 )
+                # st.dataframe(
+                #     fields.to_streamlit_dataframe(
+                #         intermediates[fields.intermediates_ResultTime]
+                #     ),
+                #     use_container_width=True
+                # )
 
         if lane_info is not None and lane_info.size and 'Speed' in lane_info.columns:
             st.markdown("#### Live data")
@@ -401,3 +407,20 @@ def show_lane_intermediates(lane_info, intermediates):
     # with cols[1]:
     #     if intermediates is not None and intermediates.size:
     #         show_intermediates(intermediates)
+
+
+def highlight_min(s, props=''):
+    return np.where(s == np.nanmin(s.values), props, '')
+
+
+def show_intermediates(inter_times, **kwargs):
+    st.dataframe(
+        inter_times.style.apply(
+            highlight_min,
+            props='background-color:#e6ffe6',
+            axis=1
+        ).format(
+            utils.format_timedelta
+        ),
+        **kwargs
+    )

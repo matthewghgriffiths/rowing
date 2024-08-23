@@ -1,5 +1,6 @@
 
 import time
+from matplotlib import use
 import streamlit as st
 
 import logging
@@ -69,33 +70,20 @@ def main(params=None):
         if n_races > 0:
             races, race_boats, intermediates = select.last_race_results(
                 n_races, fisa=False, cached=False)
-            race_name = races['Boat Class'] + ": " + races['Phase']
-            race_name.index = races.Race
-            races['Race'] = races['Race'].replace(race_name)
-            if not intermediates.empty:
-                intermediates['Race'] = intermediates[
-                    'Race'].replace(race_name)
-                race_order = races.sort_values("Race Start").Race
-                order = race_order[race_order.isin(
-                    intermediates['Race'])].drop_duplicates()
-
-                for race in order:
-                    race_inter = select.unstack_intermediates(
-                        intermediates[intermediates['Race'] == race]
-                    )
-                    st.markdown(f"#### {race}")
-                    st.dataframe(
-                        race_inter,
-                        use_container_width=True,
-                        column_config={
-                            "Race": st.column_config.TextColumn(
-                                width="small",
-                            ),
-                            "Intermediate": st.column_config.TextColumn(
-                                width="small",
-                            )
-                        }
-                    )
+            race_order = races.sort_values("Race Start").Race
+            order = race_order[race_order.isin(
+                intermediates['Race'])].drop_duplicates()
+            race_lanes = intermediates.groupby([
+                "Race", "Lane"
+            ])['Boat'].first().sort_index()
+            race_inters = intermediates.groupby([
+                "Race", "Distance", "Boat"
+            ])['ResultTime'].first()
+            for race in order:
+                st.write(f"##### {race}")
+                lane_order = race_lanes.loc[race]
+                inters = race_inters.loc[race].unstack()[lane_order]
+                plots.show_intermediates(inters)
 
     kwargs = {}
     race_expander = st.expander("Select race", True)
@@ -107,8 +95,32 @@ def main(params=None):
 
     with race_expander:
         race = select.select_live_race(replay, **kwargs)
-        st.subheader("Loading race: ")
-        st.write(race)
+        if st.toggle("## Race details", True):
+            st.dataframe(race, use_container_width=True)
+
+        if st.toggle("## Crew lists", True):
+            st.dataframe(select.get_crewlist(race.race_id))
+
+        boat_class = api.BOATCLASSES.get(race.race_event_boatClassId)
+        if st.toggle("## World Best Time", True):
+            # st.subheader("World Best Time:")
+            wbts = select.get_cbts(
+                [boat_class]
+            ).sort_values('Best Time')
+            if boat_class:
+                st.markdown("#### Details:")
+                st.dataframe(
+                    select.fields.to_streamlit_dataframe(wbts).T,
+                    # use_container_width=True
+                )
+
+            fastest_id = wbts.loc[wbts['Best Time'].idxmin(),
+                                  'bestTimes_RaceId']
+            inters = select.get_race_intermediates(fastest_id)
+            if not inters.empty:
+                st.markdown("#### Intermediates:")
+                plots.show_intermediates(
+                    inters.ResultTime, use_container_width=True)
 
     state.reset_button()
 

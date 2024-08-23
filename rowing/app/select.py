@@ -61,6 +61,11 @@ def get_results(competition_id):
 
 
 @st.cache_data(persist=True)
+def get_race_intermediates(race_id):
+    return api.get_race_intermediates(race_id)
+
+
+@st.cache_data(persist=True)
 def get_boat_classes():
     return api.get_boat_classes()
 
@@ -166,6 +171,8 @@ def get_races_livedata(races, max_workers=10):
         live_data[fields.raceBoats] + " " + live_data[fields.boatClass])
     return live_data, intermediates, lane_info
 
+
+get_crewlist = st.cache_data(persist=True)(api.get_race_athletes)
 
 get_realtime_race_data = st.cache_resource(live.LiveRaceData)
 
@@ -713,8 +720,10 @@ def last_race_results(n=10, fisa=True, cached=False):
         intermediates = intermediates.join(boat_name, on='raceBoatId')
         intermediates['Distance'] = intermediates[
             'distance.DisplayName'].str.extract("([\d]+)")[0].astype(int)
-        intermediates['Time'] = pd.to_timedelta(
-            intermediates['ResultTime']).apply(utils.format_timedelta)
+        intermediates['ResultTime'] = pd.to_timedelta(
+            intermediates['ResultTime'])
+        intermediates['Time'] = intermediates['ResultTime'].apply(
+            utils.format_timedelta)
         intermediates['Intermediate'] = ''
 
     return races, race_boats, intermediates
