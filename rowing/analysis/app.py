@@ -699,8 +699,8 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
 
         gate_angle = profile.GateAngle
         gate_angle0 = gate_angle - gate_angle.values.mean(0, keepdims=True)
-        for pos, angle0 in gate_angle0.items():
-            profile["GateAngle0", pos] = angle0
+        for (pos, side), angle0 in gate_angle0.items():
+            profile["GateAngle0", pos, side] = angle0
 
         mean_profile = profile.groupby(
             level=1
@@ -708,15 +708,15 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
             {"": "Boat"}, axis=1, level=1
         )
         boat_profiles[name, leg] = boat_profile = mean_profile.xs(
-            "Boat", axis=1, level=1)
+            "Boat", axis=1, level=1).droplevel(axis=1, level=1)
 
         profile = mean_profile[
             mean_profile.columns.levels[0].difference(
                 boat_profile.columns)
         ].rename_axis(
-            columns=("Measurement", "Position")
-        ).stack(1).reset_index(
-            "Position"
+            columns=("Measurement", "Position", 'Side')
+        ).stack([1, 2]).reset_index(
+            ["Position", 'Side']
         ).rename_axis(
             index="Normalized Time"
         ).reset_index()
@@ -914,7 +914,7 @@ def piece_names(data, name='name', leg='leg'):
     return pieces
 
 
-@st.cache_data
+# @st.cache_data
 def make_telemetry_distance_figure(compare_power, landmark_distances, col, facet_col_wrap=4):
     n_legs = compare_power.groupby(
         ["name", "leg"]
@@ -953,20 +953,24 @@ def make_telemetry_distance_figure(compare_power, landmark_distances, col, facet
     else:
         fig = go.Figure()
         for (file, leg), data in compare_power.groupby(["name", "leg"]):
+            cols = data[[col]].columns
             pos_power = data.dropna(
-                subset=col).groupby("Position")
-            for pos, pos_data in pos_power:
-                name = file if n_legs[file] == 1 else f"{file} {leg=}"
-                fig.add_trace(
-                    go.Scatter(
-                        x=pos_data["Distance"],
-                        y=pos_data[col],
-                        legendgroup=f"{file} {leg}",
-                        legendgrouptitle_text=name,
-                        name=pos,
-                        mode='lines',
+                subset=cols, how='all'
+            ).groupby(["Position", 'Side'])
+
+            for (pos, side), pos_data in pos_power:
+                name = f"{file} {side}" if n_legs[file] == 1 else f"{file} {side} {leg=}"
+                for c in cols:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=pos_data["Distance"],
+                            y=pos_data[c],
+                            legendgroup=f"{file} {leg} {side}",
+                            legendgrouptitle_text=name,
+                            name=f"{pos}",
+                            mode='lines',
+                        )
                     )
-                )
         fig.update_layout(
             xaxis_title="Distance (km)",
             yaxis_title=col,
@@ -1351,6 +1355,7 @@ def plot_rower_profiles(piece_information, default_height=600, key="rower_", inp
             x=x,
             y=y,
             color='Position',
+            line_dash='Side',
             title=f"{name}, leg={leg}"
         )
         # fig.update_yaxes(
@@ -1402,15 +1407,15 @@ def plot_crew_profile(piece_information, default_height=600, key='', input_conta
 
     fig = go.Figure()
     for (file, leg), piece_profile in crew_profile.groupby(["name", "leg"]):
-        for pos, profile in piece_profile.groupby("Position"):
+        for (pos, side), profile in piece_profile.groupby(["Position", 'Side']):
             name = file if n_legs[file] == 1 else f"{file} {leg=}"
             fig.add_trace(
                 go.Scatter(
                     x=profile[x],
                     y=profile[y],
-                    legendgroup=f"{name} {leg}",
+                    legendgroup=f"{name} {leg} {side}",
                     legendgrouptitle_text=name,
-                    name=pos,
+                    name=f"{pos} {side}",
                     mode='lines',
                 )
             )
@@ -1576,7 +1581,8 @@ def interpolate_power(telemetry_data, dists=0.005, n_iter=10):
             utils.interpolate_series, index=power.Time
         )
         power_gps = power.join(
-            pd.concat({"boat": power_gps}, axis=1).swaplevel(0, 1, axis=1)
+            pd.concat({("boat", ""): power_gps},
+                      axis=1).swaplevel(0, -1, axis=1)
         )
         power_gps_data[k] = geodesy.interp_dataframe(
             power_gps, dists, n_iter=n_iter)

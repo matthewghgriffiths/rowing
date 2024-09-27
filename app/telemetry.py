@@ -1,5 +1,4 @@
 
-from tracemalloc import start
 import streamlit as st
 import io
 from functools import partial
@@ -227,7 +226,7 @@ def main(state=None):
                 )
 
             with cols[1]:
-                options = data[c0].columns
+                options = data[c0].columns.get_level_values(0)
                 index = (
                     int(options.get_indexer_for([c1])[0]) if c1 in options else 0)
                 c1 = st.selectbox(

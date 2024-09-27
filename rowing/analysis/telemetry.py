@@ -108,6 +108,7 @@ def parse_powerline_data(split_data, use_names=True):
     gps_data = split_data["Aperiodic0x8013"]
     power_data = split_data["Aperiodic0x800A"]
     gps_info = split_data['GPS Info'].iloc[0]
+    rig_info = split_data['Rig Info']
 
     split_data['Crew List'] = crew_list = crew_data.set_index("Position").Name
     crew_list[crew_list.isna()] = crew_list.index[crew_list.isna()]
@@ -157,6 +158,7 @@ def parse_powerline_data(split_data, use_names=True):
         1000 / positions['timeDelta'].dt.total_seconds()
 
     power = power_data.copy()
+    power.columns = set_rower_sides(power.columns, rig_info)
     power.Time = pd.to_datetime(
         pd.to_timedelta(power.Time + t_shift, unit='milli') + start_date
     )
@@ -170,6 +172,8 @@ def parse_powerline_data(split_data, use_names=True):
     ], axis=1)
 
     split_data['positions'] = positions
+    split_data["Periodic"].columns = cols = set_rower_sides(
+        split_data["Periodic"].columns, rig_info)
     if use_names:
         split_data['power'] = power.rename(
             columns=crew_list.to_dict(), level=1)
@@ -177,6 +181,32 @@ def parse_powerline_data(split_data, use_names=True):
             columns=crew_list.to_dict(), level=1)
 
     return split_data
+
+
+rename_scull_cols = {
+    'Min Angle': 'MinAngle',
+    'Swivel Power': 'SwivelPower',
+}
+
+
+def set_rower_sides(columns, rig_info):
+    rower_sides = rig_info.set_index('Position').Side
+    rower_sides.index = rower_sides.index.astype(str)
+    power_columns = columns.to_frame()
+    channels = power_columns[0].str.extract(
+        "^(?P<side>P |S )?(?P<channel>.*)")
+    channels['rower'] = power_columns[1]
+    channels.side = channels.side.where(
+        pd.notna, channels['rower'].replace(rower_sides)
+    ).fillna("").replace({
+        "P ": "Port", "S ": "Stbd"
+    })
+    channels['channel'] = channels['channel'].replace(
+        rename_scull_cols
+    )
+    return pd.MultiIndex.from_frame(
+        channels[['channel', 'rower', 'side']].fillna("")
+    )
 
 
 def interp_series(s, x, **kwargs):
@@ -187,10 +217,10 @@ def interp_series(s, x, **kwargs):
 
 def norm_stroke_profile(stroke_profile, n_res):
     stroke = (
-        stroke_profile[('Normalized Time', 'Boat')].diff() < 0
+        stroke_profile[('Normalized Time', 'Boat', 'Boat')].diff() < 0
     ).cumsum()
     return stroke_profile.set_index(
-        ('Normalized Time', 'Boat')
+        ('Normalized Time', 'Boat', 'Boat')
     ).groupby(
         stroke.values
     ).apply(
@@ -229,19 +259,20 @@ def compare_piece_telemetry(telemetry_data, piece_data, gps_data, landmark_dista
             gps_adjusted_distance,
             left=np.nan, right=np.nan
         )
+
         power_distance = power.copy()  # .rename(columns={"Time": "Distance"})
         power_distance['Distance'] = power_adjusted_distance
 
         power_distance = power_distance[
             power_distance.Distance.notna()
         ].set_index("Distance")
-        power_distance.columns.names = 'Measurement', 'Position'
+        power_distance.columns.names = 'Measurement', 'Position', 'Side'
         telemetry_distance_data[piece] = power_distance
 
     compare_power = pd.concat(
         telemetry_distance_data,
         names=piece_data['Timestamp'].index.names
-    ).stack(1).reset_index()
+    ).stack([1, 2]).reset_index()
 
     return compare_power
 
@@ -266,10 +297,10 @@ def get_interval_averages(piece_timestamps, telemetry_data):
     piece_data = {}
     for k, data in avg_telem.items():
         piece_data[f"Average {k}"] = pd.concat(
-            data, names=['name', 'leg', 'position'])
+            data, names=['name', 'leg', 'position', 'side'])
     for k, data in interval_telem.items():
         piece_data[f"Interval {k}"] = pd.concat(
-            data, names=['name', 'leg', 'position'])
+            data, names=['name', 'leg', 'position', 'side'])
 
     return piece_data
 
