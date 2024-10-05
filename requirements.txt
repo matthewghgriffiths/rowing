@@ -1,9 +1,8 @@
 dm-haiku>=0.0.11
 fitparse>=1.2.0
-garminconnect>=0.1.45
 kaleido>=0.2.1
-jax>=0.4.21
-jaxlib>=0.4.21
+jax>=0.4.30
+jaxlib>=0.4.30
 gpxpy>=1.5.0
 matplotlib>=3.7.1
 numpy>=1.25.0
@@ -14,6 +13,6 @@ pyarrow>=12.0.0
 pyqt5>=5.15.9
 requests>=2.31.0
 scipy>=1.11.4
-stravalib==1.6
+stravalib>=1.6
 streamlit>=1.32.2
 tqdm>=4.65.0

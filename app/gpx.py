@@ -9,7 +9,6 @@ import logging
 
 import time
 import urllib.parse
-import stravalib
 
 # import numpy as np
 import pandas as pd

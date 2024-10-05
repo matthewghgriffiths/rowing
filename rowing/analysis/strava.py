@@ -5,7 +5,6 @@ import time
 
 import pandas as pd
 
-import stravalib
 
 from rowing.app import inputs
 from rowing.analysis import files
@@ -13,6 +12,7 @@ from rowing.analysis import files
 
 @st.cache_resource
 def get_client(code):
+    import stravalib
     client = stravalib.client.Client()
     client.code = code
     return client
@@ -56,17 +56,21 @@ def connect_client():
 
         return client
     else:
-        client = stravalib.client.Client()
-        authorize_url = client.authorization_url(
-            client_id=st.secrets.strava['client_id'],
-            redirect_uri=inputs.get_url(),
-            scope=['read_all', 'profile:read_all', 'activity:read_all']
-        )
-        st.page_link(
-            authorize_url,
-            label='Authorise Strava Access',
-            icon=":material/link:"
-        )
+        try:
+            import stravalib
+            client = stravalib.client.Client()
+            authorize_url = client.authorization_url(
+                client_id=st.secrets.strava['client_id'],
+                redirect_uri=inputs.get_url(),
+                scope=['read_all', 'profile:read_all', 'activity:read_all']
+            )
+            st.page_link(
+                authorize_url,
+                label='Authorise Strava Access',
+                icon=":material/link:"
+            )
+        except ImportError:
+            st.write("stravalib not installed yet")
 
 
 @st.cache_data
