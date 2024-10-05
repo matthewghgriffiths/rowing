@@ -34,8 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def main(params=None):
-
-    state.update(params or {})
+    st.session_state.update(params or {})
 
     st.title("PGMTs")
     st.write(
@@ -58,7 +57,6 @@ def main(params=None):
         competition = select.select_competition()
         competition_id = competition.competition_id
         competition_type = competition.WBTCompetitionType
-        state.set("CompetitionId", competition_id)
         st.write(
             f"loading Results for {competition.competition}, type: {competition_type}"
         )

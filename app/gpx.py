@@ -7,6 +7,10 @@ import sys
 
 import logging
 
+import time
+import urllib.parse
+import stravalib
+
 # import numpy as np
 import pandas as pd
 
@@ -15,7 +19,8 @@ import pandas as pd
 
 try:
     from rowing import utils
-    from rowing.analysis import geodesy, splits, app
+    from rowing.app import inputs
+    from rowing.analysis import geodesy, splits, app, garmin, strava
 except ImportError:
     DIRPATH = Path(__file__).resolve().parent
     LIBPATH = str(DIRPATH.parent)
@@ -24,7 +29,8 @@ except ImportError:
         sys.path.append(LIBPATH)
 
     from rowing import utils
-    from rowing.analysis import geodesy, splits, app
+    from rowing.app import inputs
+    from rowing.analysis import geodesy, splits, app, garmin, strava
 
 
 logger = logging.getLogger(__name__)
@@ -34,10 +40,9 @@ def main(state=None):
     state = state or {}
     data = state.pop("gpx_data", {})
     st.session_state.update(state)
-    state = st.session_state or state
 
     st.set_page_config(
-        page_title="Rowing GPX",
+        page_title="Rowing GPS Analysis",
         layout='wide',
         initial_sidebar_state='collapsed'
     )
@@ -49,17 +54,101 @@ def main(state=None):
             st.session_state.clear()
             st.cache_resource.clear()
 
-    uploaded_files = st.file_uploader(
-        "Upload GPX files",
-        accept_multiple_files=True,
-        type=['gpx'],
-    )
+    with st.expander("Load Data", expanded=True):
+        if 'code' in st.query_params or 'strava' in st.query_params:
+            strava_tab, gpx_tab = st.tabs([
+                "Strava",
+                "Upload GPX",
+            ])
+        else:
+            gpx_tab, strava_tab = st.tabs([
+                "Upload GPX",
+                "Strava",
+            ])
 
-    gpx_data, errors = utils.map_concurrent(
-        app.parse_gpx,
-        {file.name.rsplit(".", 1)[0]: file for file in uploaded_files},
-        singleton=True,
-    )
+    with gpx_tab:
+        uploaded_files = st.file_uploader(
+            "Upload GPX files",
+            accept_multiple_files=True,
+            type=['gpx'],
+        )
+
+        gpx_data, errors = utils.map_concurrent(
+            app.parse_gpx,
+            {file.name.rsplit(".", 1)[0]: file for file in uploaded_files},
+            singleton=True,
+        )
+
+    with strava_tab:
+        client = strava.connect_client()
+        if client is not None:
+            athlete = client.get_athlete()
+
+            cols = st.columns(3)
+            with cols[0]:
+                limit = st.number_input(
+                    "How many activities to load, "
+                    "set to 0 if selecting date range",
+                    value=1,
+                    min_value=0,
+                    step=1
+                )
+            with cols[1]:
+                date1 = st.date_input(
+                    "Select Date",
+                    value=pd.Timestamp.today() + pd.Timedelta("1d"),
+                    format='YYYY-MM-DD'
+                )
+            with cols[2]:
+                date2 = st.date_input(
+                    "Range",
+                    value=pd.Timestamp.today() - pd.Timedelta("7d"),
+                    format='YYYY-MM-DD'
+                )
+
+            if limit:
+                start = end = None
+            else:
+                start, end = sorted(pd.to_datetime(
+                    [date1, date2]).to_pydatetime())
+                limit = None
+
+            activities = strava.get_activities(client.code, end, start, limit)
+            activities['athlete'] = f"{athlete.firstname} {athlete.lastname}"
+            activities['activity'] = activities['athlete'].str.cat(
+                activities[['name', 'start_date_local']].astype(str),
+                sep=' '
+            )
+
+            columns_order = [
+                'activity',
+                'sport_type',
+                'start_date_local',
+                'distance',
+                'elapsed_time',
+                'type',
+                'description',
+                'name',
+                'average_cadence',
+                'average_heartrate',
+                'average_speed',
+            ]
+            # columns_order = columns_order + list(
+            #     activities.columns.difference(col_order))
+
+            sel_activities = inputs.filter_dataframe(
+                activities,
+                select_all=False,
+                column_order=columns_order
+            )
+            strava_data = {
+                activity.activity: strava.load_strava_activity(
+                    client.code, activity.id
+                )
+                for _, activity in sel_activities.iterrows()
+            }
+            gpx_data.update(strava_data)
+
     gpx_data.update(data)
 
     with st.expander("Landmarks"):
@@ -198,9 +287,10 @@ def main(state=None):
         xldata = io.BytesIO()
         with pd.ExcelWriter(xldata) as xlf:
             for name, crossings in crossing_times.items():
+                n = name.replace(":", '')
                 crossings = crossings.rename("time").dt.tz_localize(None)
                 crossings.to_frame().to_excel(
-                    xlf, sheet_name=f"{name}-crossings"
+                    xlf, sheet_name=f"{n}-crossings"
                 )
 
             for name, timings in location_timings.items():
@@ -214,14 +304,14 @@ def main(state=None):
                     utils.format_timedelta, hours=True
                 ).replace("00:00:00.00", "").T
                 upload_timings.to_excel(
-                    xlf, f"{name}-timings"
+                    xlf, f"{n}-timings"
                 )
 
             for name, times in best_times.items():
                 times.map(
                     utils.format_timedelta, hours=True
                 ).replace("00:00:00.00", "").to_excel(
-                    xlf, f"{name}-fastest"
+                    xlf, f"{n}-fastest"
                 )
 
         xldata.seek(0)

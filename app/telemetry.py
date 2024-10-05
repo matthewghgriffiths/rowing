@@ -46,7 +46,6 @@ def main(state=None):
     state = state or {}
     telemetry_data = state.pop("telemetry_data", {})
     st.session_state.update(state)
-    state = st.session_state or state
 
     logger.info("telemetry")
     st.set_page_config(
@@ -362,7 +361,6 @@ def main(state=None):
     with st.expander("Plot Stroke Profiles", True):
         if st.toggle(
             'Make profile plots',
-            value=state.get('Make profile plots'),
             key='Make profile plots'
         ) and piece_information:
             tabs = st.tabs(

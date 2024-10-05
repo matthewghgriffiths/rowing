@@ -29,7 +29,7 @@ st.set_page_config(
 
 
 def main(params=None):
-    state.update(params or {})
+    st.session_state.update(params or {})
 
     st.title("World Rowing livetracker")
 
@@ -65,8 +65,6 @@ def main(params=None):
                 step=1
             )
             threads = int(threads)
-            state.set("threads", threads)
-
             inputs.clear_cache()
 
     # st.subheader("Select livetracker data")
@@ -102,11 +100,11 @@ def main(params=None):
     ).reset_index(drop=True)
 
     if races.empty:
-        if state.get("expander.filter_races", False):
+        if st.session_state.get("expander.filter_races", False):
             st.caption("select races to load")
             st.stop()
 
-        state.set("expander.filter_races", True)
+        st.session_state["expander.filter_races"] = True
         state.update_query_params()
         st.rerun()
         raise st.runtime.scriptrunner.StopException()

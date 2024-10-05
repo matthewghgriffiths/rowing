@@ -58,7 +58,7 @@ _ACTIVITY_TYPES = {
 class GarminClient(utils.CachedClient):
     def __init__(
             self, username=None, password=None,
-            local_cache=None, path="ludum_data", map_kws=None,
+            local_cache=None, path="garmin_data", map_kws=None,
     ):
         self.client = None
         super().__init__(
@@ -116,6 +116,8 @@ class GarminClient(utils.CachedClient):
             singleton=True,
             reload=reload
         )
+        print(activities)
+
         errors and logger.warning("get_activities had errors %s", errors)
         activities = pd.concat(
             map(pd.json_normalize, activities.values()), ignore_index=True)

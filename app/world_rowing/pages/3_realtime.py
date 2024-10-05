@@ -36,7 +36,7 @@ st.set_page_config(
 
 
 def main(params=None):
-    state.update(params or {})
+    st.session_state.update(params or {})
     st.title("World Rowing Realtime Livetracker")
     st.write(
         """
@@ -49,15 +49,14 @@ def main(params=None):
 
     with st.sidebar:
         with st.expander("Settings"):
-            realtime_sleep = st.number_input(
-                "poll", 0., 10., state.get("poll", 3.), step=0.5
-            )
+            realtime_sleep = st.number_input("poll", 0., 10., 3., step=0.5)
             replay = st.checkbox(
-                "replay race data", state.get("replay", False))
-            replay_step = st.number_input(
-                "replay step", 1, 100, state.get("replay_step", 10))
-            replay_start = st.number_input(
-                "replay step", 0, 1000, state.get("replay_start", 0))
+                "replay race data",
+                st.session_state.get("replay_race", False),
+                key='replay_race'
+            )
+            replay_step = st.number_input("replay step", 1, 100, 10)
+            replay_start = st.number_input("replay step", 0, 1000, 0)
 
             fig_params = plots.select_figure_params()
             clear = st.button("clear cache")

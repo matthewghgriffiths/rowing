@@ -95,7 +95,9 @@ def test_livetracker(params):
 
 
 @pytest.mark.parametrize(
-    "params", [{'replay': 50, 'replay_step': 50, }, ]
+    "params", [
+        {'replay': 50, 'replay_step': 50, "replay_race": False},
+    ]
 )
 def test_realtime(params):
     run_streamlit(app_realtime.main, params)

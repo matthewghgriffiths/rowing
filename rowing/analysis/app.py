@@ -115,6 +115,14 @@ def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
 
 
+@st.cache_resource
+def garmin_client(username, password):
+    from rowing.analysis import garmin
+    return garmin.GarminClient(
+        username=username, password=password
+    )
+
+
 def download_csv(
     file_name, df, label=":inbox_tray: Download data as csv", csv_kws=None, **kwargs
 ):
@@ -817,6 +825,8 @@ def plot_pace_boat(piece_data, landmark_distances, gps_data, height=600, input_c
             landmark_distances
         )
 
+    print(piece_gps_data)
+
     piece_compare_gps = pd.concat({
         piece: sel_data.set_index(
             "Distance Travelled"
@@ -1080,13 +1090,12 @@ def setup_plots(piece_rowers, state, default_height=600, key='', toggle=True, nv
         if toggle:
             all_plots = st.toggle(
                 'Make all plots',
-                value=state.get('Make all plots'),
                 key=key + 'Make all plots')
         elif nview:
             all_plots = st.number_input(
                 "Number of panels",
                 min_value=0,
-                value=st.session_state.get(key + 'nview', 0),
+                value=0,
                 step=1,
                 key=key + 'nview'
             )

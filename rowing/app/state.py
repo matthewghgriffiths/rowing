@@ -38,7 +38,7 @@ def as_json(val):
 
 
 STATE = {
-    k: v[0]
+    k: v[0] if isinstance(v, list) else v
     for k, v in st.query_params.items()
 }
 

@@ -65,7 +65,7 @@ def get_race_intermediates(race_id):
     return api.get_race_intermediates(race_id)
 
 
-@st.cache_data(persist=True)
+@st.cache_data  # (persist=True)
 def get_boat_classes():
     return api.get_boat_classes()
 
@@ -216,13 +216,8 @@ def select_competition(current=True, start_date=None, end_date=None, fisa=False)
             competition[fields.competition_StartDate]) < datetime.datetime.now()
     else:
         today = datetime.date.today()
-        start_date = pd.to_datetime(
-            start_date or state.get("competition.start_date", today),
-            errors='coerce')
-        end_date = pd.to_datetime(
-            end_date or state.get("competition.end_date"),
-            errors='coerce'
-        )
+        start_date = pd.to_datetime(start_date or today, errors='coerce')
+        end_date = pd.to_datetime(end_date, errors='coerce')
         start_date = today if pd.isna(start_date) else start_date
         end_date = (
             today - datetime.timedelta(days=365*2) if pd.isna(end_date) else end_date)
@@ -233,8 +228,6 @@ def select_competition(current=True, start_date=None, end_date=None, fisa=False)
         if len(date_input) == 2:
             end_date = date_input[0].isoformat()
             start_date = date_input[1].isoformat()
-            state.set("competition.end_date", end_date)
-            state.set("competition.start_date", start_date)
 
         competitions = get_competitions(
             year=False,
@@ -421,6 +414,7 @@ def select_live_race(replay=False, **kwargs):
         if races.empty:
             wait_for_next_race(n=5)
             st.stop()
+            raise st.runtime.scriptrunner.StopException
 
         race = inputs.select_dataframe(races, fields.Race)
 

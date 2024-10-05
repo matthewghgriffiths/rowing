@@ -20,6 +20,21 @@ from . import state
 logger = logging.getLogger(__name__)
 
 
+def get_url():
+    import urllib.parse
+    try:
+        sess_mgr = st.runtime.get_instance()._session_mgr
+        sessions = sess_mgr.list_active_sessions()
+        req = sessions[0].client.request
+
+        joinme = (req.protocol, req.host, "", "", "", "")
+        my_url = urllib.parse.urlunparse(joinme)
+    except RuntimeError:
+        my_url = 'localhost'
+
+    return my_url
+
+
 def clear_cache():
     clear = st.button("clear cache")
     if clear:
@@ -32,7 +47,7 @@ def modal_button(label1, label2, key=None, mode=False):
 
     logger.debug("modal_button: %s mode=%s", key, mode)
 
-    mode = state.get(key, mode)
+    mode = st.session_state.get(key, mode)
     container = st.empty()
     if mode:
         key1 = ".".join([key, label1])
@@ -42,7 +57,6 @@ def modal_button(label1, label2, key=None, mode=False):
         key2 = ".".join([key, label2])
         rerun = mode = container.button(label2, key=key2)
 
-    state.set(key, mode)
     st.session_state[key] = mode
     if rerun:
         state.update_query_params()
@@ -54,6 +68,7 @@ def modal_button(label1, label2, key=None, mode=False):
 def filter_dataframe(
         df: pd.DataFrame, options=None, default=None, key=None, categories=(), filters=True,
         select=True, select_col='select', select_all=True, select_first=False,
+        column_order=None,  column_config=None, num_rows='fixed', use_container_width=False,
         **kwargs
 ) -> pd.DataFrame:
     """
@@ -96,9 +111,7 @@ def filter_dataframe(
                 logger.debug("filter_dataframe: %s: datetime", col_key)
                 user_date_input = right.date_input(
                     f"Values for {column}",
-                    value=state.get(
-                        col_key, (df[column].min(), df[column].max())
-                    ),
+                    value=(df[column].min(), df[column].max()),
                     key=f"{key}.{column}",
                 )
                 if len(user_date_input) == 2:
@@ -109,9 +122,7 @@ def filter_dataframe(
             elif categorical:
                 logger.debug("filter_dataframe: %s: categorical", col_key)
                 options = df[column].unique()
-                default = set(options).intersection(
-                    state.get(col_key, kwargs.get(column, []))
-                )
+                default = set(options).intersection(kwargs.get(column, []))
                 logger.debug(
                     "filter_dataframe: %s: options=%r default=%s",
                     col_key, default, options
@@ -132,7 +143,7 @@ def filter_dataframe(
                     f"Values for {column}",
                     min_value=_min,
                     max_value=_max,
-                    value=state.get(col_key, (_min, _max)),
+                    value=(_min, _max),
                     step=step,
                     key=f"{key}.{column}"
                 )
@@ -141,7 +152,6 @@ def filter_dataframe(
                 logger.debug("filter_dataframe: %s: text", col_key)
                 user_text_input = right.text_input(
                     f"Substring or regex in {column}",
-                    value=state.get(col_key, ""),
                     key=col_key,
                 )
                 if user_text_input:
@@ -155,7 +165,11 @@ def filter_dataframe(
             df[select_col] = np.r_[True, df[select_col].iloc[1:]]
 
         sel_df = st.data_editor(
-            df[[select_col] + list(column_options)].set_index(select_col)
+            df[[select_col] + list(column_options)].set_index(select_col),
+            column_order=column_order,
+            column_config=column_config,
+            num_rows=num_rows,
+            use_container_width=use_container_width,
         )
         sel_index = df.index[sel_df.index.values]
         df = df.loc[sel_index]
