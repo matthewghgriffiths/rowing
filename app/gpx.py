@@ -19,7 +19,7 @@ import pandas as pd
 try:
     from rowing import utils
     from rowing.app import inputs
-    from rowing.analysis import geodesy, splits, app, garmin, strava
+    from rowing.analysis import app, strava
 except ImportError:
     DIRPATH = Path(__file__).resolve().parent
     LIBPATH = str(DIRPATH.parent)
@@ -29,7 +29,7 @@ except ImportError:
 
     from rowing import utils
     from rowing.app import inputs
-    from rowing.analysis import geodesy, splits, app, garmin, strava
+    from rowing.analysis import app, strava
 
 
 logger = logging.getLogger(__name__)
