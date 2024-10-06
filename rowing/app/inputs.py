@@ -171,8 +171,11 @@ def filter_dataframe(
             num_rows=num_rows,
             use_container_width=use_container_width,
         )
+        df = df.copy()
         sel_index = df.index[sel_df.index.values]
-        df = df.loc[sel_index]
+        sel_df.index = df.index
+        df = df.loc[sel_index].copy()
+        df[list(column_options)] = sel_df.loc[sel_index, list(column_options)]
 
     return df
 

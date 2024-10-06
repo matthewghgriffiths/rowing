@@ -825,8 +825,6 @@ def plot_pace_boat(piece_data, landmark_distances, gps_data, height=600, input_c
             landmark_distances
         )
 
-    print(piece_gps_data)
-
     piece_compare_gps = pd.concat({
         piece: sel_data.set_index(
             "Distance Travelled"
