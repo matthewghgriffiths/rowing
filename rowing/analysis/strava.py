@@ -1,13 +1,21 @@
 
 import streamlit as st
-
+import os
+from pathlib import Path
+import base64
 import time
 
 import pandas as pd
 
-
 from rowing.app import inputs
 from rowing.analysis import files
+
+
+_file_path = Path(os.path.abspath(__file__))
+_module_path = _file_path.parent
+_DATA_PATH = _module_path.parent.parent / 'data'
+
+_STRAVA_SVG = _DATA_PATH / "btn_strava_connectwith_orange.svg"
 
 
 @st.cache_resource
@@ -16,6 +24,20 @@ def get_client(code):
     client = stravalib.client.Client()
     client.code = code
     return client
+
+
+def _strave_base64_logo(svg_path=_STRAVA_SVG):
+    with open(svg_path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
+_URL_SVG_HTML = """<a target="_self" href="{}">
+<img src="data:image/svg+xml;base64,{}" height="48px">
+</a>"""
+
+
+def _strava_html_logo(url, svg_path=_STRAVA_SVG):
+    return _URL_SVG_HTML.format(url, _strave_base64_logo(svg_path))
 
 
 def connect_client():
@@ -64,10 +86,9 @@ def connect_client():
                 redirect_uri=inputs.get_url(),
                 scope=['read_all', 'profile:read_all', 'activity:read_all']
             )
-            st.page_link(
-                authorize_url,
-                label='Authorise Strava Access',
-                icon=":material/link:"
+            st.markdown(
+                _strava_html_logo(authorize_url),
+                unsafe_allow_html=True,
             )
         except ImportError:
             st.write("stravalib not installed yet")

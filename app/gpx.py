@@ -45,9 +45,7 @@ def main(state=None):
         layout='wide',
         initial_sidebar_state='collapsed'
     )
-    """
-    # GPX data processing
-    """
+    st.title("Rowing GPS Analysis")
     with st.sidebar:
         if st.button("Reset State"):
             st.session_state.clear()
@@ -56,14 +54,14 @@ def main(state=None):
     with st.expander("Load Data", expanded=True):
         if 'code' in st.query_params or 'strava' in st.query_params:
             strava_tab, gpx_tab = st.tabs([
-                "Strava",
+                "Load Strava Activities",
                 "Upload GPX",
             ])
         else:
-            gpx_tab, strava_tab = st.tabs([
+            gpx_tab, = st.tabs([
                 "Upload GPX",
-                "Strava",
             ])
+            strava_tab = gpx_tab
 
     with gpx_tab:
         uploaded_files = st.file_uploader(
@@ -71,7 +69,6 @@ def main(state=None):
             accept_multiple_files=True,
             type=['gpx'],
         )
-
         gpx_data, errors = utils.map_concurrent(
             app.parse_gpx,
             {file.name.rsplit(".", 1)[0]: file for file in uploaded_files},
