@@ -70,6 +70,7 @@ def make_gpx_track(data):
 def process_latlontime(positions):
     first = positions.index[0]
     last = positions.index[-1]
+    positions.time = positions.time.dt.tz_convert(None)
     positions['timeElapsed'] = positions.time - positions.time[first]
     positions['distanceDelta'] = geodesy.haversine_km(
         positions, positions.shift(-1))

@@ -167,7 +167,7 @@ def main(state=None):
 
     logger.info("Show map")
     with st.expander("Show map"):
-        fig = app.draw_gps_data(gps_data, locations)
+        app.draw_gps_data(gps_data, locations)
 
     logger.info("Show heat map")
     with st.expander("Show heat map"):

@@ -125,7 +125,7 @@ def load_activity(client, activity_id):
     activity_data['longitude'] = activity_data.latlng.str[1]
     activity_data[
         'time'
-    ] = pd.to_timedelta(activity_data.time, unit='s') + activity.start_date
+    ] = pd.to_timedelta(activity_data.time, unit='s') + pd.Timestamp(activity.start_date)
     return files.process_latlontime(activity_data).drop(
         columns=['latlng']
     )

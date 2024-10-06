@@ -351,7 +351,6 @@ def align_pieces(piece_data, start_landmark, finish_landmark, gps_data, resoluti
     return piece_compare_gps
 
 
-@st.fragment
 def set_landmarks(gps_data=None, landmarks=None, title=True):
     tab0, tab1, tab2 = st.tabs([
         "From Pieces",
