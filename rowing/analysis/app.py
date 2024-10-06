@@ -351,6 +351,7 @@ def align_pieces(piece_data, start_landmark, finish_landmark, gps_data, resoluti
     return piece_compare_gps
 
 
+@st.fragment
 def set_landmarks(gps_data=None, landmarks=None, title=True):
     tab0, tab1, tab2 = st.tabs([
         "From Pieces",
@@ -617,6 +618,7 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
     return set_landmarks
 
 
+@st.fragment
 def draw_gps_data(gps_data, locations, index=None):
     fig = make_gps_figure(gps_data, locations, index)
     st.plotly_chart(fig, use_container_width=True)

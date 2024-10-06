@@ -129,7 +129,13 @@ def main(params=None):
     if live_data.empty:
         return state.get_state()
 
-    with filter_live:
+    return show_livetracker(live_data, fig_params, filter_live)
+
+
+@st.fragment
+def show_livetracker(live_data, fig_params, filter_container=None):
+    filter_container = filter_container or st.container
+    with filter_container:
         live_data = select.filter_livetracker(live_data)
 
     if live_data.empty:
@@ -155,7 +161,6 @@ def main(params=None):
         st.plotly_chart(fig, use_container_width=True)
 
     state.reset_button()
-    state.update_query_params()
     return state.get_state()
 
 

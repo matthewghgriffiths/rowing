@@ -90,6 +90,8 @@ def connect_client():
                 _strava_html_logo(authorize_url),
                 unsafe_allow_html=True,
             )
+        except AttributeError:
+            st.write("strava secrets not set yet")
         except ImportError:
             st.write("stravalib not installed yet")
 

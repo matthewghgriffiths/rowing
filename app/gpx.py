@@ -19,7 +19,7 @@ import pandas as pd
 try:
     from rowing import utils
     from rowing.app import inputs
-    from rowing.analysis import app, strava
+    from rowing.analysis import app, strava, files
 except ImportError:
     DIRPATH = Path(__file__).resolve().parent
     LIBPATH = str(DIRPATH.parent)
@@ -29,7 +29,7 @@ except ImportError:
 
     from rowing import utils
     from rowing.app import inputs
-    from rowing.analysis import app, strava
+    from rowing.analysis import app, strava, files
 
 
 logger = logging.getLogger(__name__)
@@ -144,9 +144,25 @@ def main(state=None):
                 for _, activity in sel_activities.iterrows()
             }
             gpx_data.update(strava_data)
+            if st.toggle("Download gpx data"):
+                for activity, activity_data in strava_data.items():
+                    st.download_button(
+                        f":inbox_tray: Download: {activity}.gpx",
+                        io.BytesIO(
+                            files.make_gpx_track(
+                                activity_data).to_xml().encode()
+                        ),
+                        # type='primary',
+                        file_name=f"{activity}.gpx",
+                    )
 
     gpx_data.update(data)
 
+    return analyse_gps_data(gpx_data)
+
+
+@st.fragment
+def analyse_gps_data(gpx_data):
     with st.expander("Landmarks"):
         set_landmarks = app.set_landmarks(gps_data=gpx_data)
         locations = set_landmarks.set_index(["location", "landmark"])

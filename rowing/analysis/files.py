@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 import logging
 
+from altair import Longitude
 import gpxpy
 import fitparse
 import pandas as pd
@@ -41,6 +42,29 @@ def parse_gpx_data(gpx_data):
             ])
 
     return process_latlontime(positions)
+
+
+def make_gpx_track(data):
+    gpx = gpxpy.gpx.GPX()
+
+    # Create first track in our GPX:
+    gpx_track = gpxpy.gpx.GPXTrack()
+    gpx.tracks.append(gpx_track)
+
+    # Create first segment in our GPX track:
+    gpx_segment = gpxpy.gpx.GPXTrackSegment()
+    gpx_track.segments.append(gpx_segment)
+
+    for _, point in data.iterrows():
+        gpx_segment.points.append(
+            gpxpy.gpx.GPXTrackPoint(
+                latitude=point.latitude,
+                longitude=point.longitude,
+                time=point.time
+            )
+        )
+
+    return gpx
 
 
 def process_latlontime(positions):
