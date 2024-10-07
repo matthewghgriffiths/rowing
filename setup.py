@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='rowing',
-    version='0.3.1',
+    version='0.4.0',
     description='Library for loading and presenting data from the worldrowing.com'
     ' and analysing rowing data',
     author='Matthew Griffiths',
@@ -15,11 +15,7 @@ setup(
     url='https://github.com/matthewghgriffiths/rowing',
     packages=['rowing'],
     entry_points={
-        'console_scripts': [
-            'worldrowing = rowing.worldrowing.app:main [WORLDROWING]',
-            'garmin = rowing.analysis.garmin:main [GARMIN]',
-            'gpx = rowing.analysis.files:main [GPX]',
-        ]
+        'console_scripts': []
     },
     license='MIT',
     long_description=long_description,
@@ -31,19 +27,7 @@ setup(
         'matplotlib==3.7.1',
         'tqdm==4.65.0',
     ],
-    extras_require={
-        'WORLDROWING': ['streamlit==1.29.0', 'plotly==5.14.1'],
-        # Requests is not required if using pyodide
-        'REQ': ['requests==2.31.0'],
-        'GARMIN': [
-            'garminconnect==0.1.45',
-            'fitparse==1.2.0',
-            "openpyxl==3.1.0",
-            "pyarrow==12.0.0"
-        ],
-        "GPX": ['gpxpy==1.5.0', 'fitparse==1.2.0'],
-    },
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     package_data={
         'rowing': [
             'data/iso_country.json',

@@ -19,7 +19,7 @@ import pandas as pd
 try:
     from rowing import utils
     from rowing.app import inputs
-    from rowing.analysis import app, strava, files
+    from rowing.analysis import app, strava, garmin_app, files
 except ImportError:
     DIRPATH = Path(__file__).resolve().parent
     LIBPATH = str(DIRPATH.parent)
@@ -29,7 +29,7 @@ except ImportError:
 
     from rowing import utils
     from rowing.app import inputs
-    from rowing.analysis import app, strava, files
+    from rowing.analysis import app, strava, garmin_app, files
 
 
 logger = logging.getLogger(__name__)
@@ -53,13 +53,15 @@ def main(state=None):
 
     with st.expander("Load Data", expanded=True):
         if 'code' in st.query_params or 'strava' in st.query_params:
-            strava_tab, gpx_tab = st.tabs([
+            strava_tab, gpx_tab, garmin_tab = st.tabs([
                 "Load Strava Activities",
                 "Upload GPX",
+                "Connect Garmin",
             ])
         else:
-            gpx_tab, = st.tabs([
+            gpx_tab, garmin_tab, = st.tabs([
                 "Upload GPX",
+                "Connect Garmin",
             ])
             strava_tab = gpx_tab
 
@@ -74,6 +76,11 @@ def main(state=None):
             {file.name.rsplit(".", 1)[0]: file for file in uploaded_files},
             singleton=True,
         )
+
+    with garmin_tab:
+        cols = st.columns(3)
+        garmin_client = garmin_app.login(*cols)
+        print(garmin_client)
 
     with strava_tab:
         client = strava.connect_client()
