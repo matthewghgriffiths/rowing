@@ -852,7 +852,7 @@ def get_race_intermediates(race_id, race_distance='d2000m'):
 
     full_intermediates = pd.concat([intermediates.droplevel(1), results])
     full_intermediates['Distance'] = full_intermediates['distance'].str.extract(
-        "(\d+)")[0].astype(int)
+        r"(\d+)")[0].astype(int)
 
     full_inters = full_intermediates.groupby(
         ['Distance', 'Country']
