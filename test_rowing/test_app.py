@@ -20,7 +20,7 @@ app_livetracker = importlib.import_module(
     "app.world_rowing.pages.2_livetracker", "..")
 app_realtime = importlib.import_module(
     "app.world_rowing.pages.3_realtime", "..")
-app_gpx = importlib.import_module("app.gpx", "..")
+app_gpx = importlib.import_module("gps", "..")
 app_telemetry = importlib.import_module("app.telemetry", "..")
 
 TIMEOUT = 120

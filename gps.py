@@ -17,20 +17,24 @@ import pandas as pd
 # import plotly.graph_objects as go
 # import plotly.express as px
 
-try:
-    from rowing import utils
-    from rowing.app import inputs
-    from rowing.analysis import app, strava, garmin_app as garmin, splits
-except ImportError:
-    DIRPATH = Path(__file__).resolve().parent
-    LIBPATH = str(DIRPATH.parent)
-    realpaths = [os.path.realpath(p) for p in sys.path]
-    if LIBPATH not in realpaths:
-        sys.path.append(LIBPATH)
+from rowing import utils
+from rowing.app import inputs
+from rowing.analysis import app, strava, garmin_app as garmin, splits
 
-    from rowing import utils
-    from rowing.app import inputs
-    from rowing.analysis import app, strava, garmin_app as garmin, splits
+# try:
+#     from rowing import utils
+#     from rowing.app import inputs
+#     from rowing.analysis import app, strava, garmin_app as garmin, splits
+# except ImportError:
+#     DIRPATH = Path(__file__).resolve().parent
+#     LIBPATH = str(DIRPATH)
+#     realpaths = [os.path.realpath(p) for p in sys.path]
+#     if LIBPATH not in realpaths:
+#         sys.path.append(LIBPATH)
+
+#     from rowing import utils
+#     from rowing.app import inputs
+#     from rowing.analysis import app, strava, garmin_app as garmin, splits
 
 
 logger = logging.getLogger(__name__)
