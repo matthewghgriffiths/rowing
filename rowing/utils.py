@@ -48,7 +48,6 @@ def interpolate_timedelta(s, index, **kwargs):
 
 
 def interpolate_series(s, index, **kwargs):
-
     if isinstance(index, pd.Series):
         x = index.values
         index0 = index.index
@@ -72,12 +71,19 @@ def interpolate_series(s, index, **kwargs):
             si = interpolate_datetime(s, index, **kwargs)
         elif pd.api.types.is_timedelta64_dtype(s):
             si = interpolate_timedelta(s, index, **kwargs)
+        elif pd.api.types.is_object_dtype(s):
+            i = np.clip(s.index.get_indexer_for(index), 0, s.index.size-1)
+            si = pd.Series(s[i].values, index, **kwargs)
         else:
             si = pd.Series(np.interp(x, s.index, s, **kwargs))
 
     si.index = index0
     si.index.name = si.index.name or s.index.name
     return si
+
+
+def safe_name(name):
+    return name.replace(":", "")
 
 
 @lru_cache

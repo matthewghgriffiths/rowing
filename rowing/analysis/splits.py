@@ -420,7 +420,7 @@ def get_piece_times(crossing_times, start_landmark, finish_landmark):
 
 def get_interval_averages(X, time, timestamps):
     time_intervals = pd.IntervalIndex.from_breaks(timestamps)
-    group_intervals = pd.cut(time, time_intervals).replace(
+    group_intervals = pd.cut(time, time_intervals).cat.rename_categories(
         dict(zip(time_intervals, timestamps.index[1:]))
     )
     t = (time - time.min()).dt.total_seconds()
@@ -428,13 +428,43 @@ def get_interval_averages(X, time, timestamps):
     dt = t.diff().values[:, None] * X.notna()
     Xdt = X * dt
 
-    intervalT = dt.groupby(group_intervals).sum()
-    intervalX = Xdt.groupby(group_intervals).sum() / intervalT
-    avgX = (intervalX * intervalT).cumsum() / intervalT.cumsum()
+    intervalT = dt.groupby(group_intervals, observed=False).sum()
+    interval1T = 1 / intervalT
+    intervalX = Xdt.groupby(group_intervals, observed=False).sum() * interval1T
+    interval1Tc = 1 / intervalT.apply(np.cumsum)
+    avgX = (intervalX * intervalT).apply(np.cumsum) * interval1Tc
+
     return (
         avgX.dropna(axis=0, how="all").dropna(axis=1),
         intervalX.dropna(axis=0, how="all").dropna(axis=1),
     )
+
+
+def get_pieces_interval_averages(piece_timestamps, piece_data, time='Time'):
+
+    avg_telem, interval_telem = {}, {}
+    for piece, timestamps in piece_timestamps.iterrows():
+        _, name, leg = piece
+        data = piece_data[name].sort_values(time).dropna(subset=[time])
+        avgP, intervalP = get_interval_averages(
+            data.drop(columns=[time]),
+            data[time],
+            timestamps
+        )
+        for k in avgP.columns:
+            avg_telem.setdefault(k, {})[name, leg] = avgP[k].T
+        for k in intervalP.columns:
+            interval_telem.setdefault(k, {})[name, leg] = intervalP[k].T
+
+    interval_data = {}
+    for k, data in avg_telem.items():
+        interval_data[f"Average {k}"] = pd.concat(
+            data, names=['name', 'leg'], axis=1).T
+    for k, data in interval_telem.items():
+        interval_data[f"Interval {k}"] = pd.concat(
+            data, names=['name', 'leg'], axis=1).T
+
+    return interval_data
 
 
 def get_piece_gps_data(

@@ -189,7 +189,6 @@ def main(params=None):
         )
 
     state.reset_button()
-    state.update_query_params()
 
     return state.get_state()
 

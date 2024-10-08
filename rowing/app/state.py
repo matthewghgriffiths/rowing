@@ -50,22 +50,15 @@ clear = STATE.clear
 
 
 def set(key, val):
-    STATE[key] = val
-    update_query_params()
+    pass
 
 
 def update(*args, **kwargs):
-    STATE.update(*args, **kwargs)
-    update_query_params()
+    pass
 
 
 def update_query_params():
-    STATE.update(st.session_state)
-    items = ((k, as_json(v)) for k, v in STATE.items())
-    update_params = {
-        k: v for k, v in items if v is not None
-    }
-    st.query_params.update(**update_params)
+    pass
 
 
 def get_state():

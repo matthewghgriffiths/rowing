@@ -15,8 +15,6 @@ from pandas.api.types import (
 
 from ..world_rowing import fields, api
 
-from . import state
-
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +45,6 @@ def modal_button(label1, label2, key=None, mode=False):
 
     logger.debug("modal_button: %s mode=%s", key, mode)
 
-    mode = st.session_state.get(key, mode)
     container = st.empty()
     if mode:
         key1 = ".".join([key, label1])
@@ -59,7 +56,6 @@ def modal_button(label1, label2, key=None, mode=False):
 
     st.session_state[key] = mode
     if rerun:
-        state.update_query_params()
         st.rerun()
 
     return mode
@@ -69,6 +65,7 @@ def filter_dataframe(
         df: pd.DataFrame, options=None, default=None, key=None, categories=(), filters=True,
         select=True, select_col='select', select_all=True, select_first=False,
         column_order=None,  column_config=None, num_rows='fixed', use_container_width=False,
+        disabled=False, modification_container=None,
         **kwargs
 ) -> pd.DataFrame:
     """
@@ -82,16 +79,24 @@ def filter_dataframe(
     """
     logger.debug("filter_dataframe: %s", key)
     model_key = f"{key}.modal"
-    modify = modal_button("Remove Filters", "Add filters",
-                          key=model_key, mode=filters)
+    modification_container = modification_container or st.container()
+    with modification_container:
+        modify = modal_button("Remove Filters", "Add filters",
+                              key=model_key, mode=filters)
 
     if not modify:
+        st.dataframe(
+            df,
+            column_order=column_order,
+            column_config=column_config,
+            use_container_width=use_container_width,
+        )
         return df
 
-    df = df.copy()
-    modification_container = st.container()
     with modification_container:
-        column_options = options or df.columns
+        df = df.copy()
+        column_options = options or column_order or df.columns
+
         to_filter_columns = st.multiselect(
             "Filter dataframe on",
             column_options,
@@ -170,6 +175,7 @@ def filter_dataframe(
             column_config=column_config,
             num_rows=num_rows,
             use_container_width=use_container_width,
+            disabled=disabled
         )
         df = df.copy()
         sel_index = df.index[sel_df.index.values]
