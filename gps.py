@@ -1,40 +1,18 @@
 
+import dis
 import streamlit as st
 import io
-from pathlib import Path
-import os
-import sys
 import warnings
 
 import logging
 
-import time
-import urllib.parse
-
 # import numpy as np
 import pandas as pd
 
-# import plotly.graph_objects as go
-# import plotly.express as px
-
+import plotly.express as px
+import plotly.graph_objects as go
 from rowing import utils
-from rowing.app import inputs
 from rowing.analysis import app, strava, garmin_app as garmin, splits
-
-# try:
-#     from rowing import utils
-#     from rowing.app import inputs
-#     from rowing.analysis import app, strava, garmin_app as garmin, splits
-# except ImportError:
-#     DIRPATH = Path(__file__).resolve().parent
-#     LIBPATH = str(DIRPATH)
-#     realpaths = [os.path.realpath(p) for p in sys.path]
-#     if LIBPATH not in realpaths:
-#         sys.path.append(LIBPATH)
-
-#     from rowing import utils
-#     from rowing.app import inputs
-#     from rowing.analysis import app, strava, garmin_app as garmin, splits
 
 
 logger = logging.getLogger(__name__)
@@ -185,7 +163,8 @@ def analyse_gps_data(gpx_data):
 
     if piece_information:
         with st.expander("Compare Piece Profile"):
-            plot_piece_profiles(piece_information, gpx_data, keep)
+            plot_piece_profiles(
+                piece_information, gpx_data, [app.PACE_TIME_COL] + keep)
 
     with st.expander("Landmark Timings"):
         timings_fragment(
@@ -194,12 +173,40 @@ def analyse_gps_data(gpx_data):
 
 @st.fragment
 def plot_piece_profiles(piece_information, gpx_data, keep=None):
-    if keep:
-        pace_tab, other_tab = st.tabs(['Pace Boat', 'Other'])
-    else:
-        pace_tab = st.container()
 
     piece_data = piece_information['piece_data']
+
+    piece_times = piece_data['Elapsed Time'].apply(
+        lambda x: (x + pd.Timestamp(0)).dt.time
+    )
+    use_pieces = piece_times.reset_index()
+    use_pieces = app.inputs.filter_dataframe(
+        use_pieces,
+        disabled=use_pieces.columns,
+        filters=True,
+        select_all=True,
+        column_config={
+            c: st.column_config.TimeColumn(format="m:ss")
+            for c in piece_times.columns
+        }
+    ).set_index(piece_times.index.names).index
+
+    landmark_distances = piece_data['Distance Travelled'].loc[
+        use_pieces
+    ].mean()[
+        piece_data['Total Distance'].columns]
+    pace_boat_time = piece_data[
+        'Elapsed Time'].loc[use_pieces].max(1).min()
+
+    aligned_data = app.align_pieces(
+        gpx_data, piece_data,
+        landmark_distances=landmark_distances,
+        pace_boat_time=pace_boat_time,
+        pieces=use_pieces
+    )
+    if aligned_data.empty:
+        return
+
     settings = st.popover("Figure settings")
     with settings:
         height = st.number_input(
@@ -207,19 +214,57 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
             100, None, 600, step=50,
             key="height piece profile",
         )
-    landmark_distances = piece_data['Distance Travelled'].mean()[
-        piece_data['Total Distance'].columns]
-    fig, time_behind = app.plot_pace_boat(
-        piece_data,
-        landmark_distances,
-        gpx_data,
-        input_container=settings,
-        name='name',
-    )
-    fig.update_yaxes(autorange="reversed")
-    fig.update_layout(height=height)
-    with pace_tab:
-        st.plotly_chart(fig, use_container_width=True)
+        keep = st.multiselect(
+            "Select data to plot",
+            options=aligned_data.columns,
+            default=aligned_data.columns.intersection(keep or [])
+        )
+
+    tabs = st.tabs(keep)
+    for tab, c in zip(tabs, keep):
+        plot_data = aligned_data[c].reset_index()
+        fig = px.line(
+            plot_data,
+            x='distance', y=c,
+            color='name',
+            line_dash='leg',
+        )
+        fig.update_layout(height=height)
+        with tab:
+            c2 = st.selectbox(
+                "Plot on right axis",
+                key=f"{c}_plotright",
+                index=None,
+                options=keep
+            )
+            if c2:
+                fig2 = px.line(
+                    aligned_data[c2].reset_index(),
+                    x='distance', y=c2,
+                    color='name',
+                    line_dash='leg',
+                )
+                fig2.update_traces(opacity=0.5)
+
+                for tr in fig2.data:
+                    tr.yaxis = 'y2'
+                    tr.showlegend = False
+                    fig.add_trace(tr)
+
+                fig.update_layout({
+                    "yaxis2": dict(
+                        title=dict(text=c2),
+                        side='right',
+                        tickmode="sync",
+                        overlaying="y",
+                        autoshift=True,
+                        automargin=True,
+                        # anchor='free',
+                    )
+                })
+
+            fig.update_layout(height=height)
+            st.plotly_chart(fig, use_container_width=True)
 
     # if keep:
 

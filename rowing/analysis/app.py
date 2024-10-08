@@ -12,7 +12,7 @@ import plotly.express as px
 
 from rowing.analysis import splits, files, geodesy, telemetry
 from rowing import utils
-from rowing.app import threads
+from rowing.app import threads, inputs
 
 
 logger = logging.getLogger(__name__)
@@ -324,7 +324,54 @@ def show_piece_data(piece_data):
             st.dataframe(data)
 
 
-def align_pieces(piece_data, start_landmark, finish_landmark, gps_data, resolution=0.005):
+PACE_DIST_COL = 'Distance ahead of Pace Boat (m)'
+PACE_TIME_COL = 'Time ahead of Pace Boat (s)'
+
+
+def align_pieces(gps_data, piece_data, landmark_distances=None, pace_boat_time=None, pieces=None):
+    pace_boat_time = pd.Timedelta(
+        pace_boat_time or piece_data['Elapsed Time'].iloc[:, -1].min(),
+    ).total_seconds()
+    if landmark_distances is None:
+        landmark_distances = piece_data['Distance Travelled'].mean()[
+            piece_data['Total Distance'].columns]
+
+    pace_boat_kms = landmark_distances.max() / pace_boat_time
+    pieces = piece_data['Total Distance'].index if pieces is None else pieces
+
+    aligned_data = {}
+    start_times = piece_data['Timestamp'].min(1)
+
+    for piece in pieces:
+        distances = piece_data['Total Distance'].loc[piece]
+        name = piece[1]
+        gps = gps_data[name]
+
+        gps_adj = gps.copy()
+        gps_adj['distance'] = np.interp(
+            gps_adj.distance,
+            distances,
+            landmark_distances,
+            left=np.nan, right=np.nan
+        )
+        gps_adj = gps_adj.dropna(
+            subset='distance')
+        gps_adj['timeElapsed'] = gps_adj['time'] - start_times.loc[piece]
+        gps_adj[PACE_DIST_COL] = 1000 * (
+            gps_adj.distance - gps_adj.timeElapsed.dt.total_seconds() * pace_boat_kms)
+        gps_adj[PACE_TIME_COL] = (
+            gps_adj.distance / pace_boat_kms - gps_adj.timeElapsed.dt.total_seconds())
+        aligned_data[piece] = gps_adj.set_index('distance')
+
+    if aligned_data:
+        return pd.concat(
+            aligned_data,
+            names=piece_data['Timestamp'].index.names
+        )
+    return pd.DataFrame([])
+
+
+def _align_pieces(piece_data, start_landmark, finish_landmark, gps_data, resolution=0.005):
     piece_distances = piece_data['Total Distance']
     piece_timestamps = piece_data['Timestamp']
     landmark_distances = piece_data['Distance Travelled'].mean()[
