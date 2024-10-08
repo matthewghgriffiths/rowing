@@ -105,7 +105,6 @@ def main(params=None):
             st.stop()
 
         st.session_state["expander.filter_races"] = True
-        state.update_query_params()
         st.rerun()
         raise st.runtime.scriptrunner.StopException()
 

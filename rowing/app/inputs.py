@@ -164,8 +164,10 @@ def filter_dataframe(
                         str).str.contains(user_text_input)]
 
     if select and not df.empty:
-        df[select_col] = st.checkbox(
-            "Select all", value=select_all, key=f"{key}.select_all")
+        with modification_container:
+            df[select_col] = st.checkbox(
+                "Select all", value=select_all, key=f"{key}.select_all")
+
         if select_first:
             df[select_col] = np.r_[True, df[select_col].iloc[1:]]
 

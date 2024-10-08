@@ -140,6 +140,8 @@ def load_activity(client, activity_id):
     }
     activity_data = pd.DataFrame({
         k: v[-1][1] for k, v in data.items()
+    }).rename(columns={
+        "heartrate": "heart_rate"
     })
     activity_data['latitude'] = activity_data.latlng.str[0]
     activity_data['longitude'] = activity_data.latlng.str[1]
@@ -157,6 +159,7 @@ def load_activity(client, activity_id):
 def strava_app():
     client = connect_client()
     if client is not None:
+
         athlete = client.get_athlete()
 
         name = f"{athlete.firstname} {athlete.lastname}"
@@ -185,6 +188,10 @@ def strava_app():
             )
 
         activities = get_strava_activities(client.code, date1, date2, limit)
+        if activities.empty:
+            return
+
+        st.divider()
         activities['athlete'] = name
         activities['activity'] = activities['athlete'].str.cat(
             activities[['name', 'start_date_local']].astype(str),
@@ -214,6 +221,7 @@ def strava_app():
         sel_activities = inputs.filter_dataframe(
             activities,
             select_all=False,
+            select_first=True,
             column_order=columns_order,
             column_config={
                 "elapsed_time": st.column_config.TimeColumn(
@@ -225,7 +233,9 @@ def strava_app():
                 "average_split": st.column_config.DatetimeColumn(
                     format='m:ss.S', disabled=True
                 ),
-            }
+            },
+            disabled=activities.columns.difference(['select', 'activity']),
+            modification_container=st.popover("Filter Activities"),
         )
         strava_data = {
             activity.activity: load_strava_activity(

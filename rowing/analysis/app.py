@@ -274,6 +274,9 @@ def select_pieces(all_crossing_times):
         landmarks = landmark_distance.index.get_level_values(
             "landmark").drop_duplicates()
 
+    if not len(landmark_dist):
+        return
+
     start, end = map(
         int, landmarks.get_indexer(
             [landmark_dist.idxmin(), landmark_dist.idxmax()]

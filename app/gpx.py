@@ -152,6 +152,7 @@ def analyse_gps_data(gpx_data):
 
         if piece_information is None:
             st.write("No valid pieces could be found")
+            keep = []
         else:
             options = []
             for d in gpx_data.values():
@@ -166,7 +167,6 @@ def analyse_gps_data(gpx_data):
                 "Select data to keep",
                 options=options,
                 default=options.intersection(default),
-                # default=
             )
             average_cols = ['time'] + keep
             piece_information['piece_data'].update(
@@ -179,74 +179,57 @@ def analyse_gps_data(gpx_data):
 
             app.show_piece_data(piece_information['piece_data'])
 
+    if piece_information:
+        with st.expander("Compare Piece Profile"):
+            plot_piece_profiles(piece_information, gpx_data, keep)
+
+    with st.expander("Landmark Timings"):
+        timings_fragment(
+            all_crossing_times, crossing_times, gpx_data, locations)
+
+
+@st.fragment
+def plot_piece_profiles(piece_information, gpx_data, keep=None):
+    if keep:
+        pace_tab, other_tab = st.tabs(['Pace Boat', 'Other'])
+    else:
+        pace_tab = st.container()
+
+    piece_data = piece_information['piece_data']
+    settings = st.popover("Figure settings")
+    with settings:
+        height = st.number_input(
+            "Set profile figure height",
+            100, None, 600, step=50,
+            key="height piece profile",
+        )
+    landmark_distances = piece_data['Distance Travelled'].mean()[
+        piece_data['Total Distance'].columns]
+    fig, time_behind = app.plot_pace_boat(
+        piece_data,
+        landmark_distances,
+        gpx_data,
+        input_container=settings,
+        name='name',
+    )
+    fig.update_yaxes(autorange="reversed")
+    fig.update_layout(height=height)
+    with pace_tab:
+        st.plotly_chart(fig, use_container_width=True)
+
+    # if keep:
+
+
+@st.fragment
+def timings_fragment(all_crossing_times, crossing_times, gpx_data, locations):
+
     with st.spinner("Processing split timings"):
         location_timings = app.get_location_timings(
             gpx_data, locations=locations)
 
-    with st.expander("Piece Timings"):
-        timings_fragment(all_crossing_times, crossing_times, location_timings)
-
-    with st.expander("Compare Piece Profile"):
-        if piece_information:
-            if keep:
-                pace_tab, other_tab = st.tabs(['Pace Boat', 'Other'])
-            else:
-                pace_tab = st.container()
-
-            piece_data = piece_information['piece_data']
-            settings = st.popover("Figure settings")
-            with settings:
-                height = st.number_input(
-                    "Set profile figure height",
-                    100, None, 600, step=50,
-                    key="height piece profile",
-                )
-            landmark_distances = piece_data['Distance Travelled'].mean()[
-                piece_data['Total Distance'].columns]
-            fig, time_behind = app.plot_pace_boat(
-                piece_data,
-                landmark_distances,
-                gpx_data,
-                input_container=settings,
-                name='name',
-            )
-            fig.update_yaxes(autorange="reversed")
-            fig.update_layout(height=height)
-            with pace_tab:
-                st.plotly_chart(fig, use_container_width=True)
-
     with st.spinner("Processing fastest times"):
         best_times = app.get_fastest_times(gpx_data)
 
-    with st.expander("Fastest times"):
-        tabs = st.tabs(best_times)
-        for tab, (name, times) in zip(tabs, best_times.items()):
-            show_times = times + pd.Timestamp(0)
-            with tab:
-                st.dataframe(
-                    show_times.iloc[::-1],
-                    column_config={
-                        "split": st.column_config.TimeColumn(
-                            "Split", format="m:ss.SS"
-                        ),
-                        "time": st.column_config.TimeColumn(
-                            "Time", format="m:ss.SS"
-                        )
-                    }
-                )
-                app.download_csv(
-                    f"{name}-fastest.csv",
-                    times.map(
-                        utils.format_timedelta, hours=True
-                    ).replace("00:00:00.00", "")
-                )
-
-    with st.spinner("Generating excel file"):
-        excel_export_fragment(crossing_times, location_timings, best_times)
-
-
-@st.fragment
-def timings_fragment(all_crossing_times, crossing_times, location_timings):
     tab_all, *tabs = st.tabs(['All Crossing Times'] + list(crossing_times))
     with tab_all:
         show_times = pd.concat({
@@ -300,6 +283,35 @@ def timings_fragment(all_crossing_times, crossing_times, location_timings):
                 f"{name}-timings.csv",
                 upload_timings,
             )
+
+    for tab, (name, times) in zip(tabs, best_times.items()):
+        show_times = times + pd.Timestamp(0)
+        with tab:
+            st.subheader("Best Times")
+            order = show_times.groupby(
+                'length').time.min().sort_values(ascending=False)
+            st.dataframe(
+                show_times.loc[order.index],
+                column_config={
+                    "split": st.column_config.TimeColumn(
+                        "Split", format="m:ss.SS"
+                    ),
+                    "time": st.column_config.TimeColumn(
+                        "Time", format="m:ss.SS"
+                    )
+                }
+            )
+            app.download_csv(
+                f"{name}-fastest.csv",
+                times.map(
+                    utils.format_timedelta, hours=True
+                ).replace("00:00:00.00", "")
+            )
+
+    st.divider()
+
+    with st.spinner("Generating excel file"):
+        excel_export_fragment(crossing_times, location_timings, best_times)
 
 
 @st.fragment()
