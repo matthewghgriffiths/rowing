@@ -1,38 +1,28 @@
 
+
 import time
 from matplotlib import use
 import streamlit as st
 
 import logging
 
-import sys
-import os
-from pathlib import Path
-
 from tqdm.autonotebook import tqdm
-
-DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent.parent)
-try:
-    from rowing.app import select, state, plots
-    from rowing.world_rowing import api
-except ImportError:
-    realpaths = [os.path.realpath(p) for p in sys.path]
-    if LIBPATH not in realpaths:
-        sys.path.append(LIBPATH)
-
-    from rowing.app import select, state, plots
-    from rowing.world_rowing import api
-
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
 
 st.set_page_config(
     page_title="World Rowing Realtime Livetracker",
     layout='wide',
     # page_icon=":rowing:",
 )
+try:
+    import _
+except ModuleNotFoundError:
+    pass
+finally:
+    from rowing.world_rowing import api
+    from rowing.app import select, state, plots
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
 
 
 def main(params=None):

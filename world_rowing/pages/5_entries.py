@@ -18,13 +18,10 @@ DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)
 
 try:
-    from rowing.app import state, inputs, select, plots
-    from rowing.world_rowing import fields, api
-except ImportError:
-    realpaths = [os.path.realpath(p) for p in sys.path]
-    if LIBPATH not in realpaths:
-        sys.path.append(LIBPATH)
-
+    import _
+except ModuleNotFoundError:
+    pass
+finally:
     from rowing.app import state, inputs, select, plots
     from rowing.world_rowing import fields, api
 

@@ -7,7 +7,7 @@ LIBPATH = str(DIRPATH.parent.parent)
 
 try:
     import rowing
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     realpaths = [os.path.realpath(p) for p in sys.path]
     if LIBPATH not in realpaths:
         sys.path.append(LIBPATH)

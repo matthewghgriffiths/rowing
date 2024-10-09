@@ -15,14 +15,10 @@ st.set_page_config(
 logger = logging.getLogger(__name__)
 
 try:
-    from rowing.app import state, inputs, select, plots
-    from rowing.world_rowing import fields
-except (ImportError, ModuleNotFoundError):
     import _
-    import sys
-    st.write(sys.path)
-
-    logger.warning(sys.path)
+except ModuleNotFoundError:
+    pass
+finally:
     from rowing.app import state, inputs, select, plots
     from rowing.world_rowing import fields
 
