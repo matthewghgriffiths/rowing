@@ -244,6 +244,9 @@ def get_fastest_times(gpx_data):
 
 
 def select_pieces(all_crossing_times):
+    if all_crossing_times.empty:
+        return
+
     piece_dates = np.sort(all_crossing_times.dt.date.unique())
     cols = st.columns(4)
     with cols[0]:
@@ -438,12 +441,12 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
                         )
                         data = gps_data[name]
                     with cols[1]:
-                        dist = st.slider(
-                            "Select distance",
+                        dist = st.number_input(
+                            "Select distance (km)",
                             min_value=data.distance.min(),
                             max_value=data.distance.max(),
-                            step=0.001,
-                            format="%.3f km",
+                            step=0.1,
+                            format="%.3f",
                             key=f"Pick piece distance {i}",
                         )
                     with cols[2]:

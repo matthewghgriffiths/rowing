@@ -17,6 +17,16 @@ from rowing.analysis import app, strava, garmin_app as garmin, splits
 
 logger = logging.getLogger(__name__)
 
+HELP_TEXT = """## How to use
+
+You can upload gpx files directly in the 'Upload GPX' tab, 
+
+Alternatively you can connect your Strava or Garmin account. 
+Your last activity will be automatically loaded. 
+More activities can be loaded by increasing the 'limit'. 
+Alternative you can search for activities within a certain range 
+"""
+
 
 def main(state=None):
     state = state or {}
@@ -49,10 +59,14 @@ def main(state=None):
             strava_tab = gpx_tab
 
         st.divider()
-        if st.button("Logout"):
-            st.query_params.clear()
-            st.session_state.clear()
-            st.cache_resource.clear()
+        help, logout = st.columns((6, 1))
+        with logout:
+            if st.button("Logout"):
+                st.query_params.clear()
+                st.session_state.clear()
+                st.cache_resource.clear()
+        with help:
+            st.markdown(HELP_TEXT)
 
     with gpx_tab:
         uploaded_files = st.file_uploader(
@@ -132,9 +146,12 @@ def analyse_gps_data(gpx_data):
     with st.spinner("Processing Crossing Times"):
         crossing_times = app.get_crossing_times(
             gpx_data, locations=locations)
-        all_crossing_times = pd.concat(crossing_times, names=['name'])
+        if crossing_times:
+            all_crossing_times = pd.concat(crossing_times, names=['name'])
+        else:
+            all_crossing_times = pd.DataFrame([])
 
-    with st.expander("Piece selecter"):
+    with st.expander("Piece selecter", expanded=True):
         piece_information = app.select_pieces(
             all_crossing_times)
 
@@ -173,8 +190,9 @@ def analyse_gps_data(gpx_data):
                 piece_information, gpx_data, [app.PACE_TIME_COL] + keep)
 
     with st.expander("Timings Summary"):
-        timings_fragment(
-            all_crossing_times, crossing_times, gpx_data, piece_information, locations)
+        if crossing_times:
+            timings_fragment(
+                all_crossing_times, crossing_times, gpx_data, piece_information, locations)
 
 
 @st.fragment

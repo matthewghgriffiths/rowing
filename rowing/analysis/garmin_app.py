@@ -98,10 +98,10 @@ def get_activities(client, limit, *args):
         activities = client.get_activities(0, limit)
     elif len(args) == 2:
         start, end = pd.to_datetime(
-            args).sort_values().strftime("%Y-%M-%d")
+            args).sort_values().strftime("%Y-%m-%d")
         activities = client.get_activities_by_date(start, end)
     elif len(args) == 1:
-        date = pd.Timestamp(args[0]).strftime("%Y-%M-%d")
+        date = pd.Timestamp(args[0]).strftime("%Y-%m-%d")
         activities = client.get_activities_fordate(date)
     else:
         activities = None
@@ -320,7 +320,6 @@ def garmin_activities_app(garmin_client, cols=None):
             value=pd.Timestamp.today() - pd.Timedelta("7d"),
             format='YYYY-MM-DD'
         )
-
     activities = get_garmin_activities(
         garmin_client.username, limit, date1, date2)
     if len(activities):
@@ -334,8 +333,9 @@ def garmin_activities_app(garmin_client, cols=None):
             activities.elapsedDuration, unit='s').dt.time
         activities['movingDuration'] = pd.to_datetime(
             activities.movingDuration, unit='s').dt.time
+        print(activities.averageSpeed.min())
         activities['averageSplit'] = pd.to_datetime(
-            500 / activities.averageSpeed, unit='s').dt.time
+            500 / activities.averageSpeed.replace(0, float('nan')), unit='s').dt.time
 
         if activities is not None:
             st.divider()
