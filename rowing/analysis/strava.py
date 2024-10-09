@@ -32,13 +32,13 @@ def _strave_base64_logo(svg_path=_STRAVA_SVG):
         return base64.b64encode(f.read()).decode()
 
 
-_URL_SVG_HTML = """<a target="_self" href="{}">
+_URL_SVG_HTML = """<a target="{}" href="{}">
 <img src="data:image/svg+xml;base64,{}" height="48px">
 </a>"""
 
 
-def _strava_html_logo(url, svg_path=_STRAVA_SVG):
-    return _URL_SVG_HTML.format(url, _strave_base64_logo(svg_path))
+def _strava_html_logo(url, svg_path=_STRAVA_SVG, target='_self'):
+    return _URL_SVG_HTML.format(target, url, _strave_base64_logo(svg_path))
 
 
 def connect_client():
@@ -82,13 +82,15 @@ def connect_client():
         try:
             import stravalib
             client = stravalib.client.Client()
+            url = inputs.get_url()
             authorize_url = client.authorization_url(
                 client_id=st.secrets.strava['client_id'],
-                redirect_uri=inputs.get_url(),
+                redirect_uri=url,
                 scope=['read_all', 'profile:read_all', 'activity:read_all']
             )
             st.markdown(
-                _strava_html_logo(authorize_url),
+                _strava_html_logo(
+                    authorize_url, target='_blank' if 'streamlit' in url else '_self'),
                 unsafe_allow_html=True,
             )
         except AttributeError:

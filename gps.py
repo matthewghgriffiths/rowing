@@ -48,6 +48,12 @@ def main(state=None):
             ])
             strava_tab = gpx_tab
 
+        st.divider()
+        if st.button("Logout"):
+            st.query_params.clear()
+            st.session_state.clear()
+            st.cache_resource.clear()
+
     with gpx_tab:
         uploaded_files = st.file_uploader(
             "Upload GPX files",
