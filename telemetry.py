@@ -2,14 +2,8 @@
 import streamlit as st
 import io
 from functools import partial
-from pathlib import Path
-import os
-import sys
 import yaml
 import json
-
-import io
-import zipfile
 
 import logging
 
@@ -22,18 +16,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
 
-try:
-    from rowing import utils
-    from rowing.analysis import geodesy, splits, app, telemetry
-except ImportError:
-    DIRPATH = Path(__file__).resolve().parent
-    LIBPATH = str(DIRPATH.parent)
-    realpaths = [os.path.realpath(p) for p in sys.path]
-    if LIBPATH not in realpaths:
-        sys.path.append(LIBPATH)
-
-    from rowing import utils
-    from rowing.analysis import geodesy, splits, app, telemetry
+from rowing import utils
+from rowing.analysis import app, telemetry
 
 logger = logging.getLogger("telemetry")
 # logging.basicConfig(
