@@ -7,6 +7,11 @@ import plotly.express as px
 import pandas as pd
 
 
+st.set_page_config(
+    page_title="PGMTs",
+    layout='wide'
+)
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -20,12 +25,6 @@ except (ImportError, ModuleNotFoundError):
     logger.warning(sys.path)
     from rowing.app import state, inputs, select, plots
     from rowing.world_rowing import fields
-
-
-st.set_page_config(
-    page_title="PGMTs",
-    layout='wide'
-)
 
 
 def main(params=None):
