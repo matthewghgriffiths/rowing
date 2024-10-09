@@ -12,7 +12,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from rowing import utils
-from rowing.analysis import app, strava, garmin_app as garmin, splits
+from rowing.analysis import app, strava, garmin, splits
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,10 @@ You can upload gpx files directly in the 'Upload GPX' tab,
 Alternatively you can connect your Strava or Garmin account. 
 Your last activity will be automatically loaded. 
 More activities can be loaded by increasing the 'limit'. 
-Alternative you can search for activities within a certain range 
+Alternative you can search for activities within a certain range.
+
+To remove log-out and remove all data associated with your account click 
+the logout button.
 """
 
 
@@ -60,11 +63,9 @@ def main(state=None):
 
         st.divider()
         help, logout = st.columns((6, 1))
+
         with logout:
-            if st.button("Logout"):
-                st.query_params.clear()
-                st.session_state.clear()
-                st.cache_resource.clear()
+            st.button("Logout", on_click=clear_state)
         with help:
             st.markdown(HELP_TEXT)
 
@@ -127,6 +128,12 @@ def garmin_stats(garmin_client):
         )
 
         st.dataframe(stats)
+
+
+def clear_state():
+    st.query_params.clear()
+    st.session_state.clear()
+    st.cache_resource.clear()
 
 
 @st.fragment

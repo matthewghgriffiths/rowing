@@ -115,14 +115,6 @@ def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
 
 
-@st.cache_resource
-def garmin_client(username, password):
-    from rowing.analysis import garmin
-    return garmin.GarminClient(
-        username=username, password=password
-    )
-
-
 def download_csv(
     file_name, df, label=":inbox_tray: Download data as csv", csv_kws=None, **kwargs
 ):

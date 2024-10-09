@@ -240,12 +240,14 @@ def strava_app():
             disabled=activities.columns.difference(['select', 'activity']),
             modification_container=st.popover("Filter Activities"),
         )
-        strava_data = {
-            activity.activity: load_strava_activity(
-                client.code, activity.id
-            )
-            for _, activity in sel_activities.iterrows()
-        }
+        with st.spinner("Downloading Activities"):
+            strava_data = {
+                activity.activity: load_strava_activity(
+                    client.code, activity.id
+                )
+                for _, activity in sel_activities.iterrows()
+            }
+
         if st.toggle("Download gpx data"):
             for activity, activity_data in strava_data.items():
                 st.download_button(
