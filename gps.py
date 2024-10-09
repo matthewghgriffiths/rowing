@@ -166,9 +166,9 @@ def analyse_gps_data(gpx_data):
             plot_piece_profiles(
                 piece_information, gpx_data, [app.PACE_TIME_COL] + keep)
 
-    with st.expander("Landmark Timings"):
+    with st.expander("Timings Summary"):
         timings_fragment(
-            all_crossing_times, crossing_times, gpx_data, locations)
+            all_crossing_times, crossing_times, gpx_data, piece_information, locations)
 
 
 @st.fragment
@@ -182,6 +182,7 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
     use_pieces = piece_times.reset_index()
     use_pieces = app.inputs.filter_dataframe(
         use_pieces,
+        key='filter plot_piece_profiles',
         disabled=use_pieces.columns,
         filters=True,
         select_all=True,
@@ -259,18 +260,15 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
                         overlaying="y",
                         autoshift=True,
                         automargin=True,
-                        # anchor='free',
                     )
                 })
 
             fig.update_layout(height=height)
             st.plotly_chart(fig, use_container_width=True)
 
-    # if keep:
-
 
 @st.fragment
-def timings_fragment(all_crossing_times, crossing_times, gpx_data, locations):
+def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_information, locations):
 
     with st.spinner("Processing split timings"):
         location_timings = app.get_location_timings(
@@ -279,7 +277,12 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, locations):
     with st.spinner("Processing fastest times"):
         best_times = app.get_fastest_times(gpx_data)
 
-    tab_all, *tabs = st.tabs(['All Crossing Times'] + list(crossing_times))
+    piece_data = piece_information['piece_data']
+
+    names = list(crossing_times)
+    data_names = list(piece_data)
+    tab_all, *name_tabs = st.tabs(['All Crossing Times'] + names + data_names)
+    tabs, data_tabs = name_tabs[:len(names)], name_tabs[len(names):]
     with tab_all:
         show_times = pd.concat({
             "date": all_crossing_times.dt.normalize(),
@@ -357,14 +360,17 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, locations):
                 ).replace("00:00:00.00", "")
             )
 
+    app.show_piece_data(piece_data, data_tabs)
+
     st.divider()
 
     with st.spinner("Generating excel file"):
-        excel_export_fragment(crossing_times, location_timings, best_times)
+        excel_export_fragment(
+            crossing_times, location_timings, best_times, piece_information)
 
 
 @st.fragment()
-def excel_export_fragment(crossing_times, location_timings, best_times):
+def excel_export_fragment(crossing_times, location_timings, best_times, piece_information):
     if not any([crossing_times, location_timings, best_times]):
         print("no sheets")
         return
@@ -401,6 +407,14 @@ def excel_export_fragment(crossing_times, location_timings, best_times):
             ).replace("00:00:00.00", "").to_excel(
                 xlf, f"{utils.safe_name(name)}-fastest"
             )
+
+        for key, data in piece_information['piece_data'].items():
+            data = data.copy()
+            for c, col in data.items():
+                if pd.api.types.is_timedelta64_dtype(col.dtype):
+                    data[c] = col.map(utils.format_timedelta)
+
+            data.to_excel(xlf, sheet_name=key)
 
     xldata.seek(0)
     st.download_button(

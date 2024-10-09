@@ -220,6 +220,7 @@ def strava_app():
 
         sel_activities = inputs.filter_dataframe(
             activities,
+            key='filter strava activities',
             select_all=False,
             select_first=True,
             column_order=columns_order,

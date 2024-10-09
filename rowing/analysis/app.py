@@ -312,8 +312,8 @@ def select_pieces(all_crossing_times):
         }
 
 
-def show_piece_data(piece_data):
-    tabs = st.tabs(list(piece_data))
+def show_piece_data(piece_data, tabs=None):
+    tabs = tabs or st.tabs(list(piece_data))
     for tab, (key, data) in zip(tabs, piece_data.items()):
         with tab:
             data = data.copy()
