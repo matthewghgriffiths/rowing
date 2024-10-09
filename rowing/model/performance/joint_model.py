@@ -628,23 +628,3 @@ def combine_performances(athlete_dists, data):
             data.athlete_competition_csc.nonzero()[1]
         ]
     })
-
-
-def load_competition(competition_id):
-    competition = api.get_worldrowing_record("competition", competition_id)
-
-    events = api.get_events(
-        competition_id, include="boats.boatAthletes.person"
-    ).join(
-        boat_types, on='event_boatClassId'
-    )
-
-    boat_cols = ['Event', "Boat Type", 'n_rowers']
-
-    boats = pd.json_normalize(sum(events.event_boats, [])).join(
-        events.set_index("event_id")[boat_cols], on='eventId'
-    )
-    boats = boats[boats.boatAthletes.str[0].notna()]
-    boats['Crew Names'] = boats['DisplayName'] + " " + boats['Boat Type']
-    boats['Country'] = boats['DisplayName'].str[:3]
-    boats['Final Position'] = boats.finalRank
