@@ -15,7 +15,7 @@ try:
 except (ImportError, ModuleNotFoundError):
     import _
     import sys
-    print(sys.path)
+    st.write(sys.path)
 
     logger.warning(sys.path)
     from rowing.app import state, inputs, select, plots
