@@ -12,4 +12,6 @@ except ImportError:
     if LIBPATH not in realpaths:
         sys.path.append(LIBPATH)
 
+    print(sys.path)
+
     import rowing
