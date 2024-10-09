@@ -12,7 +12,7 @@ from pathlib import Path
 from tqdm.autonotebook import tqdm
 
 DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent.parent.parent)
+LIBPATH = str(DIRPATH.parent.parent)
 try:
     from rowing.app import select, state, plots
     from rowing.world_rowing import api

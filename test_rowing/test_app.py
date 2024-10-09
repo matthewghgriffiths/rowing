@@ -15,13 +15,13 @@ logging.getLogger().setLevel(logging.INFO)
 
 dirpath = Path(__file__).resolve().parent
 
-app_GMTs = importlib.import_module("app.world_rowing.pages.1_GMTs", "..")
+app_GMTs = importlib.import_module("world_rowing.pages.1_GMTs", "..")
 app_livetracker = importlib.import_module(
-    "app.world_rowing.pages.2_livetracker", "..")
+    "world_rowing.pages.2_livetracker", "..")
 app_realtime = importlib.import_module(
-    "app.world_rowing.pages.3_realtime", "..")
+    "world_rowing.pages.3_realtime", "..")
 app_gpx = importlib.import_module("gps", "..")
-app_telemetry = importlib.import_module("app.telemetry", "..")
+app_telemetry = importlib.import_module("telemetry", "..")
 
 TIMEOUT = 120
 

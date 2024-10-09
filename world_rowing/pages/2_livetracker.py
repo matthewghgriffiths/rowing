@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent.parent.parent)
+LIBPATH = str(DIRPATH.parent.parent)
 
 try:
     from rowing.app import select, inputs, state, plots
@@ -131,7 +131,7 @@ def main(params=None):
     return show_livetracker(live_data, fig_params, filter_live)
 
 
-@st.fragment
+# @st.fragment
 def show_livetracker(live_data, fig_params, filter_container=None):
     filter_container = filter_container or st.container
     with filter_container:

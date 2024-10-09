@@ -46,6 +46,9 @@ def modal_button(label1, label2, key=None, mode=False):
     logger.debug("modal_button: %s mode=%s", key, mode)
 
     container = st.empty()
+    if key in st.session_state:
+        mode = st.session_state[key]
+
     if mode:
         key1 = ".".join([key, label1])
         rerun = container.button(label1, key=key1)

@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent.parent.parent)
+LIBPATH = str(DIRPATH.parent.parent)
 
 try:
     from rowing.app import state, inputs, select, plots
