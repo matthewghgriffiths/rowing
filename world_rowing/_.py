@@ -13,6 +13,7 @@ try:
 except ImportError:
 
     st.write(LIBPATH)
+    st.write(os.listdir(LIBPATH))
 
     realpaths = [os.path.realpath(p) for p in sys.path]
     if LIBPATH not in realpaths:
