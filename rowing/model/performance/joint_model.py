@@ -14,7 +14,7 @@ from scipy import stats, sparse
 from sklearn import metrics
 
 import jax
-from jax import numpy as jnp, tree_map
+from jax import numpy as jnp, scipy as jsp, tree_map
 from jax.scipy.linalg import solve_triangular
 from jax.scipy import linalg
 

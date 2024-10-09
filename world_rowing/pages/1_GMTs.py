@@ -1,36 +1,26 @@
 
 import streamlit as st
 
-import sys
-import os
-from pathlib import Path
-
 import logging
 
 import plotly.express as px
 import pandas as pd
 
-st.set_page_config(
-    page_title="PGMTs",
-    layout='wide'
-)
-
-DIRPATH = Path(__file__).resolve().parent
-LIBPATH = str(DIRPATH.parent.parent)
 
 try:
     from rowing.app import state, inputs, select, plots
     from rowing.world_rowing import fields
-except ImportError:
-    realpaths = [os.path.realpath(p) for p in sys.path]
-    if LIBPATH not in realpaths:
-        sys.path.append(LIBPATH)
-
+except (ImportError, ModuleNotFoundError):
+    import _
     from rowing.app import state, inputs, select, plots
     from rowing.world_rowing import fields
 
 
 logger = logging.getLogger(__name__)
+st.set_page_config(
+    page_title="PGMTs",
+    layout='wide'
+)
 
 
 def main(params=None):
