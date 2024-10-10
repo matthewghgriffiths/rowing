@@ -100,12 +100,27 @@ def get_activities(client, limit, *args):
     if activities:
         activities = pd.json_normalize(activities)
         activities.startTimeLocal = pd.to_datetime(activities.startTimeLocal)
+        activities['initials'] = activities.ownerFullName.map(utils.initials)
         activities['distance'] /= 1000
         activities.sort_values("startTimeLocal", ascending=True, inplace=True)
         activities['date'] = activities.startTimeLocal.dt.date
         activities['startTime'] = activities.startTimeLocal.dt.time
         activities['session'] = activities.groupby(['date']).cumcount() + 1
         activities.sort_values("startTimeLocal", ascending=False, inplace=True)
+
+        activities['activity'] = activities.apply(
+            "{0.initials} {0.date} #{0.session}".format,
+            axis=1
+        )
+        activities['duration'] = pd.to_datetime(
+            activities.duration, unit='s').dt.time
+        activities['elapsedDuration'] = pd.to_datetime(
+            activities.elapsedDuration, unit='s').dt.time
+        activities['movingDuration'] = pd.to_datetime(
+            activities.movingDuration, unit='s').dt.time
+        activities['averageSplit'] = pd.to_datetime(
+            500 / activities.averageSpeed.replace(0, float('nan')), unit='s').dt.time
+
         return activities
 
 
@@ -321,20 +336,6 @@ def garmin_activities_app(garmin_client, cols=None):
     activities = get_garmin_activities(
         garmin_client.username, limit, date1, date2)
     if len(activities):
-        activities['activity'] = activities.apply(
-            "{0.ownerFullName} {0.date} #{0.session}".format,
-            axis=1
-        )
-        activities['duration'] = pd.to_datetime(
-            activities.duration, unit='s').dt.time
-        activities['elapsedDuration'] = pd.to_datetime(
-            activities.elapsedDuration, unit='s').dt.time
-        activities['movingDuration'] = pd.to_datetime(
-            activities.movingDuration, unit='s').dt.time
-        print(activities.averageSpeed.min())
-        activities['averageSplit'] = pd.to_datetime(
-            500 / activities.averageSpeed.replace(0, float('nan')), unit='s').dt.time
-
         if activities is not None:
             st.divider()
             activity_hrs = get_garmin_activities_hr(

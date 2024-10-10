@@ -86,6 +86,10 @@ def safe_name(name):
     return name.replace(":", "")
 
 
+def initials(name):
+    return "".join(s[0] for s in name.split(" ") if s)
+
+
 @lru_cache
 def load_gsheet(sheet):
     from gspread_pandas import Spread

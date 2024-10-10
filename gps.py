@@ -28,6 +28,31 @@ Alternative you can search for activities within a certain range.
 
 To remove log-out and remove all data associated with your account click 
 the logout button.
+
+- [Landmarks](#landmarks) shows a map of the landmarks and activities, 
+it is possible to add landmarks from the pieces
+- [Piece selecter](#piece-selecter) allows the 
+start and end of the piece to be defined
+- [Plot Piece Profile](#plot-piece-profile) shows plots of different
+facets of data over the piece. Two facets of data (e.g. heart rate and time ahead)
+can be displayed at the same time. To help visualise changes in pace, 
+'Time/Distance ahead of Pace Boat' is provided as a facet. 
+The fastest time for the piece in the data is used to set the speed of the pace boat, 
+the relative time/distance ahead/behind a pace boat going at this speed. 
+It is useful to note that travelling at a constant speed means that the trace will be straight line
+horizontal if going at the same speed of the pace boat, slanted up if faster and down if slower.
+- [Timings summary](#timings-summary) shows the summary of timings 
+extracted from the activities, these tables can be downloaded as an 
+excel spreadsheet. Included are all, 
+  - crossing times for when an activity passed a landmark, 
+  - timings matrix to record how much time passed between each crossing times, 
+  - best times to cover a variety of different distances during each outing, and
+  - information about subsegments of the selected piece, for example, 
+  Interval split records the average split to cover a subsegment, 
+  Average Split records the average split up to the listed landmark,
+  if using data from Strava/Garmin average stroke rate (Cadence) and heart rate
+  may also be displayed if available.
+
 """
 
 
@@ -62,11 +87,12 @@ def main(state=None):
             strava_tab = gpx_tab
 
         st.divider()
-        help, logout = st.columns((6, 1))
-
+        logout, toggle, _ = st.columns((1, 1, 8))
         with logout:
             st.button("Logout", on_click=clear_state)
-        with help:
+        with toggle:
+            show = st.toggle("Show help", True)
+        if show:
             st.markdown(HELP_TEXT)
 
     with gpx_tab:
@@ -81,11 +107,6 @@ def main(state=None):
             singleton=True,
         )
 
-    with strava_tab:
-        strava_data = strava.strava_app()
-        if strava_data:
-            gpx_data.update(strava_data)
-
     with garmin_tab:
         garmin_client = garmin.login(*st.columns(3))
         if garmin_client:
@@ -99,9 +120,18 @@ def main(state=None):
             with stats_tab:
                 garmin.garmin_stats_app(garmin_client)
 
+    with strava_tab:
+        strava_client = strava.connect_client()
+        if strava_client:
+            strava_data = strava.strava_app(strava_client)
+            if strava_data:
+                gpx_data.update(strava_data)
+
     gpx_data.update(data)
 
-    return analyse_gps_data(gpx_data)
+    analyse_gps_data(gpx_data)
+
+    st.button("Logout", key='logout2', on_click=clear_state)
 
 
 @st.fragment
@@ -138,7 +168,13 @@ def clear_state():
 
 @st.fragment
 def analyse_gps_data(gpx_data):
+    start = 0
+    for k, data in gpx_data.items():
+        data.index += start
+        start += len(data)
+
     with st.expander("Landmarks"):
+        st.subheader("Landmarks")
         set_landmarks = app.set_landmarks(gps_data=gpx_data)
         locations = set_landmarks.set_index(["location", "landmark"])
 
@@ -147,8 +183,8 @@ def analyse_gps_data(gpx_data):
         st.stop()
         raise st.runtime.scriptrunner.StopException()
 
-    with st.expander("Show map"):
-        app.draw_gps_data(gpx_data, locations)
+    # with st.expander("Show map"):
+    #     app.draw_gps_data(gpx_data, locations)
 
     with st.spinner("Processing Crossing Times"):
         crossing_times = app.get_crossing_times(
@@ -159,6 +195,7 @@ def analyse_gps_data(gpx_data):
             all_crossing_times = pd.DataFrame([])
 
     with st.expander("Piece selecter", expanded=True):
+        st.subheader("Piece selecter")
         piece_information = app.select_pieces(
             all_crossing_times)
 
@@ -192,11 +229,13 @@ def analyse_gps_data(gpx_data):
             app.show_piece_data(piece_information['piece_data'])
 
     if piece_information:
-        with st.expander("Compare Piece Profile"):
+        with st.expander("Plot Piece Profile"):
+            st.subheader("Plot Piece Profile")
             plot_piece_profiles(
                 piece_information, gpx_data, [app.PACE_TIME_COL] + keep)
 
-    with st.expander("Timings Summary"):
+    with st.expander("Timings summary"):
+        st.subheader("Timings summary")
         if crossing_times:
             timings_fragment(
                 all_crossing_times, crossing_times, gpx_data, piece_information, locations)
@@ -320,11 +359,11 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_informa
             "time": all_crossing_times,
         }, axis=1)
         st.dataframe(
-            show_times,
+            show_times.reset_index(), hide_index=True,
             column_config={
                 "date": st.column_config.DateColumn("Date"),
                 "time": st.column_config.TimeColumn(
-                    "Time", format="hh:mm:ss.SS"
+                    "Time", format="HH:mm:ss.S"
                 )
             }
         )
@@ -338,13 +377,13 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_informa
             }, axis=1)
             st.subheader("Crossing times")
             st.dataframe(
-                show_crossings,
+                show_crossings.reset_index(), hide_index=True,
                 column_config={
                     "date": st.column_config.DateColumn("Date"),
                     "time": st.column_config.TimeColumn(
-                        "Time", format="hh:mm:ss.SS"
+                        "Time", format="HH:mm:ss.S"
                     )
-                }
+                },
             )
             app.download_csv(f"{name}-crossings.csv", show_crossings)
 
@@ -361,7 +400,7 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_informa
             ).replace("00:00:00.00", "").T
 
             st.subheader("Timing Matrix")
-            st.dataframe(upload_timings)
+            st.dataframe(upload_timings.reset_index(), hide_index=True)
             app.download_csv(
                 f"{name}-timings.csv",
                 upload_timings,
@@ -374,7 +413,7 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_informa
             order = show_times.groupby(
                 'length').time.min().sort_values(ascending=False)
             st.dataframe(
-                show_times.loc[order.index],
+                show_times.loc[order.index].reset_index(),
                 column_config={
                     "split": st.column_config.TimeColumn(
                         "Split", format="m:ss.SS"

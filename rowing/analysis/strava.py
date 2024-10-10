@@ -10,6 +10,7 @@ import pandas as pd
 
 from rowing.app import inputs
 from rowing.analysis import files
+from rowing import utils
 
 
 _file_path = Path(os.path.abspath(__file__))
@@ -102,7 +103,8 @@ def connect_client():
 @st.cache_data
 def get_strava_activities(code, end=None, start=None, limit=None):
     client = get_client(code)
-    return get_activities(client, end=end, start=start, limit=limit)
+    activities = get_activities(client, end=end, start=start, limit=limit)
+    return activities
 
 
 def get_activities(client, end=None, start=None, limit=None):
@@ -117,6 +119,11 @@ def get_activities(client, end=None, start=None, limit=None):
         a.dict(exclude=['map'])
         for a in client.get_activities(end, start, limit)
     ])
+
+    athlete = client.get_athlete()
+    activities['athlete'] = name = f"{athlete.firstname} {athlete.lastname}"
+    activities['initials'] = utils.initials(name)
+
     for c in ['elapsed_time', 'moving_time']:
         if c in activities:
             activities[c] = pd.to_timedelta(activities[c], unit='s')
@@ -124,6 +131,18 @@ def get_activities(client, end=None, start=None, limit=None):
         activities['average_split'] = pd.to_timedelta(
             500 / activities['average_speed'], unit='s'
         )
+
+    if 'start_date_local' in activities:
+        activities.start_date_local = pd.to_datetime(
+            activities.start_date_local)
+        activities['date'] = activities.start_date_local.dt.date
+        activities['startTime'] = activities.start_date_local.dt.time
+        activities['session'] = activities.groupby(['date']).cumcount() + 1
+        activities['activity'] = activities.apply(
+            "{0.initials} {0.date} #{0.session}".format,
+            axis=1
+        )
+
     return activities
 
 
@@ -158,106 +177,97 @@ def load_activity(client, activity_id):
     )
 
 
-def strava_app():
-    client = connect_client()
-    if client is not None:
+def strava_app(client):
+    athlete = client.get_athlete()
 
-        athlete = client.get_athlete()
+    name = f"{athlete.firstname} {athlete.lastname}"
+    st.write(f"Hello {name}!")
 
-        name = f"{athlete.firstname} {athlete.lastname}"
-        st.write(f"Hello {name}!")
-
-        cols = st.columns(3)
-        with cols[0]:
-            limit = st.number_input(
-                "How many activities to load, "
-                "set to 0 if selecting date range",
-                value=1,
-                min_value=0,
-                step=1
-            )
-        with cols[1]:
-            date1 = st.date_input(
-                "Select Date",
-                value=pd.Timestamp.today() + pd.Timedelta("1d"),
-                format='YYYY-MM-DD'
-            )
-        with cols[2]:
-            date2 = st.date_input(
-                "Range",
-                value=pd.Timestamp.today() - pd.Timedelta("7d"),
-                format='YYYY-MM-DD'
-            )
-
-        activities = get_strava_activities(client.code, date1, date2, limit)
-        if activities.empty:
-            return
-
-        st.divider()
-        activities['athlete'] = name
-        activities['activity'] = activities['athlete'].str.cat(
-            activities[['name', 'start_date_local']].astype(str),
-            sep=' '
+    cols = st.columns(3)
+    with cols[0]:
+        limit = st.number_input(
+            "How many activities to load, "
+            "set to 0 if selecting date range",
+            value=1,
+            min_value=0,
+            step=1
+        )
+    with cols[1]:
+        date1 = st.date_input(
+            "Select Date",
+            value=pd.Timestamp.today() + pd.Timedelta("1d"),
+            format='YYYY-MM-DD'
+        )
+    with cols[2]:
+        date2 = st.date_input(
+            "Range",
+            value=pd.Timestamp.today() - pd.Timedelta("7d"),
+            format='YYYY-MM-DD'
         )
 
-        columns_order = [
-            'activity',
-            'sport_type',
-            'start_date_local',
-            'distance',
-            'elapsed_time',
-            'moving_time',
-            'name',
-            'average_split',
-            # 'average_cadence',
-            # 'average_heartrate',
-            # 'description',
-        ]
-        activities['elapsed_time'] = (
-            activities['elapsed_time'] + pd.Timestamp(0)).dt.time
-        activities['moving_time'] = (
-            activities['moving_time'] + pd.Timestamp(0)).dt.time
-        activities['average_split'] = (
-            activities['average_split'] + pd.Timestamp(0)).dt.time
+    activities = get_strava_activities(client.code, date1, date2, limit)
+    if activities.empty:
+        return
 
-        sel_activities = inputs.filter_dataframe(
-            activities,
-            key='filter strava activities',
-            select_all=False,
-            select_first=True,
-            column_order=columns_order,
-            column_config={
-                "elapsed_time": st.column_config.TimeColumn(
-                    format='h:mm:ss', disabled=True
-                ),
-                "moving_time": st.column_config.DatetimeColumn(
-                    format='h:mm:ss', disabled=True
-                ),
-                "average_split": st.column_config.DatetimeColumn(
-                    format='m:ss.S', disabled=True
-                ),
-            },
-            disabled=activities.columns.difference(['select', 'activity']),
-            modification_container=st.popover("Filter Activities"),
-        )
-        with st.spinner("Downloading Activities"):
-            strava_data = {
-                activity.activity: load_strava_activity(
-                    client.code, activity.id
-                )
-                for _, activity in sel_activities.iterrows()
-            }
+    st.divider()
 
-        if st.toggle("Download gpx data"):
-            for activity, activity_data in strava_data.items():
-                st.download_button(
-                    f":inbox_tray: Download: {activity}.gpx",
-                    io.BytesIO(
-                        files.make_gpx_track(
-                            activity_data).to_xml().encode()
-                    ),
-                    # type='primary',
-                    file_name=f"{activity}.gpx",
-                )
+    columns_order = [
+        'activity',
+        'sport_type',
+        'date',
+        'startTime',
+        'distance',
+        'elapsed_time',
+        'moving_time',
+        'name',
+        'average_split',
+    ]
+    activities['elapsed_time'] = (
+        activities['elapsed_time'] + pd.Timestamp(0)).dt.time
+    activities['moving_time'] = (
+        activities['moving_time'] + pd.Timestamp(0)).dt.time
+    activities['average_split'] = (
+        activities['average_split'] + pd.Timestamp(0)).dt.time
+    activities.sort_values(
+        "start_date_local", ascending=False, inplace=True)
+    sel_activities = inputs.filter_dataframe(
+        activities,
+        key='filter strava activities',
+        select_all=False,
+        select_first=True,
+        column_order=columns_order,
+        column_config={
+            "elapsed_time": st.column_config.TimeColumn(
+                format='h:mm:ss', disabled=True
+            ),
+            "moving_time": st.column_config.DatetimeColumn(
+                format='h:mm:ss', disabled=True
+            ),
+            "average_split": st.column_config.DatetimeColumn(
+                format='m:ss.S', disabled=True
+            ),
+        },
+        disabled=activities.columns.difference(['select', 'activity']),
+        modification_container=st.popover("Filter Activities"),
+    )
+    with st.spinner("Downloading Activities"):
+        strava_data = {
+            activity.activity: load_strava_activity(
+                client.code, activity.id
+            )
+            for _, activity in sel_activities.iterrows()
+        }
 
-        return strava_data
+    if st.toggle("Download gpx data"):
+        for activity, activity_data in strava_data.items():
+            st.download_button(
+                f":inbox_tray: Download: {activity}.gpx",
+                io.BytesIO(
+                    files.make_gpx_track(
+                        activity_data).to_xml().encode()
+                ),
+                # type='primary',
+                file_name=f"{activity}.gpx",
+            )
+
+    return strava_data
