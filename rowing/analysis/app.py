@@ -1,4 +1,3 @@
-from altair import Latitude
 import streamlit as st
 import io
 import zipfile
@@ -11,7 +10,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
-# from streamlit_plotly_events import plotly_events
 from streamlit_plotly_mapbox_events import plotly_mapbox_events
 
 from rowing.analysis import splits, files, geodesy, telemetry

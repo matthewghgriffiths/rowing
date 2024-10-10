@@ -17,4 +17,5 @@ requests>=2.0
 scipy>=1.14
 stravalib>=2.0
 streamlit>=1.39
+streamlit-plotly-mapbox-events>=0.1.2
 tqdm>=4.0
