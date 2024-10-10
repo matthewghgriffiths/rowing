@@ -27,8 +27,8 @@ def get_url():
 
         joinme = (req.protocol, req.host, "", "", "", "")
         my_url = urllib.parse.urlunparse(joinme)
-    except RuntimeError:
-        my_url = 'localhost'
+    except (RuntimeError, IndexError):
+        my_url = st.secrets.get('hostname', 'localhost')
 
     return my_url
 
