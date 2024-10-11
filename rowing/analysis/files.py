@@ -86,7 +86,7 @@ def process_latlontime(positions):
     positions['metrePerSecond'] = np.gradient(
         positions.distance * 1000, positions.timeElapsed.dt.total_seconds()
     )
-    if 'velocity_smooth':
+    if 'velocity_smooth' in positions:
         positions['split'] = pd.to_timedelta(
             500 / positions['velocity_smooth'].replace({0.: np.nan}), unit='s'
         )

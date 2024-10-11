@@ -159,7 +159,28 @@ def plot_activity_data(gps_data):
         default = [c for c in DEFAULT_FACETS if c in data]
         options = default + list(plot_data.columns.difference(DEFAULT_FACETS))
         with tab:
-            col1, col2 = st.columns(2)
+            col0, col1, col2 = st.columns((1, 2, 2))
+            with col0:
+                smooth = st.number_input(
+                    "Smooth data over",
+                    0, None, value=0, step=5,
+                    key=f'{name}_activity_data_smooth',
+                )
+            if smooth:
+                data = plot_data.set_index("timeElapsed")
+                number_data = data.select_dtypes('number', "timedelta").rolling(
+                    f"{smooth}s"
+                ).mean().reset_index()
+                dt_data = data.select_dtypes('timedelta').apply(
+                    lambda s: s.dt.total_seconds()
+                ).rolling(
+                    f"{smooth}s"
+                ).mean().apply(
+                    pd.to_timedelta, unit='s'
+                ).reset_index()
+                plot_data = pd.concat([
+                    number_data, dt_data, plot_data.select_dtypes(["datetime"])
+                ], axis=1)
             with col1:
                 left_axis = st.multiselect(
                     "Plot on left axis",
@@ -290,7 +311,8 @@ def analyse_gps_data(gpx_data):
             piece_information['piece_data'].update(
                 splits.get_pieces_interval_averages(
                     piece_information['piece_data']['Timestamp'],
-                    {k: d[average_cols] for k, d in gpx_data.items()},
+                    {k: d[[c for c in average_cols if c in d]]
+                        for k, d in gpx_data.items()},
                     time='time'
                 )
             )

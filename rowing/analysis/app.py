@@ -112,7 +112,7 @@ DEFAULT_REPORT = {
 }
 
 
-def outlier_range(data, quantiles=(0.05, 0.5, 0.95)):
+def outlier_range(data, quantiles=(0.1, 0.5, 0.9)):
     y0, y1, y2 = data.quantile(quantiles)
     dt = max(y2 - y1, y1 - y0) * 1.1
     yrange = (y1 - dt, y1 + dt)
