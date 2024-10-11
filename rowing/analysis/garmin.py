@@ -22,6 +22,9 @@ def parse_garmin_fit_json(fit_json):
         positions.timestamp + GARMIN_TIMESTAMP, unit='s'
     )
     positions['distance'] /= 100
+    if 'enhanced_speed' in positions.columns:
+        positions['velocity_smooth'] = positions['enhanced_speed'] / 1000
+
     return files._parse_fit_positions(positions)
 
 

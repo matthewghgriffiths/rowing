@@ -15,6 +15,14 @@ from rowing import utils
 from rowing.analysis import app, strava, garmin, splits
 
 
+DEFAULT_FACETS = [
+    'velocity_smooth',
+    'heart_rate',
+    'cadence',
+    'bearing',
+    'split',
+]
+
 logger = logging.getLogger(__name__)
 
 HELP_TEXT = """## How to use
@@ -87,12 +95,8 @@ def main(state=None):
             strava_tab = gpx_tab
 
         st.divider()
-        logout, toggle, _ = st.columns((1, 1, 8))
-        with logout:
-            st.button("Logout", on_click=clear_state)
-        with toggle:
-            show = st.toggle("Show help", True)
-        if show:
+        st.button("Logout", on_click=clear_state)
+        if st.toggle("Show help", True):
             st.markdown(HELP_TEXT)
 
     with gpx_tab:
@@ -129,9 +133,78 @@ def main(state=None):
 
     gpx_data.update(data)
 
+    if gpx_data:
+        with st.expander("Plot activity Data"):
+            plot_activity_data(gpx_data)
+
     analyse_gps_data(gpx_data)
 
     st.button("Logout", key='logout2', on_click=clear_state)
+
+
+@st.fragment
+def plot_activity_data(gps_data):
+    with st.popover("Figure settings"):
+        height = st.number_input(
+            "Set profile figure height",
+            100, None, 600, step=50,
+            key='plot_activity_data_height',
+        )
+
+    tabs = st.tabs(gps_data)
+    for tab, (name, data) in zip(tabs, gps_data.items()):
+        plot_data = data.reset_index()
+        options = [
+            c for c in DEFAULT_FACETS if c in data
+        ] + list(plot_data.columns.difference(DEFAULT_FACETS))
+        with tab:
+            c = st.selectbox(
+                "Plot on left axis",
+                key=f"{name}_plotleft",
+                index=0,
+                options=options,
+            )
+            c2 = st.selectbox(
+                "Plot on right axis",
+                key=f"{name}_plotright",
+                index=None,
+                options=options,
+            )
+
+            fig = px.line(
+                plot_data,
+                x='distance', y=c,
+                # color='leg',
+                # line_dash='leg',
+            )
+            fig.update_layout(height=height)
+            if c2:
+                fig2 = px.line(
+                    plot_data,
+                    x='distance', y=c2,
+                    # color='leg',
+                    # line_dash='leg',
+                )
+                fig2.update_traces(opacity=0.5)
+
+                for tr in fig2.data:
+                    tr.yaxis = 'y2'
+                    tr.showlegend = False
+                    fig.add_trace(tr)
+
+                fig.update_layout({
+                    "yaxis2": dict(
+                        title=dict(text=c2),
+                        side='right',
+                        tickmode="sync",
+                        overlaying="y",
+                        autoshift=True,
+                        automargin=True,
+                    )
+                })
+
+            fig.update_layout(height=height)
+            st.plotly_chart(fig, use_container_width=True)
 
 
 @st.fragment
@@ -207,15 +280,10 @@ def analyse_gps_data(gpx_data):
             for d in gpx_data.values():
                 options = d.columns.union(options)
 
-            default = [
-                'heart_rate',
-                'cadence',
-                'bearing',
-            ]
             keep = st.multiselect(
                 "Select data to keep",
                 options=options,
-                default=options.intersection(default),
+                default=options.intersection(DEFAULT_FACETS),
             )
             average_cols = ['time'] + keep
             piece_information['piece_data'].update(

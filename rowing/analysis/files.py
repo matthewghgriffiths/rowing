@@ -83,6 +83,18 @@ def process_latlontime(positions):
     positions.loc[first, 'bearing_r'] = positions.bearing_r[positions.index[1]]
     positions['bearing'] = np.rad2deg(positions.bearing_r)
 
+    positions['metrePerSecond'] = np.gradient(
+        positions.distance * 1000, positions.timeElapsed.dt.total_seconds()
+    )
+    if 'velocity_smooth':
+        positions['split'] = pd.to_timedelta(
+            500 / positions['velocity_smooth'].replace({0.: np.nan}), unit='s'
+        )
+    else:
+        positions['split'] = pd.to_timedelta(
+            500 / positions['metrePerSecond'].replace({0.: np.nan}), unit='s'
+        )
+
     return positions
 
 
@@ -133,21 +145,22 @@ def _parse_fit_positions(positions):
             subset=['position_lat', 'position_long']
         ).reset_index(drop=True)
 
-    last = positions.index[-1]
-    positions['distance'] /= 1000
-    positions['timeElapsed'] = positions.time - positions.time.iloc[0]
-    positions['timeDelta'] = - positions.time.diff(-1)
-    positions.loc[last, 'timeDelta'] = pd.Timedelta(0)
+    # last = positions.index[-1]
+    # positions['distance'] /= 1000
+    # positions['timeElapsed'] = positions.time - positions.time.iloc[0]
+    # positions['timeDelta'] = - positions.time.diff(-1)
+    # positions.loc[last, 'timeDelta'] = pd.Timedelta(0)
 
     if 'position_lat' in positions.columns:
         positions['latitude'] = positions.position_lat * _SEMICIRCLE_SCALE
         positions['longitude'] = positions.position_long * _SEMICIRCLE_SCALE
-        positions['distanceDelta'] = - positions.distance.diff(-1)
-        positions.loc[last, 'distanceDelta'] = 0
-        positions['bearing_r'] = geodesy.rad_bearing(
-            positions, positions.shift(-1))
-        positions.loc[last, 'bearing_r'] = positions.bearing_r.iloc[-2]
-        positions['bearing'] = np.rad2deg(positions.bearing_r)
+        process_latlontime(positions)
+        # positions['distanceDelta'] = - positions.distance.diff(-1)
+        # positions.loc[last, 'distanceDelta'] = 0
+        # positions['bearing_r'] = geodesy.rad_bearing(
+        #     positions, positions.shift(-1))
+        # positions.loc[last, 'bearing_r'] = positions.bearing_r.iloc[-2]
+        # positions['bearing'] = np.rad2deg(positions.bearing_r)
 
     return positions
 

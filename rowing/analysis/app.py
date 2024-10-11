@@ -627,7 +627,6 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
 
         points = draw_gps_landmarks(
             gps_data, set_landmarks, new_landmarks, map_style=map_style, height=height)
-        print(points)
 
     return set_landmarks
 
@@ -708,7 +707,7 @@ def points_to_landmarks(points):
 
     sel_landmarks = st.data_editor(
         tables, column_order=landmarks_cols + ['distance'], num_rows='dynamic')
-    print(sel_landmarks)
+
     points = [points[i] for i in sel_landmarks.point.dropna()]
     sel_landmarks['original'] = False
     return points, sel_landmarks[landmarks_cols + ['original']]
