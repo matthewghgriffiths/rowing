@@ -67,7 +67,7 @@ def make_gpx_track(data):
     return gpx
 
 
-def process_latlontime(positions):
+def process_latlontime(positions, min_speed=0.5):
     first = positions.index[0]
     last = positions.index[-1]
     if positions.time.dt.tz:
@@ -88,11 +88,17 @@ def process_latlontime(positions):
     )
     if 'velocity_smooth' in positions:
         positions['split'] = pd.to_timedelta(
-            500 / positions['velocity_smooth'].replace({0.: np.nan}), unit='s'
+            500 /
+            positions['velocity_smooth'].clip(
+                min_speed, None).replace({min_speed: np.nan}),
+            unit='s', errors='coerce'
         )
     else:
         positions['split'] = pd.to_timedelta(
-            500 / positions['metrePerSecond'].replace({0.: np.nan}), unit='s'
+            500 /
+            positions['metrePerSecond'].clip(
+                min_speed, None).replace({min_speed: np.nan}),
+            unit='s', errors='coerce'
         )
 
     return positions

@@ -114,8 +114,9 @@ DEFAULT_REPORT = {
 
 def outlier_range(data, quantiles=(0.1, 0.5, 0.9)):
     y0, y1, y2 = data.quantile(quantiles)
+    r = (y2 - y0) * 0.1
     dt = max(y2 - y1, y1 - y0) * 1.1
-    yrange = (y1 - dt, y1 + dt)
+    yrange = (max(y1 - dt, data.min() - r), min(y1 + dt, data.max() + r))
     return yrange
 
 
@@ -173,7 +174,7 @@ def scatter(data, x, y, fig=None, **kwargs):
     return fig
 
 
-@st.cache_data
+@ st.cache_data
 def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
 
@@ -190,7 +191,7 @@ def download_csv(
     )
 
 
-@st.cache_data
+@ st.cache_data
 def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
     uploaded_data = {
         file.name.rsplit(".", 1)[0]: file.read().decode("utf-8")
@@ -211,13 +212,13 @@ def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
     return data
 
 
-@st.cache_data
+@ st.cache_data
 def parse_excel(file, use_names=True):
     data = pd.read_excel(file, header=None)
     return telemetry.parse_powerline_excel(data, use_names=use_names)
 
 
-@st.cache_data
+@ st.cache_data
 def parse_telemetry_excel(uploaded_files, use_names=True):
     uploaded_data = {
         file.name.rsplit(".", 1)[0]: file
@@ -236,7 +237,7 @@ def parse_telemetry_excel(uploaded_files, use_names=True):
     return data
 
 
-@st.cache_data
+@ st.cache_data
 def parse_telemetry_zip(uploaded_files):
     telem_data = {}
     for file in uploaded_files:
@@ -257,7 +258,7 @@ def parse_telemetry_zip(uploaded_files):
     return telem_data
 
 
-@st.cache_data
+@ st.cache_data
 def get_crossing_times(gpx_data, locations=None, thresh=0.5):
     crossing_times, errors = utils.map_concurrent(
         splits.find_all_crossing_times,
@@ -274,7 +275,7 @@ def get_crossing_times(gpx_data, locations=None, thresh=0.5):
     }
 
 
-@st.cache_data
+@ st.cache_data
 def get_location_timings(gpx_data, locations=None, thresh=0.5):
     location_timings, errors = utils.map_concurrent(
         splits.get_location_timings, gpx_data,
@@ -287,7 +288,7 @@ def get_location_timings(gpx_data, locations=None, thresh=0.5):
     return location_timings
 
 
-@st.cache_data
+@ st.cache_data
 def get_fastest_times(gpx_data):
     best_times, errors = utils.map_concurrent(
         splits.find_all_best_times,
@@ -578,13 +579,13 @@ def edit_landmarks(landmarks):
         st.write(
             """
             Add new landmarks by entering at the bottom.
-            
+
             Delete old landmarks by selecting the left column and pressing delete
-            
+
             Hold shift to select multiple landmarks
-            
+
             The current set of landmarks can be downloaded as a csv
-            
+
             A custom landmarks can be uploaded as a csv which will be merged with the existing landmarks.
             This csv must match the format of the downloaded csv
             """)
@@ -643,13 +644,13 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
             st.write(
                 """
                 Add new landmarks by entering at the bottom.
-                
+
                 Delete old landmarks by selecting the left column and pressing delete
-                
+
                 Hold shift to select multiple landmarks
-                
+
                 The current set of landmarks can be downloaded as a csv
-                
+
                 A custom landmarks can be uploaded as a csv which will be merged with the existing landmarks.
                 This csv must match the format of the downloaded csv
                 """)
@@ -706,9 +707,9 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
         st.subheader("Landmarks from Activities")
         st.markdown(
             """Click on a track on the map to add a custom landmark,
-        Landmarks can be selecting the box on the right of the entry, 
-        the table can be directly edited to change the name/location. 
-        
+        Landmarks can be selecting the box on the right of the entry,
+        the table can be directly edited to change the name/location.
+
         """)
         points, sel_landmarks = points_to_landmarks(get_points(gps_data))
 
@@ -805,7 +806,7 @@ def match_point(point, gps_data):
     return point
 
 
-@st.fragment
+@ st.fragment
 def clickable_map(fig, height=800):
     points, *_ = plotly_mapbox_events(
         fig, override_width='100%', override_height=height
@@ -819,7 +820,7 @@ def clickable_map(fig, height=800):
             st.rerun()
 
 
-@st.cache_data
+@ st.cache_data
 def make_gps_landmarks_figure(gps_data, landmarks, map_style='open-street-map', height=600):
     fig = go.Figure()
     color_cycle = cycle(color_discrete_sequence)
@@ -923,7 +924,7 @@ def draw_gps_landmarks(gps_data, set_landmarks, new_landmarks, map_style='open-s
     return state
 
 
-@st.fragment
+@ st.fragment
 def draw_gps_data(gps_data, locations, index=None):
     fig = make_gps_figure(gps_data, locations, index)
     st.plotly_chart(fig, use_container_width=True)
@@ -995,7 +996,7 @@ def make_gps_figure(gps_data, locations, index=None):
     return fig
 
 
-@st.cache_data
+@ st.cache_data
 def make_stroke_profiles(telemetry_data, piece_data, nres=101):
     profiles = {}
     boat_profiles = {}
@@ -1053,7 +1054,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
     }
 
 
-@st.cache_data
+@ st.cache_data
 def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
     if col == 'Work PC':
         WorkPC_cols = [
@@ -1302,7 +1303,7 @@ def make_telemetry_distance_figure(compare_power, landmark_distances, col, facet
     return fig
 
 
-@st.cache_data
+@ st.cache_data
 def make_telemetry_figures(telemetry_data, piece_data, window: int = 0, tab_names=None):
     if tab_names is None:
         tab_names = telemetry.FIELDS
@@ -1346,7 +1347,7 @@ def make_telemetry_figures(telemetry_data, piece_data, window: int = 0, tab_name
     return telemetry_figures
 
 
-@st.cache_data
+@ st.cache_data
 def figures_to_zipfile(figures, file_type, **kwargs):
     zipdata = io.BytesIO()
     with zipfile.ZipFile(zipdata, 'w') as zipf:
@@ -1882,7 +1883,7 @@ def plot_piece_col(col, piece_information, default_height=600, key='piece', inpu
     # return {(col, f"{start_landmark} to {finish_landmark}"): fig}
 
 
-@st.cache_data
+@ st.cache_data
 def interpolate_power(telemetry_data, dists=0.005, n_iter=10):
     power_gps_data = {}
     for k, data in telemetry_data.items():
@@ -1904,7 +1905,7 @@ def interpolate_power(telemetry_data, dists=0.005, n_iter=10):
     return power_gps_data
 
 
-@st.cache_data
+@ st.cache_data
 def make_gps_heatmap(telemetry_data, dists, file_col, marker_size=5, map_style='open-street-map', height=600):
 
     power_gps_data = interpolate_power(telemetry_data, dists)
