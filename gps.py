@@ -20,8 +20,8 @@ DEFAULT_FACETS = [
     'velocity_smooth',
     'heart_rate',
     'cadence',
-    'bearing',
     'split',
+    'bearing',
 ]
 
 logger = logging.getLogger(__name__)

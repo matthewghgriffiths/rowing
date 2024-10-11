@@ -112,7 +112,7 @@ DEFAULT_REPORT = {
 }
 
 
-def outlier_range(data, quantiles=(0.1, 0.5, 0.9)):
+def outlier_range(data, quantiles=(0.05, 0.5, 0.9)):
     y0, y1, y2 = data.quantile(quantiles)
     r = (y2 - y0) * 0.1
     dt = max(y2 - y1, y1 - y0) * 1.1
@@ -693,6 +693,11 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
     return set_landmarks
 
 
+# Terrible hacks to fix plotly_mapbox_events...
+MAPBOX_WIDTHS = cycle(['100%', '100.1%'])
+MAPBOX_SUFFIXES = cycle(['', ' '])
+
+
 def set_landmarks(gps_data=None, landmarks=None, title=True):
     tab0, tab1, tab2 = tabs = st.tabs([
         "From Pieces",
@@ -737,10 +742,10 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
         )
 
     fig = make_gps_landmarks_figure(
-        gps_data, landmarks, map_style=map_style, height=height)
+        gps_data, landmarks, map_style=map_style, height=height, suffix=next(MAPBOX_SUFFIXES))
     with map:
         st.subheader("Map")
-        clickable_map(fig, height)
+        clickable_map(fig, height, next(MAPBOX_WIDTHS))
         update_points(points)
 
     download_csv(
@@ -780,7 +785,10 @@ def get_points(gps_data):
     if st.session_state.get('new_point'):
         st.session_state['new_point'] = False
         point = st.session_state['last_point']
-        points.append(match_point(point.copy(), gps_data))
+        matched_point = match_point(point.copy(), gps_data)
+        if "name" in matched_point:
+            points.append(matched_point)
+
     return points
 
 
@@ -807,9 +815,13 @@ def match_point(point, gps_data):
 
 
 @ st.fragment
-def clickable_map(fig, height=800):
+def clickable_map(fig, height=800, width='100%'):
+    # fig.config(responsive=True)
     points, *_ = plotly_mapbox_events(
-        fig, override_width='100%', override_height=height
+        fig,
+        override_width=width,
+        override_height=height,
+        key='LandmarksMap'
     )
     if points:
         point, = points
@@ -821,7 +833,7 @@ def clickable_map(fig, height=800):
 
 
 @ st.cache_data
-def make_gps_landmarks_figure(gps_data, landmarks, map_style='open-street-map', height=600):
+def make_gps_landmarks_figure(gps_data, landmarks, map_style='open-street-map', height=600, suffix=' '):
     fig = go.Figure()
     color_cycle = cycle(color_discrete_sequence)
     landmark_color = next(color_cycle)
@@ -832,8 +844,10 @@ def make_gps_landmarks_figure(gps_data, landmarks, map_style='open-street-map', 
                 lon=data.longitude,
                 lat=data.latitude,
                 mode='lines',
-                name=name,
-                line_color=next(color_cycle)
+                name=name + suffix,
+                line_color=next(color_cycle),
+                legendgroup='Activities',
+                legendgrouptitle_text='Activities',
             ))
 
     fig.add_trace(go.Scattermapbox(
@@ -841,7 +855,7 @@ def make_gps_landmarks_figure(gps_data, landmarks, map_style='open-street-map', 
         lat=landmarks.latitude,
         # customdata = set_landmarks,
         mode='markers+text',
-        name='Landmarks',
+        name='Landmarks' + suffix,
         text=landmarks.landmark,
         cluster=dict(
             enabled=True,
@@ -858,32 +872,46 @@ def make_gps_landmarks_figure(gps_data, landmarks, map_style='open-street-map', 
         textposition='bottom right',
     ))
 
-    new_landmark_color = next(color_cycle)
+    first = True
+    landmark_kws = dict(
+        name="Bearings" + suffix,
+        marker={"color": landmark_color},
+        legendgroup='Landmarks',
+        legendgrouptitle_text='Landmarks',
+    )
+    set_kws = dict(
+        showlegend=True,
+        legendgroup='Set Landmarks',
+        legendgrouptitle_text='Set Landmarks',
+    )
     for i, landmark in landmarks.iterrows():
         arrow = geodesy.make_arrow_base(landmark, 0.25, 0.1, 20)
-        color = landmark_color if landmark.original else new_landmark_color
+        if landmark.original:
+            landmark_kws["showlegend"] = first
+            first = False
+            kws = landmark_kws
+        else:
+            set_kws.update(
+                name=f"{landmark.location} @ {landmark.landmark}" + suffix,
+                marker={"color": next(color_cycle)},
+            )
+            kws = set_kws
 
         trace = go.Scattermapbox(
             lon=arrow.longitude,
             lat=arrow.latitude,
             mode='lines',
-            name=landmark.landmark,
             fill='toself',
-            hovertext=f"bearing={landmark.bearing:.1f}",
-            line=dict(
-                width=3,
-            ),
-            marker={"color": color},
+            hovertext=f"{landmark.landmark} bearing={landmark.bearing:.1f}",
+            line=dict(width=3,),
             textposition='bottom right',
-            showlegend=False,
-            legendgroup='Landmarks',
-            legendgrouptitle_text='Landmarks',
+            **kws
         )
         fig.add_trace(trace)
 
     lon = landmarks.longitude.mean()
     lat = landmarks.latitude.mean()
-    zoom = 5
+    zoom = 9
 
     if gps_data:
         positions = pd.concat(gps_data)
@@ -904,11 +932,21 @@ def make_gps_landmarks_figure(gps_data, landmarks, map_style='open-street-map', 
             yanchor="top",
             y=0.99,
             xanchor="left",
-            x=0.01
+            x=0.01,
+            itemsizing='constant',
+            # yref='paper',
+            # entrywidth=50,
+            # autosize=True
         ),
         height=height,
         overwrite=True,
-        template=pio.templates.default,
+        autosize=True,
+        margin=dict(
+            b=0, l=0, r=0, t=0,
+            pad=10,
+            autoexpand=True,
+        )
+        # template=pio.templates.default,
     )
     return fig
 
