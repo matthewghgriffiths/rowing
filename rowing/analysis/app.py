@@ -112,6 +112,67 @@ DEFAULT_REPORT = {
 }
 
 
+def outlier_range(data, quantiles=(0.05, 0.5, 0.95)):
+    y0, y1, y2 = data.quantile(quantiles)
+    dt = max(y2 - y1, y1 - y0) * 1.1
+    yrange = (y1 - dt, y1 + dt)
+    return yrange
+
+
+def scatter(data, x, y, fig=None, **kwargs):
+    fig = fig or go.Figure()
+
+    xdata = data[x]
+    ydata = data[y]
+
+    xaxis = "xaxis" + kwargs.get("xaxis", "x")[1:]
+    yaxis = "yaxis" + kwargs.get("yaxis", "y")[1:]
+    yaxis_layout = dict(title=dict(text=y))
+    xaxis_layout = dict(title=dict(text=x))
+    if yaxis != "yaxis":
+        yaxis_layout.update(
+            side='right',
+            tickmode="sync",
+            overlaying="y",
+            autoshift=True,
+            automargin=True,
+        )
+
+    if x_is_td := pd.api.types.is_timedelta64_dtype(xdata):
+        xdata = xdata + pd.Timestamp(0)
+        xaxis_layout.update(
+            tickformat="%-M:%S",
+            range=outlier_range(xdata)
+        )
+    if y_is_td := pd.api.types.is_timedelta64_dtype(ydata):
+        ydata = ydata + pd.Timestamp(0)
+        yaxis_layout.update(
+            tickformat="%-M:%S",
+            range=outlier_range(ydata)
+        )
+
+    kwargs.setdefault("name", y)
+    if 'text' not in kwargs:
+        kwargs['text'] = data.apply((
+            ("%s={0.%s} " % (x, x))
+            + ("%s={0.%s}" % (y, y))
+        ).format, axis=1),
+
+    fig.add_trace(
+        go.Scatter(
+            x=xdata,
+            y=ydata,
+            **kwargs,
+        )
+    )
+    fig.update_layout({
+        yaxis: yaxis_layout,
+        xaxis: xaxis_layout,
+    })
+
+    return fig
+
+
 @st.cache_data
 def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
@@ -859,7 +920,6 @@ def draw_gps_landmarks(gps_data, set_landmarks, new_landmarks, map_style='open-s
         use_container_width=True,
         selection_mode=['points'],
     )
-    print(1, state)
     return state
 
 

@@ -13,6 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from rowing import utils
 from rowing.analysis import app, strava, garmin, splits
+from rowing.world_rowing.fields import is_timedelta64_dtype
 
 
 DEFAULT_FACETS = [
@@ -144,6 +145,8 @@ def main(state=None):
 
 @st.fragment
 def plot_activity_data(gps_data):
+    tabs = st.tabs(gps_data)
+    st.divider()
     with st.popover("Figure settings"):
         height = st.number_input(
             "Set profile figure height",
@@ -151,59 +154,57 @@ def plot_activity_data(gps_data):
             key='plot_activity_data_height',
         )
 
-    tabs = st.tabs(gps_data)
     for tab, (name, data) in zip(tabs, gps_data.items()):
         plot_data = data.reset_index()
-        options = [
-            c for c in DEFAULT_FACETS if c in data
-        ] + list(plot_data.columns.difference(DEFAULT_FACETS))
+        default = [c for c in DEFAULT_FACETS if c in data]
+        options = default + list(plot_data.columns.difference(DEFAULT_FACETS))
         with tab:
-            c = st.selectbox(
-                "Plot on left axis",
-                key=f"{name}_plotleft",
-                index=0,
-                options=options,
-            )
-            c2 = st.selectbox(
-                "Plot on right axis",
-                key=f"{name}_plotright",
-                index=None,
-                options=options,
-            )
-
-            fig = px.line(
-                plot_data,
-                x='distance', y=c,
-                # color='leg',
-                # line_dash='leg',
-            )
-            fig.update_layout(height=height)
-            if c2:
-                fig2 = px.line(
-                    plot_data,
-                    x='distance', y=c2,
-                    # color='leg',
-                    # line_dash='leg',
+            col1, col2 = st.columns(2)
+            with col1:
+                left_axis = st.multiselect(
+                    "Plot on left axis",
+                    key=f"{name}_plotleft",
+                    # index=0,
+                    default=default[:1],
+                    options=options,
                 )
-                fig2.update_traces(opacity=0.5)
+            with col2:
+                right_axis = st.multiselect(
+                    "Plot on right axis",
+                    key=f"{name}_plotright",
+                    default=[],
+                    options=options,
+                )
 
-                for tr in fig2.data:
-                    tr.yaxis = 'y2'
-                    tr.showlegend = False
-                    fig.add_trace(tr)
+            fig = go.Figure()
+            for c in left_axis:
+                fig = app.scatter(
+                    plot_data, 'distance', c, fig=fig
+                )
+            for c2 in right_axis:
+                fig = app.scatter(
+                    plot_data, 'distance', c2, fig=fig, yaxis='y2'
+                )
 
-                fig.update_layout({
-                    "yaxis2": dict(
-                        title=dict(text=c2),
-                        side='right',
-                        tickmode="sync",
-                        overlaying="y",
-                        autoshift=True,
-                        automargin=True,
-                    )
-                })
-
-            fig.update_layout(height=height)
+            fig.update_layout(
+                height=height,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                ),
+                yaxis=dict(
+                    title="+".join(left_axis)
+                ),
+                yaxis2=dict(
+                    title=" + ".join(right_axis)
+                ),
+                xaxis=dict(
+                    title='Distance (km)'
+                )
+            )
             st.plotly_chart(fig, use_container_width=True)
 
 
@@ -401,7 +402,16 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
                     )
                 })
 
-            fig.update_layout(height=height)
+            fig.update_layout(
+                height=height,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                ),
+            )
             st.plotly_chart(fig, use_container_width=True)
 
 
