@@ -229,32 +229,6 @@ def plot_activity_data(gps_data):
             st.plotly_chart(fig, use_container_width=True)
 
 
-@st.fragment
-def garmin_stats(garmin_client):
-    if garmin_client:
-        cols = st.columns(2)
-        with cols[0]:
-            date1 = st.date_input(
-                "Select Date",
-                key="Garmin Stats Select Date",
-                value=pd.Timestamp.today() + pd.Timedelta("1d"),
-                format='YYYY-MM-DD'
-            )
-        with cols[1]:
-            date2 = st.date_input(
-                "Range",
-                key="Garmin Stats Range",
-                value=pd.Timestamp.today() - pd.Timedelta("7d"),
-                format='YYYY-MM-DD'
-            )
-
-        stats = garmin.get_garmin_sleep_stats(
-            garmin_client.username, date1, date2
-        )
-
-        st.dataframe(stats)
-
-
 def clear_state():
     st.query_params.clear()
     st.session_state.clear()

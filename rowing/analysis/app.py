@@ -2,6 +2,7 @@ import streamlit as st
 import io
 import zipfile
 import logging
+import datetime
 from itertools import count, cycle
 
 import numpy as np
@@ -151,6 +152,20 @@ def scatter(data, x, y, fig=None, **kwargs):
             tickformat="%-M:%S",
             range=outlier_range(ydata)
         )
+    if y_is_obj := pd.api.types.is_object_dtype(ydata):
+        t, = ydata.map(type).mode()
+        if t == datetime.time:
+            t0 = pd.Timestamp(0)
+            ydata = ydata.map(lambda t: pd.Timestamp(
+                year=t0.year, month=t0.month, day=t0.day,
+                hour=t.hour,
+                minute=t.minute,
+                second=t.second,
+                microsecond=t.microsecond,
+            ) if pd.notna(t) else pd.Timestamp(np.nan))
+            yaxis_layout.update(
+                tickformat="%HH:%MM"
+            )
 
     kwargs.setdefault("name", y)
     if 'text' not in kwargs:
@@ -317,28 +332,19 @@ def select_pieces(all_crossing_times):
         all_crossing_times.dt.date.isin(select_dates)
     ].sort_index(level=(0, 4)).droplevel("location")
 
-    landmark_distance = sel_times.reset_index(
-        'distance'
-    ).distance
-    landmarks = landmark_distance.groupby(
-        level=2).mean().sort_values().index
-    landmark_dist = landmark_distance.unstack(
-        'landmark'
-    ).dropna(axis=1).mean(0)
+    longest_leg = sel_times.loc[
+        sel_times.groupby(level=[0, 1]).size().idxmax()]
+    leg_landmarks = longest_leg.index.get_level_values(0)
+    other_landmarks = sel_times.index.get_level_values(
+        'landmark').difference(leg_landmarks)
+    landmarks = leg_landmarks.append(other_landmarks)
 
-    if landmark_dist.size < 2:
-        landmark_distance = sel_times.sort_values().reset_index("distance").distance
-        landmark_dist = landmark_distance.unstack(
-            'landmark').mean(0)
-        landmarks = landmark_distance.index.get_level_values(
-            "landmark").drop_duplicates()
-
-    if not len(landmark_dist):
+    if not len(leg_landmarks):
         return
 
     start, end = map(
         int, landmarks.get_indexer(
-            [landmark_dist.idxmin(), landmark_dist.idxmax()]
+            [leg_landmarks[0], leg_landmarks[-1]]
         )
     )
     with cols[1]:
@@ -671,7 +677,6 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
         )
 
     with tab0:
-        # if True:
         st.subheader("Map of Landmarks")
         cols = st.columns([5, 2])
         with cols[0]:

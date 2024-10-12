@@ -7,7 +7,7 @@ import functools
 import pandas as pd
 
 from rowing.app import inputs
-from rowing.analysis import files
+from rowing.analysis import files, app
 from rowing import utils
 
 GARMIN_EPOCH = pd.Timestamp('1989-12-31 00:00:00')
@@ -83,6 +83,8 @@ def login(user_container=None, pw_container=None, mfa_container=None):
             client.prompt_mfa = prompt_mfa(mfa_container)
             if client.login():
                 return client
+            else:
+                st.write(f"Could not log in {username}")
         except garth.exc.GarthHTTPError as e:
             print(e)
 
@@ -130,11 +132,11 @@ def get_activities(client, limit, *args):
 def download_fit(client, activity_id):
     zip_data = client.download_activity(
         activity_id, dl_fmt=client.ActivityDownloadFormat.ORIGINAL)
-    return files.zipfit_to_json(io.BytesIO(zip_data))
+    return io.BytesIO(zip_data)
 
 
 def load_fit(client, activity_id):
-    data = download_fit(client, activity_id)
+    data = files.zipfit_to_json(download_fit(client, activity_id))
     return parse_garmin_fit_json(data)
 
 
@@ -147,6 +149,7 @@ def download_gpx(client, activity_id):
 get_garmin_activities = cache_client(get_activities)
 load_garmin_fit = cache_client(load_fit)
 download_garmin_gpx = cache_client(download_gpx)
+download_garmin_fit = cache_client(download_fit)
 
 
 def get_activity_hr(client, activity_id):
@@ -384,8 +387,25 @@ def garmin_activities_app(garmin_client, cols=None):
 
             if st.toggle("Download gpx data"):
                 download_gpx_files(garmin_client, sel_activities)
-
+            if st.toggle("Download fit file"):
+                download_fit_files(garmin_client, sel_activities)
             return garmin_data
+
+
+@st.fragment
+def download_fit_files(client, activities):
+    for _, activity in activities.iterrows():
+        fit = download_garmin_fit(
+            client.username, activity.activityId
+        )
+        file_name = utils.safe_name(activity.activity)
+        st.download_button(
+            f":inbox_tray: Download: {file_name}.fit",
+            fit,
+            # type='primary',
+            # mime="text/plain",
+            file_name=f"{file_name}.fit",
+        )
 
 
 @st.fragment
@@ -418,7 +438,7 @@ def garmin_stats_app(garmin_client):
         date2 = st.date_input(
             "Range",
             key="Garmin Stats Range",
-            value=pd.Timestamp.today() - pd.Timedelta("7d"),
+            value=pd.Timestamp.today() - pd.Timedelta("0d"),
             format='YYYY-MM-DD'
         )
 
@@ -438,3 +458,72 @@ def garmin_stats_app(garmin_client):
             'awakeSleep': st.column_config.TimeColumn(format="H:mm"),
         }
     )
+    if st.toggle("Plot stats"):
+        plot_stats(stats)
+
+
+@st.fragment
+def plot_stats(health_stats):
+    health_stats = health_stats.reset_index()
+    st.divider()
+    with st.popover("Figure settings"):
+        height = st.number_input(
+            "Set profile figure height",
+            100, None, 600, step=50,
+            key='plot_garmin_stats_height',
+        )
+
+    options = health_stats.columns
+    col0, col1, col2 = st.columns((1, 2, 2))
+    with col0:
+        x = st.selectbox(
+            "Set x-axis",
+            key='garmin_stats_x',
+            options=options,
+            index=0,
+        )
+    with col1:
+        left_axis = st.multiselect(
+            "Plot on left axis",
+            key="garmin_stats_plotleft",
+            default=['restingHeartRate'],
+            options=options,
+        )
+    with col2:
+        right_axis = st.multiselect(
+            "Plot on right axis",
+            key="garmin_stats_plotright",
+            default=[],
+            options=options,
+        )
+
+    fig = app.go.Figure()
+    for c in left_axis:
+        fig = app.scatter(
+            health_stats, x, c, fig=fig
+        )
+    for c2 in right_axis:
+        fig = app.scatter(
+            health_stats, x, c2, fig=fig, yaxis='y2'
+        )
+
+    fig.update_layout(
+        height=height,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        yaxis=dict(
+            title="+".join(left_axis)
+        ),
+        yaxis2=dict(
+            title=" + ".join(right_axis)
+        ),
+        xaxis=dict(
+            title=x
+        )
+    )
+    st.plotly_chart(fig, use_container_width=True)
