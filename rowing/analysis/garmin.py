@@ -15,6 +15,11 @@ UNIX_EPOCH = pd.Timestamp(0)
 GARMIN_TIMESTAMP = (GARMIN_EPOCH - UNIX_EPOCH) // pd.Timedelta('1s')
 
 
+def parse_garmin_fit(fit_data):
+    data = files.zipfit_to_json(fit_data)
+    return parse_garmin_fit_json(data)
+
+
 def parse_garmin_fit_json(fit_json):
     positions = pd.DataFrame.from_records(
         fit_json).dropna(axis=1, how='all')
@@ -311,7 +316,6 @@ def time_config():
 
 def garmin_activities_app(garmin_client, cols=None):
     print(f"Hello {garmin_client.full_name}")
-
     cols = cols or st.columns((1, 3, 3, 3))
     with cols[0]:
         st.image(

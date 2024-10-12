@@ -114,6 +114,19 @@ def main(state=None):
 
     with garmin_tab:
         garmin_client = garmin.login(*st.columns(3))
+        uploaded_fits = st.file_uploader(
+            "(optional) Upload .fit files",
+            type='fit',
+            accept_multiple_files=True
+        )
+        fit_data, errors = utils.map_concurrent(
+            garmin.parse_garmin_fit,
+            {file.name.rsplit(".", 1)[0]: file for file in uploaded_fits},
+            singleton=True,
+        )
+        print(fit_data)
+        gpx_data.update(fit_data)
+
         if garmin_client:
             activities_tab, stats_tab = st.tabs(
                 ["Load Activities", "Load Health Stats"])

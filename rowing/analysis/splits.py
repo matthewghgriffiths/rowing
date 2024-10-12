@@ -446,6 +446,8 @@ def get_pieces_interval_averages(piece_timestamps, piece_data, time='Time'):
     for piece, timestamps in piece_timestamps.iterrows():
         _, name, leg = piece
         data = piece_data[name].sort_values(time).dropna(subset=[time])
+        invalid = (timestamps.shift() - timestamps) > pd.Timedelta(0)
+        timestamps = timestamps[~ invalid]
         avgP, intervalP = get_interval_averages(
             data.drop(columns=[time]),
             data[time],
