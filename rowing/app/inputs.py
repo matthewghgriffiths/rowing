@@ -114,7 +114,7 @@ def filter_dataframe(
             col_key = f"{key}.{column}"
             # Treat columns with < 10 unique values as categorical
             categorical = (
-                is_categorical_dtype(df[column])
+                isinstance(df[column].dtype, pd.CategoricalDtype)
                 or df[column].nunique() < 10
                 or column in categories
             )

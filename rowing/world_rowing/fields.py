@@ -3,7 +3,7 @@ from functools import partial
 
 import pandas as pd
 from pandas.api.types import (
-    is_categorical_dtype,
+    # is_categorical_dtype,
     is_datetime64_any_dtype,
     is_timedelta64_dtype,
     is_numeric_dtype,
@@ -147,6 +147,10 @@ race_event_competitionId = 'race_event_competitionId'
 
 distance_from_paceboat = "Distance from Pace Boat"
 PGMT_paceboat = "% Pace Boat Speed"
+
+
+def is_categorical_dtype(dtype):
+    return isinstance(dtype, pd.CategoricalDtype)
 
 
 dtype_checks = {

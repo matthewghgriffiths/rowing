@@ -110,8 +110,9 @@ def parse_powerline_data(split_data, use_names=True):
     gps_info = split_data['GPS Info'].iloc[0]
     rig_info = split_data['Rig Info']
 
-    split_data['Crew List'] = crew_list = crew_data.set_index("Position").Name
-    crew_list[crew_list.isna()] = crew_list.index[crew_list.isna()]
+    crew_list = crew_data.set_index("Position").Name
+    crew_list = crew_list.where(crew_list.notna(), crew_list.index).astype(str)
+    split_data['Crew List'] = crew_list
 
     for fmt in [
         "%d %b %Y %H:%M:%S (%Z)",
@@ -147,15 +148,18 @@ def parse_powerline_data(split_data, use_names=True):
 
     positions = pd.concat({
         "time": pd.to_timedelta(gps_data['UTC Time'].Boat, unit='milli') + start_date,
-        "longitude": gps_data.long / long_scale + lon,
-        "latitude": gps_data.lat / lat_scale + lat
+        "longitude": gps_data.long.apply(
+            pd.to_numeric, errors='coerce') / long_scale + lon,
+        "latitude": gps_data.lat.apply(
+            pd.to_numeric, errors='coerce') / lat_scale + lat
     }, axis=1).dropna().droplevel(1, axis=1)
 
-    positions = files.process_latlontime(positions)
-    positions['timeDelta'] = (
-        positions.time.shift(-1) - positions.time).fillna(pd.Timedelta(0))
-    positions['metrePerSeconds'] = positions.distanceDelta * \
-        1000 / positions['timeDelta'].dt.total_seconds()
+    if not positions.empty:
+        positions = files.process_latlontime(positions)
+        positions['timeDelta'] = (
+            positions.time.shift(-1) - positions.time).fillna(pd.Timedelta(0))
+        positions['metrePerSeconds'] = positions.distanceDelta * \
+            1000 / positions['timeDelta'].dt.total_seconds()
 
     power = power_data.copy()
     power.columns = set_rower_sides(power.columns, rig_info)
@@ -164,21 +168,21 @@ def parse_powerline_data(split_data, use_names=True):
     )
     stroke_length = power.MaxAngle - power.MinAngle
     effect = stroke_length - power.CatchSlip - power.FinishSlip
-    power = pd.concat([
+    split_data['power'] = power = pd.concat([
         power, pd.concat({
             "Length": stroke_length,
             "Effective": effect,
         }, axis=1)
     ], axis=1)
 
-    split_data['positions'] = positions
-    split_data["Periodic"].columns = cols = set_rower_sides(
+    split_data['positions'] = positions.sort_index(axis=1)
+    split_data["Periodic"].columns = set_rower_sides(
         split_data["Periodic"].columns, rig_info)
     if use_names:
         split_data['power'] = power.rename(
             columns=crew_list.to_dict(), level=1)
         split_data["Periodic"] = split_data["Periodic"].rename(
-            columns=crew_list.to_dict(), level=1)
+            columns=crew_list.to_dict(), level=1).sort_index(axis=1)
 
     return split_data
 
@@ -216,11 +220,13 @@ def interp_series(s, x, **kwargs):
 
 
 def norm_stroke_profile(stroke_profile, n_res):
+    stroke_norm_time = stroke_profile[
+        ('Normalized Time', 'Boat', 'Boat')].squeeze()
     stroke = (
-        stroke_profile[('Normalized Time', 'Boat', 'Boat')].diff() < 0
+        stroke_norm_time.diff() < 0
     ).cumsum()
     return stroke_profile.set_index(
-        ('Normalized Time', 'Boat', 'Boat')
+        stroke_norm_time.values
     ).groupby(
         stroke.values
     ).apply(
@@ -272,7 +278,7 @@ def compare_piece_telemetry(telemetry_data, piece_data, gps_data, landmark_dista
     compare_power = pd.concat(
         telemetry_distance_data,
         names=piece_data['Timestamp'].index.names
-    ).stack([1, 2]).reset_index()
+    ).stack(level=[1, 2], future_stack=True).reset_index()
 
     return compare_power
 

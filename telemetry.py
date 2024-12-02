@@ -547,7 +547,8 @@ def main(state=None):
                                     partial(utils.format_timedelta, hours=True)
                                 )
 
-                        save_data.to_excel(xlf, name.replace("/", " per "))
+                        save_data.to_excel(
+                            xlf, sheet_name=name.replace("/", " per "))
 
                 xldata.seek(0)
                 start_landmark = piece_information['start_landmark']

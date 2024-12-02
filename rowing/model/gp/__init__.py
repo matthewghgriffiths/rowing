@@ -1,7 +1,7 @@
 from .utils import OptTransform, transform, apply, init_apply
 from .kernels import (
     SEKernel, IntSEKernel, Bias, WhiteNoise,
-    SumKernel, ProductKernel
+    SumKernel, ProductKernel, DotProduct, SEPeriodicKernel
 )
 from .gpr import (
     GaussianProcessRegression,

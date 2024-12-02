@@ -61,18 +61,56 @@ class AbstractKernel(ABC, hk.Module):
 
 
 class DotProduct(AbstractKernel):
-    def __init__(self, variance=None, name=None, shape=()):
+    def __init__(self, offset=None, variance=None, name=None, shape=()):
         super().__init__(name=name)
+        self.offset = offset or hk.get_parameter(
+            "offset", shape=shape, dtype="f", init=jnp.zeros)
         self.variance = variance or jnp.exp(hk.get_parameter(
             "log_var", shape=shape, dtype="f", init=jnp.zeros))
 
     def k(self, X0, X1=None):
         X0, X1 = self.to_2d(X0, X1)
-        return jax.vmap(jnp.dot)(X0 * self.variance, X1)
+        return jax.vmap(jnp.dot)(
+            (X0 - self.offset) * self.variance, (X1 - self.offset))
 
     def K(self, X0, X1=None):
         X0, X1 = self.to_2d(X0, X1)
         return (X0 * self.variance) @ X1.T
+
+
+class ChangePoint(AbstractKernel):
+    def __init__(self, change=None, scale=None, variance=None, name=None, shape=()):
+        super().__init__(name=name)
+        self.change = change if change is not None else hk.get_parameter(
+            "change", shape=shape, dtype="f", init=jnp.zeros)
+        self.scale = scale or hk.get_parameter(
+            "scale", shape=shape, dtype="f", init=jnp.ones)
+        self.variance = variance or jnp.exp(hk.get_parameter(
+            "log_var", shape=shape, dtype="f", init=jnp.zeros))
+
+    def k(self, X0, X1=None):
+        X0, X1 = self.to_2d(X0, X1)
+        S0 = jax.nn.sigmoid((X0 - self.change) / self.scale)
+        S1 = jax.nn.sigmoid((X1 - self.change) / self.scale)
+        return (S0 * self.variance * S1).sum(-1)
+
+
+class ChangePoints(AbstractKernel):
+    def __init__(self, change, scale=None, variance=None, name=None):
+        super().__init__(name=name)
+        self.change = jnp.sort(change)
+        self.scale = scale or hk.get_parameter(
+            "scale", shape=self.change.shape, dtype="f", init=jnp.ones)
+        self.variance = variance or jnp.exp(hk.get_parameter(
+            "log_var", shape=self.change[1:].shape, dtype="f", init=jnp.zeros))
+
+    def k(self, X0, X1=None):
+        X0, X1 = self.to_2d(X0, X1)
+        S0 = jax.nn.sigmoid((X0 - self.change) / self.scale)
+        S1 = jax.nn.sigmoid((X1 - self.change) / self.scale)
+        R0 = S0[..., :-1] * (1 - S0[..., 1:])
+        R1 = S1[..., :-1] * (1 - S1[..., 1:])
+        return (R0 * R1 * self.variance).sum(-1)
 
 
 class ArcCosine(AbstractKernel):
@@ -248,24 +286,30 @@ class Matern(AbstractKernel):
         return self.variance * self.matern(d)
 
 
+def matern12(d):
+    return jnp.exp(- d)
+
+
+def matern32(d):
+    sqrt3 = jnp.sqrt(3)
+    return (1 + sqrt3 * d) * jnp.exp(- sqrt3 * d)
+
+
+def matern52(d):
+    sqrt5 = jnp.sqrt(5)
+    return (1 + sqrt5 * d + 5 / 3 * jnp.square(d)) * jnp.exp(- sqrt5 * d)
+
+
 class Matern12(Matern):
-    @staticmethod
-    def matern(d):
-        return jnp.exp(- d)
+    matern = staticmethod(matern12)
 
 
 class Matern32(Matern):
-    @staticmethod
-    def matern(d):
-        sqrt3 = jnp.sqrt(3)
-        return (1 + sqrt3 * d) * jnp.exp(- sqrt3 * d)
+    matern = staticmethod(matern32)
 
 
 class Matern52(Matern):
-    @staticmethod
-    def matern(d):
-        sqrt5 = jnp.sqrt(5)
-        return (1 + sqrt5 * d + 5 / 3 * jnp.square(d)) * jnp.exp(- sqrt5 * d)
+    matern = staticmethod(matern52)
 
 
 class IntSEKernel(AbstractKernel):
@@ -371,3 +415,56 @@ def iint_se_kernel(t0, t1, t2, s=1.):
         - jnp.exp(-d12**2 / 2)
         - 1
     ) * s**2
+
+
+def sin_dist2d(X1, X2, period=1., axis=-1):
+    return jnp.abs(jnp.sin(jnp.sqrt(dist2d(X1, X2, period, axis=axis)) * jnp.pi))
+
+
+def se_periodic_kernel(X1, X2, period=1., l=1., axis=-1):
+    d12 = sin_dist2d(X1, X2, period, axis=axis) / l
+    return jnp.exp(-2 * d12**2)
+
+
+class SEPeriodicKernel(AbstractKernel):
+    def __init__(self, period=None, scale=None, variance=None, *, name=None, shape=()):
+        super().__init__(name=name)
+        self.variance = variance or jnp.exp(hk.get_parameter(
+            "log_var", shape=(), dtype="f", init=jnp.zeros))
+        self.period = period if period is not None else jnp.exp(hk.get_parameter(
+            "log_period", shape=shape, dtype="f", init=jnp.zeros))
+        self.scale = scale if scale is not None else jnp.exp(hk.get_parameter(
+            "log_scale", shape=shape, dtype="f", init=jnp.zeros))
+
+    def k(self, X0, X1=None):
+        X0, X1 = self.to_2d(X0, X1)
+        return self.variance * se_periodic_kernel(X0, X1, self.period, self.scale)
+
+
+class PeriodicMatern(Matern):
+    matern: Callable[[jax.Array], jax.Array]
+
+    def __init__(self, period=None, scale=None, variance=None, *, name=None, shape=()):
+        super().__init__(name=name)
+        self.variance = variance or jnp.exp(hk.get_parameter(
+            "log_var", shape=(), dtype="f", init=jnp.zeros))
+        self.period = period if period is not None else jnp.exp(hk.get_parameter(
+            "log_period", shape=shape, dtype="f", init=jnp.zeros))
+        self.scale = scale if scale is not None else jnp.exp(hk.get_parameter(
+            "log_scale", shape=shape, dtype="f", init=jnp.zeros))
+
+    def dist2d(self, X0, X1=None):
+        X0, X1 = self.to_2d(X0, X1)
+        return sin_dist2d(X0, X1, self.period) / self.scale
+
+
+class PeriodicMatern12(PeriodicMatern):
+    matern = staticmethod(matern52)
+
+
+class PeriodicMatern32(PeriodicMatern):
+    matern = staticmethod(matern32)
+
+
+class PeriodicMatern52(PeriodicMatern):
+    matern = staticmethod(matern52)

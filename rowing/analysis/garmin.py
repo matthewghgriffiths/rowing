@@ -7,7 +7,7 @@ import functools
 import pandas as pd
 
 from rowing.app import inputs
-from rowing.analysis import files, app
+from rowing.analysis import files
 from rowing import utils
 
 GARMIN_EPOCH = pd.Timestamp('1989-12-31 00:00:00')
@@ -141,8 +141,7 @@ def download_fit(client, activity_id):
 
 
 def load_fit(client, activity_id):
-    data = files.zipfit_to_json(download_fit(client, activity_id))
-    return parse_garmin_fit_json(data)
+    return parse_garmin_fit(download_fit(client, activity_id))
 
 
 def download_gpx(client, activity_id):
@@ -468,6 +467,7 @@ def garmin_stats_app(garmin_client):
 
 @st.fragment
 def plot_stats(health_stats):
+    from rowing.analysis import app
     health_stats = health_stats.reset_index()
     st.divider()
     with st.popover("Figure settings"):

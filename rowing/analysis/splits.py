@@ -66,8 +66,9 @@ def find_all_crossing_times(positions, locations=None, thresh=0.5):
     names = list(locations.index.names) + ["distance"]
 
     times = pd.concat({
-        loc: find_crossing_times(positions, pos, thresh=thresh)
+        loc: crossings
         for loc, pos in locations.iterrows()
+        if len(crossings := find_crossing_times(positions, pos, thresh=thresh))
     },
         names=names
     ).sort_index(level=-1).reset_index()
@@ -453,6 +454,8 @@ def get_pieces_interval_averages(piece_timestamps, piece_data, time='Time'):
             data[time],
             timestamps
         )
+        print(name)
+        print(avgP)
         for k in avgP.columns:
             avg_telem.setdefault(k, {})[name, leg] = avgP[k].T
         for k in intervalP.columns:

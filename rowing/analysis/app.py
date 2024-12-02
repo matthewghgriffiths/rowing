@@ -11,7 +11,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
-from streamlit_plotly_mapbox_events import plotly_mapbox_events
 
 from rowing.analysis import splits, files, geodesy, telemetry
 from rowing import utils
@@ -722,8 +721,9 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
 
         """)
         points, sel_landmarks = points_to_landmarks(get_points(gps_data))
-
-        landmarks = pd.concat([sel_landmarks, landmarks])
+        if not sel_landmarks.empty:
+            print(sel_landmarks)
+            landmarks = pd.concat([sel_landmarks, landmarks])
 
     with tab1:
         with st.container():
@@ -821,6 +821,7 @@ def match_point(point, gps_data):
 
 @ st.fragment
 def clickable_map(fig, height=800, width='100%'):
+    from streamlit_plotly_mapbox_events import plotly_mapbox_events
     # fig.config(responsive=True)
     points, *_ = plotly_mapbox_events(
         fig,
@@ -1046,7 +1047,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
     crew_profiles = {}
     for piece, piece_times in piece_data['Timestamp'].iterrows():
         name, leg = piece[1:3]
-        profile = telemetry_data[name]['Periodic']
+        profile = telemetry_data[name]['Periodic'].sort_index(axis=1)
         start_time = piece_times.min()
         finish_time = piece_times.max()
         piece_profile = profile[
@@ -1074,7 +1075,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
                 boat_profile.columns)
         ].rename_axis(
             columns=("Measurement", "Position", 'Side')
-        ).stack([1, 2]).reset_index(
+        ).stack(level=[1, 2], future_stack=True).reset_index(
             ["Position", 'Side']
         ).rename_axis(
             index="Normalized Time"
