@@ -2084,7 +2084,7 @@ def set_gps_heatmap(
                 f"choose data type to plot for {k}",
                 options=options,
                 index=index,
-                key='heatmap_datatype' + key
+                key=f'heatmap_datatype_{k}' + key
             )
 
         with data_container:
@@ -2095,7 +2095,7 @@ def set_gps_heatmap(
                 f"choose data to plot for {k}",
                 options=options,
                 index=index,
-                key='heatmap_data' + key
+                key=f'heatmap_data_{k}' + key
             )
 
         file_col[k] = (c0, c1)
