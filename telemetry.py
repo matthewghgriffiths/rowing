@@ -404,7 +404,7 @@ def main(state=None):
             template_container = st.popover("Report template")
 
         with template_container:
-            if st.button("use default"):
+            if st.toggle("use default"):
                 for k0, vs in app.DEFAULT_REPORT.items():
                     for k1, v in vs.items():
                         k = ".".join([k0, k1])
