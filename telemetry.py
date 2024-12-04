@@ -58,7 +58,7 @@ def main(state=None):
             st.session_state.clear()
             st.cache_resource.clear()
 
-    with st.expander("Upload Telemetry Data"):
+    with st.expander("Upload Telemetry Data", True):
         use_names = st.checkbox("Use crew list", True)
         tabs = st.tabs([
             "Upload text", "Upload csv", "Upload xlsx", "Upload Zip"
