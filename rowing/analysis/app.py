@@ -1117,6 +1117,7 @@ def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
             color='Measurement',
             title=name,
             color_discrete_sequence=color_discrete_sequence,
+            template="plotly_white",
         )
     else:
         plot_data = piece_power.stack(1)[
@@ -1133,7 +1134,7 @@ def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
             y=col,
             color='Position',
             title=name,
-            template="streamlit",
+            template="plotly_white",
             color_discrete_sequence=color_discrete_sequence,
         )
 
@@ -1232,6 +1233,7 @@ def plot_pace_boat(piece_data, landmark_distances, gps_data, height=600, input_c
         y='time behind pace boat (s)',
         color="name",
         line_dash='leg',
+        template="plotly_white",
     )
 
     for landmark, distance in landmark_distances.items():
@@ -1306,6 +1308,7 @@ def make_telemetry_distance_figure(compare_power, landmark_distances, col, facet
             color='Measurement',
             facet_col_spacing=0.01,
             facet_row_spacing=0.02,
+            template="plotly_white",
             # title=name,
             # color_discrete_sequence=app.color_discrete_sequence,
         )
@@ -1729,13 +1732,15 @@ def plot_rower_profiles(piece_information, default_height=600, key="rower_", inp
             y=y,
             color='Position',
             line_dash='Side',
-            title=f"{name}, leg={leg}"
+            title=f"{name}, leg={leg}",
+            template="plotly_white",
         )
         # fig.update_yaxes(
         #     range=yrange
         # )
         fig.update_layout(
-            height=height
+            height=height,
+            template=pio.templates.default,
         )
         figures[f"{name}, leg={leg}: {x}-{y}"] = fig
         # st.plotly_chart(fig, use_container_width=True)
@@ -1796,6 +1801,7 @@ def plot_crew_profile(piece_information, default_height=600, key='', input_conta
     fig.update_layout(
         title=f"{start_landmark} to {finish_landmark}: {y} vs {x}",
         height=height,
+        template=pio.templates.default,
         legend=dict(
             itemclick='toggle',
             itemdoubleclick='toggleothers',
@@ -1852,10 +1858,11 @@ def plot_boat_profile(piece_information, default_height=600, key="boat_", input_
         color='name',
         line_dash='leg',
         facet_row='Measurement',
+        template="plotly_white",
         # title=name
     )
     fig.update_yaxes(matches=None, showticklabels=True)
-    fig.update_layout(height=height)
+    fig.update_layout(height=height, template=pio.templates.default)
 
     return {'Boat profile': fig}, {}
 
@@ -2009,3 +2016,102 @@ def make_gps_heatmap(telemetry_data, dists, file_col, marker_size=5, map_style='
     )
 
     return fig
+
+
+def set_gps_heatmap(
+        telemetry_data,
+        datatype_container=None, data_container=None, settings_container=None,
+        key='', default_height=1000,
+):
+    # cols = st.columns((4, 4, 2))
+    datatype_container = datatype_container or st.container()
+    data_container = data_container or st.container()
+    settings_container = settings_container or st.container()
+    with settings_container:
+        dists = st.number_input(
+            "marker spacing (m)", min_value=1, value=5,
+            key='heatmap_spacing' + key
+        ) / 1000
+        height = st.number_input(
+            "Heatmap height (px)", min_value=100, step=50, value=default_height,
+            key='heatmap_height' + key
+        )
+        marker_size = st.number_input(
+            "Marker size", min_value=1, value=10, key='heatmap_size' + key
+        )
+        map_style = st.selectbox(
+            "map style",
+            ["open-street-map", "carto-positron", "carto-darkmatter"],
+            key='heatmap_style' + key
+        )
+        colorscales = px.colors.named_colorscales()
+        colorscale = st.selectbox(
+            "heatmap color scale",
+            colorscales,
+            index=colorscales.index('plasma'),
+            key='heatmap_colorscale' + key
+        )
+        cmin = st.number_input(
+            "Color scale min (clear for autoscaling)", value=None, key='heatmap_cmin' + key)
+        cmid = st.number_input(
+            "Color scale mid (clear for autoscaling)", value=None, key='heatmap_cmid' + key)
+        cmax = st.number_input(
+            "Color scale max (clear for autoscaling)", value=None, key='heatmap_cmax' + key)
+        zoom = st.number_input(
+            "Zoom level",
+            min_value=0., max_value=30., value=12., step=1.,
+            key='heatmap_zoom' + key
+        )
+
+    c0 = 'AvgBoatSpeed'
+    c1 = 'Boat'
+    file_col = {}
+    for k, data in telemetry_data.items():
+        data = data['power']
+        with datatype_container:
+            _options = [
+                'Angle 0.7 F', 'Angle Max F', 'Average Power', 'AvgBoatSpeed',
+                'CatchSlip', 'Dist/Stroke', 'Drive Start T', 'Drive Time',
+                'Effective', 'FinishSlip', 'Length', 'Max Force PC', 'MaxAngle',
+                'MinAngle', 'Rating', 'Recovery Time', 'Rower Swivel Power',
+                'StrokeNumber', 'SwivelPower''Work PC Q1', 'Work PC Q2',
+                'Work PC Q3', 'Work PC Q4'
+            ]
+            options = data.columns.levels[0].intersection(_options)
+            index = (
+                int(options.get_indexer_for([c0])[0]) if c0 in options else 0)
+            c0 = st.selectbox(
+                f"choose data type to plot for {k}",
+                options=options,
+                index=index,
+                key='heatmap_datatype' + key
+            )
+
+        with data_container:
+            options = data[c0].columns.get_level_values(0)
+            index = (
+                int(options.get_indexer_for([c1])[0]) if c1 in options else 0)
+            c1 = st.selectbox(
+                f"choose data to plot for {k}",
+                options=options,
+                index=index,
+                key='heatmap_data' + key
+            )
+
+        file_col[k] = (c0, c1)
+
+    fig = make_gps_heatmap(
+        telemetry_data, dists, file_col, marker_size=marker_size, map_style=map_style, height=height)
+    fig.update_coloraxes(
+        cmin=cmin,
+        cmid=cmid,
+        cmax=cmax,
+        colorscale=colorscale,
+        showscale=True,
+        colorbar=dict(
+            outlinewidth=0,
+        )
+    )
+    fig.update_layout(mapbox={'zoom': zoom})
+
+    return fig, file_col

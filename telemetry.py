@@ -17,7 +17,7 @@ import plotly.express as px
 import plotly.io as pio
 
 from rowing import utils
-from rowing.analysis import app, telemetry
+from rowing.analysis import app, telemetry, static
 
 logger = logging.getLogger("telemetry")
 # logging.basicConfig(
@@ -158,96 +158,21 @@ def main(state=None):
         cols = st.columns((4, 4, 2))
         with cols[-1]:
             heat_map_settings = st.popover("heat map settings")
-            with heat_map_settings:
-                dists = st.number_input(
-                    "marker spacing (m)", min_value=1, value=5
-                ) / 1000
-                height = st.number_input(
-                    "Heatmap height (px)", min_value=100, step=50, value=default_height
-                )
-                marker_size = st.number_input(
-                    "Marker size", min_value=1, value=10
-                )
-                map_style = st.selectbox(
-                    "map style",
-                    ["open-street-map", "carto-positron", "carto-darkmatter"],
-                    key='heatmap_style'
-                )
-                colorscales = px.colors.named_colorscales()
-                colorscale = st.selectbox(
-                    "heatmap color scale",
-                    colorscales,
-                    index=colorscales.index('plasma'),
-                )
-                cmin = st.number_input(
-                    "Color scale min (clear for autoscaling)", value=None)
-                cmid = st.number_input(
-                    "Color scale mid (clear for autoscaling)", value=None)
-                cmax = st.number_input(
-                    "Color scale max (clear for autoscaling)", value=None)
-                zoom = st.number_input(
-                    "Zoom level",
-                    min_value=0., max_value=30., value=12., step=1.
-                )
-
-        c0 = 'AvgBoatSpeed'
-        c1 = 'Boat'
-        file_col = {}
-        for k, data in telemetry_data.items():
-            data = data['power']
-            with cols[0]:
-                _options = [
-                    'Angle 0.7 F', 'Angle Max F', 'Average Power', 'AvgBoatSpeed',
-                    'CatchSlip', 'Dist/Stroke', 'Drive Start T', 'Drive Time',
-                    'Effective', 'FinishSlip', 'Length', 'Max Force PC', 'MaxAngle',
-                    'MinAngle', 'Rating', 'Recovery Time', 'Rower Swivel Power',
-                    'StrokeNumber', 'SwivelPower''Work PC Q1', 'Work PC Q2',
-                    'Work PC Q3', 'Work PC Q4'
-                ]
-                options = data.columns.levels[0].intersection(_options)
-                index = (
-                    int(options.get_indexer_for([c0])[0]) if c0 in options else 0)
-                c0 = st.selectbox(
-                    f"choose data type to plot for {k}",
-                    options=options,
-                    index=index
-                )
-
-            with cols[1]:
-                options = data[c0].columns.get_level_values(0)
-                index = (
-                    int(options.get_indexer_for([c1])[0]) if c1 in options else 0)
-                c1 = st.selectbox(
-                    f"choose data to plot for {k}",
-                    options=options,
-                    index=index
-                )
-
-            file_col[k] = (c0, c1)
-
-        fig = app.make_gps_heatmap(
-            telemetry_data, dists, file_col, marker_size=marker_size, map_style=map_style, height=height)
-        fig.update_coloraxes(
-            cmin=cmin,
-            cmid=cmid,
-            cmax=cmax,
-            colorscale=colorscale,
-            showscale=True,
-            colorbar=dict(
-                outlinewidth=0,
-            )
+        fig, file_col = app.set_gps_heatmap(
+            telemetry_data,
+            cols[0], cols[1], heat_map_settings,
+            key='_primary',
         )
-        fig.update_layout(mapbox={'zoom': zoom})
         st.plotly_chart(fig, use_container_width=True, theme=None)
 
         with heat_map_settings:
             if st.toggle(":inbox_tray: Download Heatmap"):
+                (c0, c1), *_ = file_col.values()
                 app.save_figure_html(
                     fig,
                     ":inbox_tray: Download Heatmap",
-                    f"heatmap-{c0}-{c1}.html",
+                    f"heatmap-{c0, c1}.html",
                     include_plotlyjs='cdn',
-                    default_height=height,
                 )
 
     logger.info("Crossing Times")
@@ -416,7 +341,7 @@ def main(state=None):
                 )
                 if template:
                     template_data = yaml.safe_load(template)
-                    print(json.dumps(template_data, indent=4))
+                    # print(json.dumps(template_data, indent=4))
 
                     for k0, vs in template_data.items():
                         for k1, v in vs.items():
@@ -432,7 +357,34 @@ def main(state=None):
         piece_information = app.setup_plot_data(
             piece_information, window, show_rowers)
 
+        report_outputs = {}
         with report:
+            if st.toggle("Show Summary", True) and piece_information:
+                initial = {
+                    t: piece_information['piece_data'][t]
+                    for t in [
+                        'Elapsed Time',
+                        'Distance Travelled',
+                        'Average Split',
+                        'Interval Split'
+                    ]
+                }
+                st.header("Summary")
+                report_outputs[-1, 'Summary'] = outputs = {}
+                for t, table in initial.items():
+                    st.subheader(t)
+                    table = table.copy()
+                    for c, col in table.items():
+                        if pd.api.types.is_timedelta64_dtype(col.dtype):
+                            table[c] = col.map(utils.format_timedelta)
+
+                    st.dataframe(
+                        table,
+                        height=(len(table) + 1) * 35 + 3,
+                        use_container_width=True
+                    )
+                    outputs['tables', 'Piece profile', t] = table
+
             for i in range(n_views):
                 key = f"report_{i}."
 
@@ -440,12 +392,9 @@ def main(state=None):
                 with pop:
                     inputs = st.popover("Select Panel")
                 cols = [inputs] * 3
-                # with st.popover("Select Panel"):
-                #     cols = st.columns((1, 1, 4))
 
-                figures = {}
-
-                with cols[0]:
+                figures = tables = {}
+                with inputs:
                     plot_type = st.selectbox(
                         "What would you like to plot?",
                         key=key + "select plot",
@@ -453,12 +402,14 @@ def main(state=None):
                             "Piece profile",
                             "Stroke profile",
                             "Interval averages",
-                            "Piece averages"
+                            "Piece averages",
+                            "Heatmap",
                         ]
                     )
+                    st.divider()
 
                 if plot_type == "Piece profile":
-                    with cols[1]:
+                    with inputs:
                         plot_data_type = st.selectbox(
                             "What data would you like to plot?",
                             key=key + "select piece",
@@ -466,11 +417,11 @@ def main(state=None):
                         )
                     figures, tables = app.plot_piece_col(
                         plot_data_type, piece_information, default_height=height, key=key,
-                        input_container=cols[-1]
+                        input_container=inputs
                     )
 
                 elif plot_type == "Stroke profile":
-                    with cols[1]:
+                    with inputs:
                         plot_data_type = st.selectbox(
                             "What data would you like to plot?",
                             key=key + "select stroke",
@@ -495,7 +446,7 @@ def main(state=None):
                             cols=cols)
 
                 elif plot_type == "Interval averages":
-                    with cols[1]:
+                    with inputs:
                         plot_data_type = st.selectbox(
                             "What data would you like to show?",
                             key=key + "select piece",
@@ -507,7 +458,7 @@ def main(state=None):
                         }
 
                 elif plot_type == "Piece averages":
-                    with cols[1]:
+                    with inputs:
                         plot_data_type = st.selectbox(
                             "What data would you like to show?",
                             key=key + "select piece",
@@ -518,12 +469,32 @@ def main(state=None):
                                 f"Average {plot_data_type}")
                         }
 
+                elif plot_type == "Heatmap":
+                    with inputs:
+                        select0 = st.container()
+                        st.divider()
+                        select1 = st.container()
+                    fig, file_col = app.set_gps_heatmap(
+                        telemetry_data, select0, select0, select1,
+                        key=key
+                    )
+                    plot_data_type = ", ".join(
+                        f"{k}: {c0}-{c1}" for k, (c0, c1) in file_col.items()
+                    )
+                    figures = {plot_data_type: fig}
+
+                header = f"{plot_type}: {plot_data_type}"
                 with title:
-                    st.subheader(f"{plot_type}: {plot_data_type}")
+                    st.subheader(header)
+
+                report_outputs[i, header] = outputs = {}
 
                 for c, fig in figures.items():
                     st.subheader(c)
-                    st.plotly_chart(fig, use_container_width=True)
+                    fig_key = i, 'figure', plot_type, plot_data_type, c
+                    st.plotly_chart(fig, use_container_width=True, key=fig_key)
+                    outputs[fig_key] = fig
+
                 for t, table in tables.items():
                     st.subheader(t)
                     st.dataframe(
@@ -531,6 +502,7 @@ def main(state=None):
                         height=(len(table) + 1) * 35 + 3,
                         use_container_width=True
                     )
+                    outputs[i, 'table', plot_type, plot_data_type, t] = table
 
         with template_container:
             report_state = {}
@@ -545,6 +517,27 @@ def main(state=None):
                 report_settings,
                 "telemetry_report_template.yaml",
             )
+            if st.toggle(":inbox_tray: Download telemetry_report_figures.html"):
+                static_report = static.StreamlitStaticExport()
+                for (i, header), outputs in report_outputs.items():
+                    static_report.add_header(i, header, 'H2')
+                    for keys, output in outputs.items():
+                        key = "-".join(keys[1:])
+                        static_report.add_header(
+                            f"{i}-{key}", keys[-1], 'H3')
+                        if keys[0] == 'figure':
+                            output.update_layout(template='plotly_white')
+                            static_report.export_plotly_graph(
+                                key, output, include_plotlyjs='cdn')
+                        elif keys[0] == 'table':
+                            static_report.export_dataframe(key, output)
+
+                st.download_button(
+                    ":inbox_tray: Download telemetry_report_figures.html",
+                    static_report.create_html(),
+                    "telemetry_report_figures.html",
+                    mime='text/html',
+                )
 
     logger.info("Download data")
     with st.expander("Download Data"):
