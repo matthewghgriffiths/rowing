@@ -722,7 +722,6 @@ def set_landmarks(gps_data=None, landmarks=None, title=True):
         """)
         points, sel_landmarks = points_to_landmarks(get_points(gps_data))
         if not sel_landmarks.empty:
-            print(sel_landmarks)
             landmarks = pd.concat([sel_landmarks, landmarks])
 
     with tab1:
@@ -1409,6 +1408,21 @@ def figures_to_zipfile(figures, file_type, **kwargs):
     return zipdata
 
 
+def save_figure_html(
+        figure,
+        label='Download Figure',
+        file_name='figure.html', include_plotlyjs=True, **kwargs):
+    html_data = figure.to_html(
+        include_plotlyjs=include_plotlyjs,
+    )
+    st.download_button(
+        label=label,
+        data=html_data,
+        file_name=file_name,
+        mime='text/html',
+    )
+
+
 def telemetry_to_zipfile(telemetry_data):
     zipdata = io.BytesIO()
     with zipfile.ZipFile(zipdata, 'w') as zipf:
@@ -1825,7 +1839,10 @@ def plot_boat_profile(piece_information, default_height=600, key="boat_", input_
         boat_profiles, names=['name', 'leg']
     ).reset_index(["name", 'leg']).rename_axis(
         columns='Measurement'
-    ).set_index(
+    )
+    boat_profile = boat_profile.loc[
+        :, ~boat_profile.columns.duplicated()
+    ].set_index(
         ["Normalized Time", "name", 'leg']
     )[facets].stack().rename("value").reset_index()
     fig = px.line(

@@ -157,7 +157,8 @@ def main(state=None):
     with st.expander("Show heat map"):
         cols = st.columns((4, 4, 2))
         with cols[-1]:
-            with st.popover("heat map settings") as heat_map_settings:
+            heat_map_settings = st.popover("heat map settings")
+            with heat_map_settings:
                 dists = st.number_input(
                     "marker spacing (m)", min_value=1, value=5
                 ) / 1000
@@ -233,6 +234,15 @@ def main(state=None):
             )
         )
         st.plotly_chart(fig, use_container_width=True, theme=None)
+
+        with heat_map_settings:
+            if st.toggle(":inbox_tray: Download Heatmap"):
+                app.save_figure_html(
+                    fig,
+                    ":inbox_tray: Download Heatmap",
+                    f"heatmap-{c0}-{c1}.html",
+                    include_plotlyjs='cdn',
+                )
 
     logger.info("Crossing Times")
     with st.spinner("Processing Crossing Times"):
