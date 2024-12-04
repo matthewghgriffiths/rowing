@@ -185,6 +185,10 @@ def main(state=None):
                     "Color scale mid (clear for autoscaling)", value=None)
                 cmax = st.number_input(
                     "Color scale max (clear for autoscaling)", value=None)
+                zoom = st.number_input(
+                    "Zoom level",
+                    min_value=0., max_value=30., value=12., step=1.
+                )
 
         c0 = 'AvgBoatSpeed'
         c1 = 'Boat'
@@ -233,6 +237,7 @@ def main(state=None):
                 outlinewidth=0,
             )
         )
+        fig.update_layout(mapbox={'zoom': zoom})
         st.plotly_chart(fig, use_container_width=True, theme=None)
 
         with heat_map_settings:
