@@ -242,6 +242,7 @@ def main(state=None):
                     ":inbox_tray: Download Heatmap",
                     f"heatmap-{c0}-{c1}.html",
                     include_plotlyjs='cdn',
+                    default_height=height,
                 )
 
     logger.info("Crossing Times")
