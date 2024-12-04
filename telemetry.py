@@ -359,6 +359,11 @@ def main(state=None):
 
         report_outputs = {}
         with report:
+            if n_views:
+                st.markdown(
+                    r'[Go to Bottom of Report](#report-settings)'
+                    # r"[#report-settings](Go to Report Settings)"
+                )
             if st.toggle("Show Summary", True) and piece_information:
                 initial = {
                     t: piece_information['piece_data'][t]
@@ -517,7 +522,8 @@ def main(state=None):
                 report_settings,
                 "telemetry_report_template.yaml",
             )
-            if st.toggle(":inbox_tray: Download telemetry_report_figures.html"):
+            file_name = f"report-{'-'.join(telemetry_data)}.html"
+            if st.toggle(f":inbox_tray: Get Static Report"):
                 static_report = static.StreamlitStaticExport()
                 for (i, header), outputs in report_outputs.items():
                     static_report.add_header(i, header, 'H2')
@@ -534,9 +540,9 @@ def main(state=None):
                             print(key)
 
                 st.download_button(
-                    ":inbox_tray: Download telemetry_report_figures.html",
+                    f":inbox_tray: {file_name}",
                     static_report.create_html(),
-                    "telemetry_report_figures.html",
+                    file_name,
                     mime='text/html',
                 )
 
