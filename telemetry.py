@@ -383,7 +383,7 @@ def main(state=None):
                         height=(len(table) + 1) * 35 + 3,
                         use_container_width=True
                     )
-                    outputs['tables', 'Piece profile', t] = table
+                    outputs[-1, 'table', 'Piece profile', t] = table
 
             for i in range(n_views):
                 key = f"report_{i}."
@@ -523,14 +523,15 @@ def main(state=None):
                     static_report.add_header(i, header, 'H2')
                     for keys, output in outputs.items():
                         key = "-".join(keys[1:])
-                        static_report.add_header(
-                            f"{i}-{key}", keys[-1], 'H3')
-                        if keys[0] == 'figure':
+                        static_report.add_header(f"{i}-{key}", keys[-1], 'H3')
+                        if keys[1] == 'figure':
                             output.update_layout(template='plotly_white')
                             static_report.export_plotly_graph(
                                 key, output, include_plotlyjs='cdn')
-                        elif keys[0] == 'table':
+                        elif keys[1] == 'table':
                             static_report.export_dataframe(key, output)
+                        else:
+                            print(key)
 
                 st.download_button(
                     ":inbox_tray: Download telemetry_report_figures.html",
