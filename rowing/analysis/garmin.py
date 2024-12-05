@@ -69,7 +69,7 @@ def login(user_container=None, pw_container=None, mfa_container=None):
 
     with user_container or st.container():
         username = st.text_input(
-            "Enter email address: ", key='garmin_email')
+            "Enter email address: ", key='garmin_email', autocomplete='username')
     with pw_container or st.container():
         password = st.text_input("Enter password: ", type='password')
 

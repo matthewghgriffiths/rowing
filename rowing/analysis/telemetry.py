@@ -58,13 +58,15 @@ def parse_powerline_text_data(raw_text_data, sep='\t', use_names=True):
                     sep=sep
                 ).rename(columns=Unnamed)  # .dropna(axis=1, how='all')
             elif 'Rig' in key:
-                split_data[key] = pd.read_table(
+                split_data[key] = rig = pd.read_table(
                     io.StringIO(raw_text),
                     header=None, skiprows=[0, 1],
                     names=['Position', 'Side'],
+                    usecols=[0, 1],
                     low_memory=False,
+                    index_col=None,
                     sep=sep,
-                ).rename(columns=Unnamed)  # .dropna(axis=1, how='all')
+                )[['Position', 'Side']]  # .dropna(axis=1, how='all')
             elif raw_text:
                 split_data[key] = pd.read_table(
                     io.StringIO(raw_text),
@@ -90,6 +92,9 @@ def parse_powerline_excel(data, use_names=True):
             )
             key_data = key_data.iloc[2:].convert_dtypes()
             key_data.columns = key_columns
+        elif 'Rig' in key:
+            key_data = key_data.iloc[2:, :2]
+            key_data.columns = ['Position', 'Side']
         elif not key_data.empty:
             key_columns = key_data.iloc[0]
             key_data = key_data.iloc[1:].convert_dtypes()
@@ -208,6 +213,7 @@ def set_rower_sides(columns, rig_info):
     channels['channel'] = channels['channel'].replace(
         rename_scull_cols
     )
+
     return pd.MultiIndex.from_frame(
         channels[['channel', 'rower', 'side']].fillna("")
     )

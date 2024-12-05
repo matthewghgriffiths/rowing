@@ -17,7 +17,7 @@ import plotly.express as px
 import plotly.io as pio
 
 from rowing import utils
-from rowing.analysis import app, telemetry, static
+from rowing.analysis import app, telemetry
 
 logger = logging.getLogger("telemetry")
 # logging.basicConfig(
@@ -43,9 +43,11 @@ def main(state=None):
     with st.sidebar:
         st.subheader("QR Code")
         st.image(
-            "https://chart.googleapis.com/chart"
-            "?cht=qr&chl=https%3A%2F%2Frowing-telemetry.streamlit.app"
-            "&chs=360x360&choe=UTF-8&chld=L|0"
+            "https://qrcode.tec-it.com/API/QRCode"
+            "?data=https%3A%2F%2Frowing-telemetry.streamlit.app"
+            # "&backcolor=%23ffffff"
+            "&size=small"
+            "&quietzone=1&errorcorrection=H"
         )
         default_height = st.number_input(
             "Default Figure Height",
@@ -61,12 +63,35 @@ def main(state=None):
     with st.expander("Upload Telemetry Data", True):
         use_names = st.checkbox("Use crew list", True)
         tabs = st.tabs([
-            "Upload text", "Upload csv", "Upload xlsx", "Upload Zip"
+            "Upload", "Upload text", "Upload csv", "Upload xlsx", "Upload Zip"
         ])
         with tabs[0]:
             uploaded_files = st.file_uploader(
+                "Upload Data Export from PowerLine",
+                accept_multiple_files=True,
+            )
+            st.markdown(
+                """
+                Automatically infers filetype from file endings
+
+                text (default): `tsv` `txt`
+
+                csv : `csv`
+
+                Excel : `xlsx` `xls`
+
+                Zip: `zip`
+                """
+            )
+            telemetry_data.update(
+                app.parse_telemetry_files(
+                    uploaded_files, use_names=use_names))
+
+        with tabs[1]:
+            uploaded_files = st.file_uploader(
                 "Upload All Data Export from PowerLine (tab separated)",
-                accept_multiple_files=True
+                accept_multiple_files=True,
+                # type=['tsv', 'txt'],
             )
             st.write("Text should should be formatted like below (no commas!)")
             st.code(
@@ -85,10 +110,11 @@ def main(state=None):
                     uploaded_files, use_names=use_names, sep='\t'
                 )
             )
-        with tabs[1]:
+        with tabs[2]:
             uploaded_files = st.file_uploader(
                 "Upload All Data Export from PowerLine (comma separated)",
-                accept_multiple_files=True
+                accept_multiple_files=True,
+                type=['csv'],
             )
             st.write("Text should should be formatted like below")
             st.code(
@@ -106,7 +132,7 @@ def main(state=None):
                     uploaded_files, use_names=use_names, sep=','
                 )
             )
-        with tabs[2]:
+        with tabs[3]:
             uploaded_files = st.file_uploader(
                 "Upload Data Export from PowerLine",
                 accept_multiple_files=True,
@@ -117,10 +143,11 @@ def main(state=None):
                     uploaded_files, use_names=use_names
                 )
             )
-        with tabs[3]:
+        with tabs[4]:
             uploaded_files = st.file_uploader(
                 "Upload Zip of Data Exports",
-                accept_multiple_files=True
+                accept_multiple_files=True,
+                type=['zip'],
             )
             telemetry_data.update(
                 app.parse_telemetry_zip(uploaded_files)
@@ -288,6 +315,10 @@ def main(state=None):
             'Make profile plots',
             key='Make profile plots'
         ) and piece_information:
+            # for p, profile in piece_information['crew_profiles'].items():
+            #     print(p)
+            #     print(profile)
+
             tabs = st.tabs(
                 ["Rower Profiles", "Boat Profile", "Grouped Profiles"])
             with tabs[0]:
@@ -522,29 +553,9 @@ def main(state=None):
                 report_settings,
                 "telemetry_report_template.yaml",
             )
-            file_name = f"report-{'-'.join(telemetry_data)}.html"
             if st.toggle(f":inbox_tray: Get Static Report"):
-                static_report = static.StreamlitStaticExport()
-                for (i, header), outputs in report_outputs.items():
-                    static_report.add_header(i, header, 'H2')
-                    for keys, output in outputs.items():
-                        key = "-".join(keys[1:])
-                        static_report.add_header(f"{i}-{key}", keys[-1], 'H3')
-                        if keys[1] == 'figure':
-                            output.update_layout(template='plotly_white')
-                            static_report.export_plotly_graph(
-                                key, output, include_plotlyjs='cdn')
-                        elif keys[1] == 'table':
-                            static_report.export_dataframe(key, output)
-                        else:
-                            print(key)
-
-                st.download_button(
-                    f":inbox_tray: {file_name}",
-                    static_report.create_html(),
-                    file_name,
-                    mime='text/html',
-                )
+                file_name = f"report-{'-'.join(telemetry_data)}.html"
+                app.make_static_report(report_outputs, file_name)
 
     logger.info("Download data")
     with st.expander("Download Data"):

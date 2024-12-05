@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
 
-from rowing.analysis import splits, files, geodesy, telemetry
+from rowing.analysis import splits, files, geodesy, telemetry, static
 from rowing import utils
 from rowing.app import threads, inputs
 
@@ -226,7 +226,48 @@ def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
     return data
 
 
-@ st.cache_data
+@st.cache_data
+def parse_telemetry_files(uploaded_files, use_names=True):
+    uploaded_data = {
+        file.name.rsplit(".", 1)[0]: file for file in uploaded_files
+    }
+    data, errs = utils.map_concurrent(
+        parse_file,
+        uploaded_data,
+        singleton=True,
+        use_names=use_names,
+    )
+    if errs:
+        for k, err in errs.items():
+            raise err
+        logging.error(errs)
+
+    return data
+
+
+@st.cache_data
+def parse_file(file, use_names=True):
+    filename, ending = file.name.rsplit(".", 1)
+    ending = ending.lower()
+    if ending == 'csv':
+        return parse_text_data(file, use_names=use_names, sep=',')
+    elif ending in {'xlsx', 'xls'}:
+        return parse_excel(file, use_names=use_names)
+    elif ending == 'zip':
+        return telemetry.load_zipfile(file)
+    return parse_text_data(file, use_names=use_names, sep='\t')
+
+
+@st.cache_data
+def parse_text_data(file, use_names=True, sep='\t'):
+    return telemetry.parse_powerline_text_data(
+        file.read().decode("utf-8"),
+        use_names=use_names,
+        sep=sep
+    )
+
+
+@st.cache_data
 def parse_excel(file, use_names=True):
     data = pd.read_excel(file, header=None)
     return telemetry.parse_powerline_excel(data, use_names=use_names)
@@ -1039,7 +1080,7 @@ def make_gps_figure(gps_data, locations, index=None):
     return fig
 
 
-@ st.cache_data
+@st.cache_data
 def make_stroke_profiles(telemetry_data, piece_data, nres=101):
     profiles = {}
     boat_profiles = {}
@@ -1055,7 +1096,6 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
 
         profiles[name, leg] = profile = telemetry.norm_stroke_profile(
             piece_profile, nres)
-
         gate_angle = profile.GateAngle
         gate_angle0 = gate_angle - gate_angle.values.mean(0, keepdims=True)
         for (pos, side), angle0 in gate_angle0.items():
@@ -2115,3 +2155,25 @@ def set_gps_heatmap(
     fig.update_layout(mapbox={'zoom': zoom})
 
     return fig, file_col
+
+
+def make_static_report(report_outputs, file_name):
+    static_report = static.StreamlitStaticExport()
+    for (i, header), outputs in report_outputs.items():
+        static_report.add_header(i, header, 'H2')
+        for keys, output in outputs.items():
+            key = "-".join(keys[1:])
+            static_report.add_header(f"{i}-{key}", keys[-1], 'H3')
+            if keys[1] == 'figure':
+                output.update_layout(template='plotly_white')
+                static_report.export_plotly_graph(
+                    key, output, include_plotlyjs='cdn')
+            elif keys[1] == 'table':
+                static_report.export_dataframe(key, output)
+
+    st.download_button(
+        f":inbox_tray: {file_name}",
+        static_report.create_html(),
+        file_name,
+        mime='text/html',
+    )
