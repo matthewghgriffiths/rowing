@@ -34,64 +34,71 @@ color_discrete_sequence = [
 
 DEFAULT_REPORT = {
     "report_0": {
-        "pace boat time input": None,
+        "select plot": "Heatmap"
+    },
+    "report_1": {
+        # "pace boat time input": None,
         "select piece": "Pace Boat",
         "select plot": "Piece profile"
     },
-    "report_1": {
+    "report_2": {
         "select piece": "AvgBoatSpeed",
         "select plot": "Piece profile"
     },
-    "report_2": {
+    "report_3": {
         "select piece": "Rating",
         "select plot": "Piece profile"
     },
-    "report_3": {
+    "report_4": {
         "select piece": "Rower Swivel Power",
         "select plot": "Piece profile"
     },
-    "report_4": {
+    "report_5": {
         "select piece": "MinAngle",
         "select plot": "Piece profile"
     },
-    "report_5": {
+    "report_6": {
         "select piece": "MaxAngle",
         "select plot": "Piece profile"
     },
-    "report_6": {
-        "select piece": "CatchSlip",
-        "select plot": "Piece profile"
-    },
     "report_7": {
-        "select piece": "FinishSlip",
+        "select piece": "Length",
         "select plot": "Piece profile"
     },
     "report_8": {
-        "select piece": "Effective",
+        "select piece": "CatchSlip",
         "select plot": "Piece profile"
     },
     "report_9": {
-        "Select x-axis": "GateAngle",
-        "Select y-axis": "GateForceX",
-        "rower profile figure height": 600,
-        "select plot": "Stroke profile",
-        "select stroke": "Rower profile"
+        "select piece": "FinishSlip",
+        "select plot": "Piece profile"
     },
     "report_10": {
-        "Select x-axis": "GateAngle",
-        "Select y-axis": "GateAngleVel",
-        "rower profile figure height": 600,
-        "select plot": "Stroke profile",
-        "select stroke": "Rower profile"
+        "select piece": "Effective",
+        "select plot": "Piece profile"
     },
     "report_11": {
-        "Select x-axis": "Normalized Time",
+        "Select x-axis": "GateAngle",
         "Select y-axis": "GateForceX",
         "rower profile figure height": 600,
         "select plot": "Stroke profile",
         "select stroke": "Rower profile"
     },
     "report_12": {
+        "Select x-axis": "GateAngle",
+        "Select y-axis": "GateAngleVel",
+        "rower profile figure height": 600,
+        "select plot": "Stroke profile",
+        "select stroke": "Rower profile"
+    },
+    "report_13": {
+        "Select x-axis": "Normalized Time",
+        "Select y-axis": "GateForceX",
+        "rower profile figure height": 600,
+        "select plot": "Stroke profile",
+        "select stroke": "Rower profile"
+    },
+    "report_14": {
         "select plot": "Stroke profile",
         "select stroke": "Boat profile",
         "select_boat_facets": [
@@ -101,11 +108,11 @@ DEFAULT_REPORT = {
             "Pitch Angle",
             "Yaw Angle"
         ],
-        "select_boat_heigh": 1000
+        "select_boat_height": 1000
     },
     "report_setup": {
         "figure_height": 1000,
-        "nview": 13,
+        "nview": 15,
         "toggleother": False,
         "window": 10
     }
@@ -2006,14 +2013,14 @@ def interpolate_power(telemetry_data, dists=0.005, n_iter=10):
         power_gps = power.join(
             pd.concat({("boat", ""): power_gps},
                       axis=1).swaplevel(0, -1, axis=1)
-        )
+        ).sort_index(axis=1)
         power_gps_data[k] = geodesy.interp_dataframe(
             power_gps, dists, n_iter=n_iter)
 
     return power_gps_data
 
 
-@ st.cache_data
+@st.cache_data
 def make_gps_heatmap(telemetry_data, dists, file_col, marker_size=5, map_style='open-street-map', height=600):
 
     power_gps_data = interpolate_power(telemetry_data, dists)

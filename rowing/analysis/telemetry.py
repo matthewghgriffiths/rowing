@@ -88,22 +88,24 @@ def parse_powerline_excel(data, use_names=True):
         ).dropna(axis=0, how='all')
         if "eriodic" in key:
             key_columns = pd.MultiIndex.from_frame(
-                key_data.iloc[:2].fillna("").T
+                key_data.iloc[:2].fillna("").T.reset_index(drop=True)
             )
             key_data = key_data.iloc[2:].convert_dtypes()
             key_data.columns = key_columns
         elif 'Rig' in key:
-            key_data = key_data.iloc[2:, :2]
+            key_data = key_data.iloc[
+                2:, :2
+            ]
             key_data.columns = ['Position', 'Side']
         elif not key_data.empty:
-            key_columns = key_data.iloc[0]
+            key_columns = key_data.iloc[0].reset_index(drop=True)
             key_data = key_data.iloc[1:].convert_dtypes()
             key_data.columns = key_columns
 
         for c, vals in key_data.items():
             if pd.api.types.is_numeric_dtype(vals.dtype):
                 key_data[c] = vals.astype(float)
-        split_data[key] = key_data
+        split_data[key] = key_data.reset_index(drop=True)
 
     return parse_powerline_data(split_data, use_names=use_names)
 
@@ -202,9 +204,10 @@ def set_rower_sides(columns, rig_info):
     rower_sides = rig_info.set_index('Position').Side
     rower_sides.index = rower_sides.index.astype(str)
     power_columns = columns.to_frame()
-    channels = power_columns[0].str.extract(
+
+    channels = power_columns.iloc[:, 0].str.extract(
         "^(?P<side>P |S )?(?P<channel>.*)")
-    channels['rower'] = power_columns[1]
+    channels['rower'] = power_columns.iloc[:, 1]
     channels.side = channels.side.where(
         pd.notna, channels['rower'].replace(rower_sides)
     ).fillna("").replace({
