@@ -254,8 +254,8 @@ def main(state=None):
                 )
                 app.download_csv(f"{name}-crossings.csv", show_crossings)
 
-    logger.info("Select piece start end", True)
-    with st.expander("Select Piece start/end"):
+    logger.info("Select piece start end")
+    with st.expander("Select Piece start/end", True):
         piece_information = app.select_pieces(all_crossing_times)
         if piece_information is None:
             st.write("No valid pieces could be found")
