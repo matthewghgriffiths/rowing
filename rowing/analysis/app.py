@@ -1476,7 +1476,7 @@ def setup_plots(piece_rowers, state, default_height=600, key='', toggle=True, nv
             all_plots = st.number_input(
                 "Number of panels",
                 min_value=0,
-                value=0,
+                value=st.session_state.get(key + 'nview', 0),
                 step=1,
                 key=key + 'nview'
             )
@@ -1512,6 +1512,7 @@ def setup_plots(piece_rowers, state, default_height=600, key='', toggle=True, nv
             100, 3000, default_height, step=50,
             key=key+'figure_height',
         )
+
     return window, show_rowers, all_plots, height
 
 

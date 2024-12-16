@@ -254,7 +254,7 @@ def main(state=None):
                 )
                 app.download_csv(f"{name}-crossings.csv", show_crossings)
 
-    logger.info("Select piece start end")
+    logger.info("Select piece start end", True)
     with st.expander("Select Piece start/end"):
         piece_information = app.select_pieces(all_crossing_times)
         if piece_information is None:
@@ -280,76 +280,7 @@ def main(state=None):
 
             app.show_piece_data(piece_information['piece_data'])
 
-    logger.info("Plot piece data")
-    telemetry_figures = {}
-    with st.expander("Plot piece data", True):
-        if piece_information:
-            window, show_rowers, all_plots, height = app.setup_plots(
-                piece_information['piece_rowers'], state, default_height=default_height)
-            piece_information = app.setup_plot_data(
-                piece_information, window, show_rowers)
-
-            tab_names = ["Pace Boat"] + list(telemetry.FIELDS)
-            telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
-            for col, tab in telem_tabs.items():
-                with tab:
-                    cols = st.columns((1, 7))
-                    with cols[0]:
-                        on = st.toggle('Make plot', value=all_plots,
-                                       key=col + ' make plot')
-
-                    if on:
-                        figures, tables = app.plot_piece_col(
-                            col, piece_information,
-                            default_height=default_height,
-                            key=col, input_container=cols[1]
-                        )
-                        for c, fig in figures.items():
-                            st.plotly_chart(fig, use_container_width=True)
-                        for t, table in tables.items():
-                            st.subheader(t)
-                            st.dataframe(table, use_container_width=True)
-
-    with st.expander("Plot Stroke Profiles", True):
-        if st.toggle(
-            'Make profile plots',
-            key='Make profile plots'
-        ) and piece_information:
-            # for p, profile in piece_information['crew_profiles'].items():
-            #     print(p)
-            #     print(profile)
-
-            tabs = st.tabs(
-                ["Rower Profiles", "Boat Profile", "Grouped Profiles"])
-            with tabs[0]:
-                figures, tables = app.plot_rower_profiles(
-                    piece_information, default_height=default_height)
-
-                for c, fig in figures.items():
-                    st.plotly_chart(fig, use_container_width=True)
-                for t, table in tables.items():
-                    st.subheader(t)
-                    st.dataframe(table, use_container_width=True)
-
-            with tabs[1]:
-                figures, tables = app.plot_boat_profile(
-                    piece_information, default_height=default_height)
-                for c, fig in figures.items():
-                    st.plotly_chart(fig, use_container_width=True)
-                for t, table in tables.items():
-                    st.subheader(t)
-                    st.dataframe(table, use_container_width=True)
-
-            with tabs[2]:
-                figures, tables = app.plot_crew_profile(
-                    piece_information, default_height=default_height)
-                for c, fig in figures.items():
-                    st.plotly_chart(fig, use_container_width=True)
-                for t, table in tables.items():
-                    st.subheader(t)
-                    st.dataframe(table, use_container_width=True)
-
-    with st.expander("Report"):
+    with st.expander("Report", True):
 
         report = st.container()
 
@@ -366,6 +297,11 @@ def main(state=None):
                         k = ".".join([k0, k1])
                         st.session_state[k] = v
             else:
+                for k0, vs in app.DEFAULT_REPORT.items():
+                    for k1, v in vs.items():
+                        k = ".".join([k0, k1])
+                        st.session_state.setdefault(k, v)
+
                 template = st.file_uploader(
                     "Upload report template",
                     type=['yaml', 'json'],
@@ -383,7 +319,9 @@ def main(state=None):
             piece_information['piece_rowers'], state,
             key='report_setup.',
             cols=settings_cols,
-            toggle=False, nview=True, default_height=default_height
+            toggle=False,
+            nview=True,
+            default_height=default_height
         )
         piece_information = app.setup_plot_data(
             piece_information, window, show_rowers)
@@ -557,13 +495,82 @@ def main(state=None):
                 file_name = f"report-{'-'.join(telemetry_data)}.html"
                 app.make_static_report(report_outputs, file_name)
                 st.write(
-                    "note: to open report on iPhone, have to use Edge browser")
+                    "note: to open report on iPhone, use Edge internet browser")
 
             if st.toggle(f":inbox_tray: Get Offline Static Report"):
                 file_name = f"offline-{'-'.join(telemetry_data)}.html"
                 app.make_offline_static_report(report_outputs, file_name)
                 st.write(
-                    "note: to open report on iPhone, have to use Edge browser")
+                    "note: to open report on iPhone, use Edge internet browser")
+
+    logger.info("Plot piece data")
+    telemetry_figures = {}
+    with st.expander("Plot piece data"):
+        if piece_information:
+            window, show_rowers, all_plots, height = app.setup_plots(
+                piece_information['piece_rowers'], state, default_height=default_height)
+            piece_information = app.setup_plot_data(
+                piece_information, window, show_rowers)
+
+            tab_names = ["Pace Boat"] + list(telemetry.FIELDS)
+            telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
+            for col, tab in telem_tabs.items():
+                with tab:
+                    cols = st.columns((1, 7))
+                    with cols[0]:
+                        on = st.toggle('Make plot', value=all_plots,
+                                       key=col + ' make plot')
+
+                    if on:
+                        figures, tables = app.plot_piece_col(
+                            col, piece_information,
+                            default_height=default_height,
+                            key=col, input_container=cols[1]
+                        )
+                        for c, fig in figures.items():
+                            st.plotly_chart(fig, use_container_width=True)
+                        for t, table in tables.items():
+                            st.subheader(t)
+                            st.dataframe(table, use_container_width=True)
+
+    with st.expander("Plot Stroke Profiles"):
+        if st.toggle(
+            'Make profile plots',
+            key='Make profile plots'
+        ) and piece_information:
+            # for p, profile in piece_information['crew_profiles'].items():
+            #     print(p)
+            #     print(profile)
+
+            tabs = st.tabs(
+                ["Rower Profiles", "Boat Profile", "Grouped Profiles"])
+            with tabs[0]:
+                figures, tables = app.plot_rower_profiles(
+                    piece_information, default_height=default_height)
+
+                for c, fig in figures.items():
+                    st.plotly_chart(fig, use_container_width=True)
+                for t, table in tables.items():
+                    st.subheader(t)
+                    st.dataframe(table, use_container_width=True)
+
+            with tabs[1]:
+                figures, tables = app.plot_boat_profile(
+                    piece_information, default_height=default_height)
+                for c, fig in figures.items():
+                    st.plotly_chart(fig, use_container_width=True)
+                for t, table in tables.items():
+                    st.subheader(t)
+                    st.dataframe(table, use_container_width=True)
+
+            with tabs[2]:
+                figures, tables = app.plot_crew_profile(
+                    piece_information, default_height=default_height)
+                for c, fig in figures.items():
+                    st.plotly_chart(fig, use_container_width=True)
+                for t, table in tables.items():
+                    st.subheader(t)
+                    st.dataframe(table, use_container_width=True)
 
     logger.info("Download data")
     with st.expander("Download Data"):
