@@ -556,6 +556,14 @@ def main(state=None):
             if st.toggle(f":inbox_tray: Get Static Report"):
                 file_name = f"report-{'-'.join(telemetry_data)}.html"
                 app.make_static_report(report_outputs, file_name)
+                st.write(
+                    "note: to open report on iPhone, have to use Edge browser")
+
+            if st.toggle(f":inbox_tray: Get Offline Static Report"):
+                file_name = f"offline-{'-'.join(telemetry_data)}.html"
+                app.make_offline_static_report(report_outputs, file_name)
+                st.write(
+                    "note: to open report on iPhone, have to use Edge browser")
 
     logger.info("Download data")
     with st.expander("Download Data"):

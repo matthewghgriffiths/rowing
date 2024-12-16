@@ -32,90 +32,56 @@ color_discrete_sequence = [
     '#FECB52'
 ]
 
-DEFAULT_REPORT = {
-    "report_0": {
-        "select plot": "Heatmap"
+REPORT = [
+    {'select plot': 'Heatmap'},
+    {'select piece': 'Pace Boat', 'select plot': 'Piece profile'},
+    {'select piece': 'AvgBoatSpeed', 'select plot': 'Piece profile'},
+    {'select piece': 'Rating', 'select plot': 'Piece profile'},
+    {'select piece': 'Rower Swivel Power', 'select plot': 'Piece profile'},
+    {'select piece': 'MinAngle', 'select plot': 'Piece profile'},
+    {'select piece': 'MaxAngle', 'select plot': 'Piece profile'},
+    {'select piece': 'Length', 'select plot': 'Piece profile'},
+    {'select piece': 'CatchSlip', 'select plot': 'Piece profile'},
+    {'select piece': 'FinishSlip', 'select plot': 'Piece profile'},
+    {'select piece': 'Effective', 'select plot': 'Piece profile'},
+    {
+        'Select x-axis': 'GateAngle',
+        'Select y-axis': 'GateForceX',
+        'rower profile figure height': 600,
+        'select plot': 'Stroke profile',
+        'select stroke': 'Rower profile'
     },
-    "report_1": {
-        # "pace boat time input": None,
-        "select piece": "Pace Boat",
-        "select plot": "Piece profile"
-    },
-    "report_2": {
-        "select piece": "AvgBoatSpeed",
-        "select plot": "Piece profile"
-    },
-    "report_3": {
-        "select piece": "Rating",
-        "select plot": "Piece profile"
-    },
-    "report_4": {
-        "select piece": "Rower Swivel Power",
-        "select plot": "Piece profile"
-    },
-    "report_5": {
-        "select piece": "MinAngle",
-        "select plot": "Piece profile"
-    },
-    "report_6": {
-        "select piece": "MaxAngle",
-        "select plot": "Piece profile"
-    },
-    "report_7": {
-        "select piece": "Length",
-        "select plot": "Piece profile"
-    },
-    "report_8": {
-        "select piece": "CatchSlip",
-        "select plot": "Piece profile"
-    },
-    "report_9": {
-        "select piece": "FinishSlip",
-        "select plot": "Piece profile"
-    },
-    "report_10": {
-        "select piece": "Effective",
-        "select plot": "Piece profile"
-    },
-    "report_11": {
-        "Select x-axis": "GateAngle",
-        "Select y-axis": "GateForceX",
-        "rower profile figure height": 600,
-        "select plot": "Stroke profile",
-        "select stroke": "Rower profile"
-    },
-    "report_12": {
-        "Select x-axis": "GateAngle",
-        "Select y-axis": "GateAngleVel",
-        "rower profile figure height": 600,
-        "select plot": "Stroke profile",
-        "select stroke": "Rower profile"
-    },
-    "report_13": {
-        "Select x-axis": "Normalized Time",
-        "Select y-axis": "GateForceX",
-        "rower profile figure height": 600,
-        "select plot": "Stroke profile",
-        "select stroke": "Rower profile"
-    },
-    "report_14": {
-        "select plot": "Stroke profile",
-        "select stroke": "Boat profile",
-        "select_boat_facets": [
-            "Speed",
-            "Accel",
-            "Roll Angle",
-            "Pitch Angle",
-            "Yaw Angle"
-        ],
-        "select_boat_height": 1000
-    },
-    "report_setup": {
-        "figure_height": 1000,
-        "nview": 15,
-        "toggleother": False,
-        "window": 10
-    }
+    {
+        'Select x-axis': 'GateAngle',
+        'Select y-axis': 'GateAngleVel',
+        'rower profile figure height': 600,
+        'select plot': 'Stroke profile',
+        'select stroke': 'Rower profile'},
+    {
+        'Select x-axis': 'Normalized Time',
+        'Select y-axis': 'GateForceX',
+        'rower profile figure height': 600,
+        'select plot': 'Stroke profile',
+        'select stroke': 'Rower profile'},
+    {
+        'Select x-axis': 'Normalized Time',
+        'Select y-axis': 'GateAngleVel',
+        'rower profile figure height': 600,
+        'select plot': 'Stroke profile',
+        'select stroke': 'Rower profile'},
+    {
+        'select plot': 'Stroke profile',
+        'select stroke': 'Boat profile',
+        'select_boat_facets': [
+            'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'],
+        'select_boat_heigh': 1000}
+]
+DEFAULT_REPORT = {f"report_{i}": v for i, v in enumerate(REPORT)}
+DEFAULT_REPORT["report_setup"] = {
+    "figure_height": 1000,
+    "nview": len(REPORT),
+    "toggleother": False,
+    "window": 10
 }
 
 
@@ -254,7 +220,8 @@ def parse_telemetry_files(uploaded_files, use_names=True):
 
 @st.cache_data
 def parse_file(file, use_names=True):
-    filename, ending = file.name.rsplit(".", 1)
+    filename, *endings = file.name.rsplit(".", 1)
+    ending, = endings or ("",)
     ending = ending.lower()
     if ending == 'csv':
         return parse_text_data(file, use_names=use_names, sep=',')
@@ -1984,7 +1951,7 @@ def plot_piece_col(col, piece_information, default_height=600, key='piece', inpu
         )
 
         figures[col] = fig
-        interval_stats = piece_data_filter.get(f"Average {col}")
+        interval_stats = piece_data_filter.get(f"Interval {col}")
         if interval_stats is not None:
             tables[f"Interval {col} Average"] = interval_stats
 
@@ -2175,6 +2142,31 @@ def make_static_report(report_outputs, file_name):
                 output.update_layout(template='plotly_white')
                 static_report.export_plotly_graph(
                     key, output, include_plotlyjs='cdn')
+            elif keys[1] == 'table':
+                static_report.export_dataframe(key, output)
+
+    st.download_button(
+        f":inbox_tray: {file_name}",
+        static_report.create_html(),
+        file_name,
+        mime='text/html',
+    )
+
+
+def make_offline_static_report(report_outputs, file_name):
+    include_plotlyjs = True
+    static_report = static.StreamlitStaticExport()
+    for (i, header), outputs in report_outputs.items():
+        static_report.add_header(i, header, 'H2')
+        for keys, output in outputs.items():
+            key = "-".join(keys[1:])
+            static_report.add_header(f"{i}-{key}", keys[-1], 'H3')
+            if keys[1] == 'figure':
+                output.update_layout(template='plotly_white')
+                static_report.export_plotly_graph(
+                    key, output, include_plotlyjs=include_plotlyjs
+                )
+                include_plotlyjs = False
             elif keys[1] == 'table':
                 static_report.export_dataframe(key, output)
 
