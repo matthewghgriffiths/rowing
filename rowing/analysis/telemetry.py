@@ -333,8 +333,8 @@ def match_stroke_timings(timings, stroke_start, thresh=0.1):
 
     for s in pd.to_timedelta([0, thresh, -thresh], unit='s'):
         match.loc[~is_close] = stroke_start.searchsorted(time[~is_close] + s)
-        diff = (time[~is_close] -
-                stroke_start.loc[match.loc[~is_close]].values)
+        diff = (
+            time[~is_close] - stroke_start.reindex(match.loc[~is_close]).values)
         is_close.loc[~is_close] = diff.dt.total_seconds() < thresh * 2
 
     return match.loc[is_close].drop_duplicates(keep='last')
