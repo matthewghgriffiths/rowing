@@ -83,6 +83,26 @@ DEFAULT_REPORT["report_setup"] = {
     "toggleother": False,
     "window": 10
 }
+REPORT = [
+    {'select piece': 'catch_lag', 'select plot': 'Piece profile'},
+    {'select piece': 'finish_lag', 'select plot': 'Piece profile'},
+    # {'select piece': 'drive_angle', 'select plot': 'Piece profile'},
+    # {'select piece': 'drive_finish_angle', 'select plot': 'Piece profile'},
+    # {'select piece': 'min_angle_time', 'select plot': 'Piece profile'},
+    # {'select piece': 'max_angle_time', 'select plot': 'Piece profile'},
+    {'select piece': 'drive_start_time', 'select plot': 'Piece profile'},
+    {'select piece': 'max_force_time', 'select plot': 'Piece profile'},
+    {'select piece': 'drive_finish_time', 'select plot': 'Piece profile'},
+    # {'select piece': 'predrive_start_time', 'select plot': 'Piece profile'},
+    {'select piece': 'max_force', 'select plot': 'Piece profile'},
+]
+TIMINGS_REPORT = {f"report_{i}": v for i, v in enumerate(REPORT)}
+TIMINGS_REPORT["report_setup"] = {
+    "figure_height": 1000,
+    "nview": len(REPORT),
+    "toggleother": False,
+    "window": 10
+}
 
 
 def outlier_range(data, quantiles=(0.05, 0.5, 0.9)):
@@ -161,7 +181,7 @@ def scatter(data, x, y, fig=None, **kwargs):
     return fig
 
 
-@ st.cache_data
+@st.cache_data
 def parse_gpx(file):
     return files.parse_gpx_data(files.gpxpy.parse(file))
 
@@ -178,8 +198,8 @@ def download_csv(
     )
 
 
-@ st.cache_data
-def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
+@st.cache_data
+def parse_telemetry_text(uploaded_files, use_names=True, sep='\t', with_timings=True):
     uploaded_data = {
         file.name.rsplit(".", 1)[0]: file.read().decode("utf-8")
         for file in uploaded_files
@@ -189,6 +209,7 @@ def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
         uploaded_data,
         singleton=True,
         use_names=use_names,
+        with_timings=with_timings,
         sep=sep
     )
     if errs:
@@ -200,7 +221,7 @@ def parse_telemetry_text(uploaded_files, use_names=True, sep='\t'):
 
 
 @st.cache_data
-def parse_telemetry_files(uploaded_files, use_names=True):
+def parse_telemetry_files(uploaded_files, use_names=True, with_timings=False):
     uploaded_data = {
         file.name.rsplit(".", 1)[0]: file for file in uploaded_files
     }
@@ -209,6 +230,7 @@ def parse_telemetry_files(uploaded_files, use_names=True):
         uploaded_data,
         singleton=True,
         use_names=use_names,
+        with_timings=with_timings
     )
     if errs:
         for k, err in errs.items():
@@ -219,36 +241,37 @@ def parse_telemetry_files(uploaded_files, use_names=True):
 
 
 @st.cache_data
-def parse_file(file, use_names=True):
+def parse_file(file, use_names=True, with_timings=True):
     filename, *endings = file.name.rsplit(".", 1)
     ending, = endings or ("",)
     ending = ending.lower()
     if ending == 'csv':
-        return parse_text_data(file, use_names=use_names, sep=',')
+        return parse_text_data(file, use_names=use_names, sep=',', with_timings=with_timings)
     elif ending in {'xlsx', 'xls'}:
-        return parse_excel(file, use_names=use_names)
+        return parse_excel(file, use_names=use_names, with_timings=with_timings)
     elif ending == 'zip':
         return telemetry.load_zipfile(file)
-    return parse_text_data(file, use_names=use_names, sep='\t')
+    return parse_text_data(file, use_names=use_names, sep='\t', with_timings=with_timings)
 
 
 @st.cache_data
-def parse_text_data(file, use_names=True, sep='\t'):
+def parse_text_data(file, use_names=True, sep='\t', with_timings=True):
     return telemetry.parse_powerline_text_data(
         file.read().decode("utf-8"),
         use_names=use_names,
-        sep=sep
+        sep=sep,
+        with_timings=with_timings
     )
 
 
 @st.cache_data
-def parse_excel(file, use_names=True):
+def parse_excel(file, use_names=True, with_timings=True):
     data = pd.read_excel(file, header=None)
-    return telemetry.parse_powerline_excel(data, use_names=use_names)
+    return telemetry.parse_powerline_excel(data, use_names=use_names, with_timings=with_timings)
 
 
-@ st.cache_data
-def parse_telemetry_excel(uploaded_files, use_names=True):
+@st.cache_data
+def parse_telemetry_excel(uploaded_files, use_names=True, with_timings=True):
     uploaded_data = {
         file.name.rsplit(".", 1)[0]: file
         # file.read().decode()
@@ -258,7 +281,7 @@ def parse_telemetry_excel(uploaded_files, use_names=True):
         parse_excel,
         uploaded_data,
         singleton=True,
-        use_names=use_names,
+        use_names=use_names, with_timings=with_timings,
     )
     if errs:
         logging.error(errs)
@@ -266,7 +289,7 @@ def parse_telemetry_excel(uploaded_files, use_names=True):
     return data
 
 
-@ st.cache_data
+@st.cache_data
 def parse_telemetry_zip(uploaded_files):
     telem_data = {}
     for file in uploaded_files:
@@ -287,7 +310,7 @@ def parse_telemetry_zip(uploaded_files):
     return telem_data
 
 
-@ st.cache_data
+@st.cache_data
 def get_crossing_times(gpx_data, locations=None, thresh=0.5):
     crossing_times, errors = utils.map_concurrent(
         splits.find_all_crossing_times,
@@ -304,7 +327,7 @@ def get_crossing_times(gpx_data, locations=None, thresh=0.5):
     }
 
 
-@ st.cache_data
+@st.cache_data
 def get_location_timings(gpx_data, locations=None, thresh=0.5):
     location_timings, errors = utils.map_concurrent(
         splits.get_location_timings, gpx_data,
@@ -317,7 +340,7 @@ def get_location_timings(gpx_data, locations=None, thresh=0.5):
     return location_timings
 
 
-@ st.cache_data
+@st.cache_data
 def get_fastest_times(gpx_data):
     best_times, errors = utils.map_concurrent(
         splits.find_all_best_times,
@@ -833,7 +856,7 @@ def match_point(point, gps_data):
     return point
 
 
-@ st.fragment
+@st.fragment
 def clickable_map(fig, height=800, width='100%'):
     from streamlit_plotly_mapbox_events import plotly_mapbox_events
     # fig.config(responsive=True)
@@ -852,7 +875,7 @@ def clickable_map(fig, height=800, width='100%'):
             st.rerun()
 
 
-@ st.cache_data
+@st.cache_data
 def make_gps_landmarks_figure(gps_data, landmarks, map_style='open-street-map', height=600, suffix=' '):
     fig = go.Figure()
     color_cycle = cycle(color_discrete_sequence)
@@ -982,7 +1005,7 @@ def draw_gps_landmarks(gps_data, set_landmarks, new_landmarks, map_style='open-s
     return state
 
 
-@ st.fragment
+@st.fragment
 def draw_gps_data(gps_data, locations, index=None):
     fig = make_gps_figure(gps_data, locations, index)
     st.plotly_chart(fig, use_container_width=True)
@@ -1111,7 +1134,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
     }
 
 
-@ st.cache_data
+@st.cache_data
 def make_telemetry_figure(piece_power, col, name, start_time, epoch_times):
     if col == 'Work PC':
         WorkPC_cols = [
@@ -1363,7 +1386,7 @@ def make_telemetry_distance_figure(compare_power, landmark_distances, col, facet
     return fig
 
 
-@ st.cache_data
+@st.cache_data
 def make_telemetry_figures(telemetry_data, piece_data, window: int = 0, tab_names=None):
     if tab_names is None:
         tab_names = telemetry.FIELDS
@@ -1407,7 +1430,7 @@ def make_telemetry_figures(telemetry_data, piece_data, window: int = 0, tab_name
     return telemetry_figures
 
 
-@ st.cache_data
+@st.cache_data
 def figures_to_zipfile(figures, file_type, **kwargs):
     zipdata = io.BytesIO()
     with zipfile.ZipFile(zipdata, 'w') as zipf:
@@ -1966,7 +1989,7 @@ def plot_piece_col(col, piece_information, default_height=600, key='piece', inpu
     # return {(col, f"{start_landmark} to {finish_landmark}"): fig}
 
 
-@ st.cache_data
+@st.cache_data
 def interpolate_power(telemetry_data, dists=0.005, n_iter=10):
     power_gps_data = {}
     for k, data in telemetry_data.items():

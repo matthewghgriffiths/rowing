@@ -33,6 +33,19 @@ FIELDS = [
     'Work PC Q4',
     'Work PC',
 ]
+TIMING_FIELDS = [
+    'drive_angle',
+    'drive_finish_angle',
+    'min_angle_time',
+    'drive_start_time',
+    'predrive_start_time',
+    'catch_lag',
+    'max_angle_time',
+    'drive_finish_time',
+    'finish_lag',
+    'max_force',
+    'max_force_time'
+]
 
 
 def Unnamed(col):
@@ -42,7 +55,7 @@ def Unnamed(col):
         return col
 
 
-def parse_powerline_text_data(raw_text_data, sep='\t', use_names=True):
+def parse_powerline_text_data(raw_text_data, sep='\t', use_names=True, with_timings=True):
     parts = raw_text_data.split("=====")
     split_data = {}
     for part in parts:
@@ -74,10 +87,10 @@ def parse_powerline_text_data(raw_text_data, sep='\t', use_names=True):
                     sep=sep,
                 ).rename(columns=Unnamed)  # .dropna(axis=1, how='all')
 
-    return parse_powerline_data(split_data, use_names=use_names)
+    return parse_powerline_data(split_data, use_names=use_names, with_timings=with_timings)
 
 
-def parse_powerline_excel(data, use_names=True):
+def parse_powerline_excel(data, use_names=True, with_timings=True):
     data_groups = data[data[0] == "====="]
     data_keys = data_groups[1] + data_groups[2].fillna("")
     split_data = {}
@@ -107,10 +120,10 @@ def parse_powerline_excel(data, use_names=True):
                 key_data[c] = vals.astype(float)
         split_data[key] = key_data.reset_index(drop=True)
 
-    return parse_powerline_data(split_data, use_names=use_names)
+    return parse_powerline_data(split_data, use_names=use_names, with_timings=with_timings)
 
 
-def parse_powerline_data(split_data, use_names=True):
+def parse_powerline_data(split_data, use_names=True, with_timings=True):
     crew_data = split_data['Crew Info']
     gps_data = split_data["Aperiodic0x8013"]
     power_data = split_data["Aperiodic0x800A"]
@@ -143,18 +156,18 @@ def parse_powerline_data(split_data, use_names=True):
             errors='coerce'
         )
 
-    start_date = pd.Timestamp(start_time.date())
+    # start_date = pd.Timestamp(start_time.date())
+    # t_shift = (gps_data['UTC Time'].Boat - gps_data.Time).max()
+    start_time = start_time.astimezone(None)
     lat, lon = gps_info.Lat, gps_info.Lon
     lat_scale = (geodesy._AVG_EARTH_RADIUS_KM * 1000 * np.pi/180)
     long_scale = lat_scale * np.cos(np.deg2rad(lat))
 
-    t_shift = (gps_data['UTC Time'].Boat - gps_data.Time).max()
-    split_data["Periodic"]['Time'] = pd.to_datetime(pd.to_timedelta(
-        split_data['Periodic'].Time, unit='milli'
-    ) + start_time)
+    split_data["Periodic"]['Time'] = start_time + pd.to_timedelta(
+        split_data['Periodic'].Time, unit='milli')
 
     positions = pd.concat({
-        "time": pd.to_timedelta(gps_data['UTC Time'].Boat, unit='milli') + start_date,
+        "time": start_time + pd.to_timedelta(gps_data['Time'].squeeze(), unit='milli'),
         "longitude": gps_data.long.apply(
             pd.to_numeric, errors='coerce') / long_scale + lon,
         "latitude": gps_data.lat.apply(
@@ -170,9 +183,7 @@ def parse_powerline_data(split_data, use_names=True):
 
     power = power_data.copy()
     power.columns = set_rower_sides(power.columns, rig_info)
-    power.Time = pd.to_datetime(
-        pd.to_timedelta(power.Time + t_shift, unit='milli') + start_date
-    )
+    power.Time = start_time + pd.to_timedelta(power.Time, unit='milli')
     stroke_length = power.MaxAngle - power.MinAngle
     effect = stroke_length - power.CatchSlip - power.FinishSlip
     split_data['power'] = power = pd.concat([
@@ -191,7 +202,142 @@ def parse_powerline_data(split_data, use_names=True):
         split_data["Periodic"] = split_data["Periodic"].rename(
             columns=crew_list.to_dict(), level=1).sort_index(axis=1)
 
+    if with_timings:
+        split_data['power'] = add_timings(split_data)
+
     return split_data
+
+
+def add_timings(piece_data):
+    power = piece_data['power']
+    periodic = piece_data['Periodic']
+    parameters = piece_data[
+        'Parameter Info'
+    ].set_index('Parameter').Value.infer_objects()
+    catch_thresh = parameters.loc['Sweep Drive Start']
+    finish_thresh = parameters.loc['Sweep Recovery']
+
+    timings = calc_catch_timings(
+        periodic, catch_thresh=catch_thresh, finish_thresh=finish_thresh)
+    matches = match_stroke_timings(timings, power.Time.sort_values())
+    return power.join(
+        timings.loc[
+            matches.index
+        ].set_index(matches).drop(
+            'Time', axis=1, level=0
+        )
+    ).sort_values("Time")
+
+
+def calc_catch_timings(periodic: pd.DataFrame, catch_thresh=30, finish_thresh=15):
+    raw_data = periodic.infer_objects()
+
+    raw_data['stroke'] = (raw_data['Normalized Time'].diff() < -50).cumsum()
+    raw_data['seconds'] = (
+        raw_data.Time - raw_data.Time.min()).dt.total_seconds()
+    stroke_start = pd.Series(np.interp(
+        np.arange(raw_data.stroke.iloc[-1] + 1) * 100 + 50,
+        raw_data['Normalized Time'].squeeze() + raw_data.stroke * 100,
+        raw_data.seconds
+    ), np.arange(raw_data.stroke.iloc[-1] + 1))
+    raw_data['norm_seconds'] = raw_data['seconds'] - \
+        stroke_start.loc[raw_data.stroke].values
+
+    GateAngle = raw_data.GateAngle
+    GateForceX = raw_data.GateForceX
+    GateAngleVel = raw_data.GateAngleVel
+    norm_seconds = raw_data.norm_seconds
+
+    # Catch timings
+    min_angle_time = (
+        (GateAngleVel > 0).diff().fillna(0)
+        & (GateAngle < 0)
+    ).apply(
+        norm_seconds.where, other=np.nan
+    ).groupby(raw_data.stroke).min()
+
+    drive_angle_sig = (
+        (GateForceX > catch_thresh).diff().fillna(0)
+        & (GateAngle < 0)
+        & (GateAngleVel > 0)
+    )
+    drive_start_time = drive_angle_sig.apply(
+        norm_seconds.where, other=np.nan
+    ).groupby(raw_data.stroke).min()
+    _drive_angle = GateAngle.where(
+        drive_angle_sig, np.nan)
+    drive_angle = _drive_angle.groupby(raw_data.stroke).min()
+    predrive_start_time = (
+        (GateAngle < _drive_angle.bfill(axis=0)).diff()
+        & (GateAngleVel < 0)
+    ).apply(
+        norm_seconds.where, other=np.nan
+    ).groupby(raw_data.stroke).min()
+
+    # Finish Timings
+    drive_angle_sig = (
+        (GateAngleVel < 0).diff().fillna(0)
+        & (GateAngle > 0)
+    )
+    max_angle_time = drive_angle_sig.apply(
+        norm_seconds.where, other=np.nan
+    ).groupby(raw_data.stroke).max()
+    finish_angle = GateAngle.where(
+        drive_angle_sig, np.nan
+    ).groupby(raw_data.stroke).max()
+    drive_finish_time = (
+        (GateForceX > finish_thresh).diff().fillna(0)
+        & (GateAngle > 0)
+        & (GateAngleVel > 0)
+    ).apply(
+        norm_seconds.where, other=np.nan
+    ).groupby(raw_data.stroke).max()
+
+    # Drive timings
+    max_force = (
+        GateForceX
+        * (GateAngleVel > 0)
+        * (GateForceX > catch_thresh)
+    ).groupby(raw_data.stroke).max()
+    max_force_time = (
+        GateForceX == (
+            GateForceX
+            * (GateAngleVel > 0)
+            * (GateForceX > catch_thresh)
+        ).groupby(raw_data.stroke).transform('max')
+    ).apply(
+        norm_seconds.where, other=np.nan
+    ).groupby(raw_data.stroke).min()
+
+    timings = pd.concat({
+        'drive_angle': drive_angle,
+        'drive_finish_angle': finish_angle,
+        'min_angle_time': min_angle_time,
+        'drive_start_time': drive_start_time,
+        'predrive_start_time': predrive_start_time,
+        'catch_lag': drive_start_time - predrive_start_time,
+        'max_angle_time': max_angle_time,
+        'drive_finish_time': drive_finish_time,
+        'finish_lag': max_angle_time - drive_finish_time,
+        'max_force': max_force,
+        'max_force_time': max_force_time,
+    }, axis=1)
+    timings['Time'] = raw_data['Time'].groupby(raw_data.stroke).min().values
+    return timings
+
+
+def match_stroke_timings(timings, stroke_start, thresh=0.1):
+    time = timings.Time
+    is_close = time.astype(bool) & 0
+    match = time.astype(int) * 0
+
+    for s in pd.to_timedelta([0, thresh, -thresh], unit='s'):
+        match.loc[~is_close] = stroke_start.searchsorted(time[~is_close] + s)
+        diff = (time[~is_close] -
+                stroke_start.loc[match.loc[~is_close]].values)
+        is_close.loc[~is_close] = diff.dt.total_seconds() < thresh * 2
+
+    return match.loc[is_close].drop_duplicates(keep='last')
 
 
 rename_scull_cols = {

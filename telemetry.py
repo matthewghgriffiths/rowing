@@ -49,6 +49,21 @@ def main(state=None):
             "&size=small"
             "&quietzone=1&errorcorrection=H"
         )
+        st.markdown(
+            r'''
+            ### Page Navigation
+            - [Landmarks](#landmarks-from-activities)
+            - [Map](#map)
+            - [Heat Map](#heat-map)
+            - [Crossing Times](#crossing-times)
+            - [Select Piece](#select-piece)
+            - [Report](#report)
+            - [Report Settings](#report-settings)
+            - [Plot Piece Data](#plot-piece-data)
+            - [Plot Stroke Profiles](#plot-stroke-profiles)
+            - [Download Data](#download-data)
+            '''
+        )
         default_height = st.number_input(
             "Default Figure Height",
             min_value=100,
@@ -62,6 +77,7 @@ def main(state=None):
 
     with st.expander("Upload Telemetry Data", True):
         use_names = st.checkbox("Use crew list", True)
+        with_timings = st.checkbox("Calc timings", True)
         tabs = st.tabs([
             "Upload", "Upload text", "Upload csv", "Upload xlsx", "Upload Zip"
         ])
@@ -85,7 +101,7 @@ def main(state=None):
             )
             telemetry_data.update(
                 app.parse_telemetry_files(
-                    uploaded_files, use_names=use_names))
+                    uploaded_files, use_names=use_names, with_timings=with_timings))
 
         with tabs[1]:
             uploaded_files = st.file_uploader(
@@ -107,7 +123,7 @@ def main(state=None):
                 """, None)
             telemetry_data.update(
                 app.parse_telemetry_text(
-                    uploaded_files, use_names=use_names, sep='\t'
+                    uploaded_files, use_names=use_names, sep='\t', with_timings=with_timings
                 )
             )
         with tabs[2]:
@@ -129,7 +145,7 @@ def main(state=None):
                 """, None)
             telemetry_data.update(
                 app.parse_telemetry_text(
-                    uploaded_files, use_names=use_names, sep=','
+                    uploaded_files, use_names=use_names, sep=',', with_timings=with_timings
                 )
             )
         with tabs[3]:
@@ -178,10 +194,12 @@ def main(state=None):
 
     logger.info("Show map")
     with st.expander("Show map"):
+        st.subheader("Map")
         app.draw_gps_data(gps_data, locations)
 
     logger.info("Show heat map")
     with st.expander("Show heat map"):
+        st.subheader("Heat Map")
         cols = st.columns((4, 4, 2))
         with cols[-1]:
             heat_map_settings = st.popover("heat map settings")
@@ -211,6 +229,7 @@ def main(state=None):
         return
 
     with st.expander("Crossing times"):
+        st.subheader("Crossing Times")
         show_times = pd.concat({
             "date": all_crossing_times.dt.normalize(),
             "time": all_crossing_times,
@@ -256,6 +275,7 @@ def main(state=None):
 
     logger.info("Select piece start end")
     with st.expander("Select Piece start/end", True):
+        st.subheader("Select Piece")
         piece_information = app.select_pieces(all_crossing_times)
         if piece_information is None:
             st.write("No valid pieces could be found")
@@ -281,6 +301,7 @@ def main(state=None):
             app.show_piece_data(piece_information['piece_data'])
 
     with st.expander("Report", True):
+        st.subheader("Report")
 
         report = st.container()
 
@@ -291,12 +312,19 @@ def main(state=None):
             template_container = st.popover("Report template")
 
         with template_container:
-            if st.toggle("use default"):
+            use_default = st.toggle("Use default", True)
+            show_timings = st.toggle("Use timings default", False)
+            if show_timings:
+                for k0, vs in app.TIMINGS_REPORT.items():
+                    for k1, v in vs.items():
+                        k = ".".join([k0, k1])
+                        st.session_state[k] = v
+            elif use_default:
                 for k0, vs in app.DEFAULT_REPORT.items():
                     for k1, v in vs.items():
                         k = ".".join([k0, k1])
                         st.session_state[k] = v
-            else:
+            if not (use_default or show_timings):
                 for k0, vs in app.DEFAULT_REPORT.items():
                     for k1, v in vs.items():
                         k = ".".join([k0, k1])
@@ -388,6 +416,7 @@ def main(state=None):
                             "What data would you like to plot?",
                             key=key + "select piece",
                             options=["Pace Boat"] + list(telemetry.FIELDS)
+                            + telemetry.TIMING_FIELDS if with_timings else []
                         )
                     figures, tables = app.plot_piece_col(
                         plot_data_type, piece_information, default_height=height, key=key,
@@ -506,6 +535,7 @@ def main(state=None):
     logger.info("Plot piece data")
     telemetry_figures = {}
     with st.expander("Plot piece data"):
+        st.subheader("Plot piece data")
         if piece_information:
             window, show_rowers, all_plots, height = app.setup_plots(
                 piece_information['piece_rowers'], state, default_height=default_height)
@@ -534,6 +564,7 @@ def main(state=None):
                             st.dataframe(table, use_container_width=True)
 
     with st.expander("Plot Stroke Profiles"):
+        st.subheader("Plot Stroke Profiles")
         if st.toggle(
             'Make profile plots',
             key='Make profile plots'
@@ -574,6 +605,7 @@ def main(state=None):
 
     logger.info("Download data")
     with st.expander("Download Data"):
+        st.subheader("Download Data")
         cols = st.columns(4)
         if piece_information:
             with cols[0], st.spinner("Generating excel file"):
