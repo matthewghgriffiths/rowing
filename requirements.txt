@@ -4,6 +4,7 @@ flax>=0.9
 gpxpy>=1.6
 garminconnect>=0.2
 garth>=0.4
+gspread_pandas>=3.3.0
 jax>=0.4
 jaxlib>=0.4
 matplotlib>=3.0
