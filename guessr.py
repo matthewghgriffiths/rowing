@@ -35,19 +35,19 @@ color_discrete_sequence = [
 ]
 EMBED_TEMPLATE = '<iframe {attrs}></iframe>'
 urls = [
-    'https://www.google.com/maps/embed?pb=!4v1740937659682!6m8!1m7!1s7n-WTPtXECxAvFLXDrNsfw!2m2!1d51.47199119470677!2d-0.2211678208793883!3f315.0939529616098!4f-5.864996603455182!5f0.7820865974627469',
     'https://www.google.com/maps/embed?pb=!4v1740937700326!6m8!1m7!1so13J2hDBvzD2DEBvBitudA!2m2!1d51.47518037604937!2d-0.2242292696858267!3f346.3098504563404!4f-2.9170632522334046!5f0.7820865974627469',
-    'https://www.google.com/maps/embed?pb=!4v1740937764503!6m8!1m7!1sHzD_WPH8y6hZM4z16TpiVg!2m2!1d51.48556562963177!2d-0.2275685590965088!3f329.5361314675874!4f1.9134370118583774!5f0.7820865974627469',
-    'https://www.google.com/maps/embed?pb=!4v1740937791623!6m8!1m7!1s_JOvQy1AcO2irHu0JPfTFg!2m2!1d51.48937565474303!2d-0.236029361578029!3f267.28461971146044!4f4.750520231606188!5f0.7820865974627469',
-    'https://www.google.com/maps/embed?pb=!4v1740937811578!6m8!1m7!1sbMfomb_2aR3XMm-QKQL1rQ!2m2!1d51.47894321344205!2d-0.2501845319736254!3f328.53376420842056!4f4.735363193930297!5f0.7820865974627469',
-    'https://www.google.com/maps/embed?pb=!4v1740937828663!6m8!1m7!1sARNMTaU6sXKEYCWDWY7pdQ!2m2!1d51.48780458749148!2d-0.2434770474349015!3f199.24679586930398!4f-0.447988281292254!5f0.7820865974627469',
-    'https://www.google.com/maps/embed?pb=!4v1740992989025!6m8!1m7!1sS4nvotTAxX3OfqpiCyXaZw!2m2!1d51.47273697908322!2d-0.2537821746250593!3f19.61499272671466!4f0.4419032345348626!5f0.7820865974627469',
-    'https://www.google.com/maps/embed?pb=!4v1740993013759!6m8!1m7!1sGz76EHNj-usIpkEw_53HxA!2m2!1d51.47751722208024!2d-0.2506622751974344!3f358.8312926662331!4f-3.9092282295517435!5f0.7820865974627469',
-    'https://www.google.com/maps/embed?pb=!4v1740993045740!6m8!1m7!1sR3Di9l9x-KEtpZRJwY4TBA!2m2!1d51.48502796256749!2d-0.2477391471914139!3f302.7402791263707!4f-3.3762630236734594!5f0.4000000000000002',
     'https://www.google.com/maps/embed?pb=!4v1740993098607!6m8!1m7!1sy_Dn-AB_q2Cc0ZAS07RnPA!2m2!1d51.47555724203108!2d-0.2513615534092112!3f111.85247397332517!4f5.401017195468057!5f0.4000000000000002',
+    'https://www.google.com/maps/embed?pb=!4v1740937764503!6m8!1m7!1sHzD_WPH8y6hZM4z16TpiVg!2m2!1d51.48556562963177!2d-0.2275685590965088!3f329.5361314675874!4f1.9134370118583774!5f0.7820865974627469',
     'https://www.google.com/maps/embed?pb=!4v1740993154633!6m8!1m7!1sZQ4ePFQqdQ4L0_e5naGy4g!2m2!1d51.47112647679729!2d-0.2645214922996735!3f77.35616795021275!4f0.6503664590120479!5f1.8309513899817027',
     'https://www.google.com/maps/embed?pb=!4v1740993219312!6m8!1m7!1sPRSR_0uu80XA7lL9YJjw2A!2m2!1d51.48858251972053!2d-0.2308372793755596!3f278.9311651677046!4f-1.529163553946404!5f1.9587109090973311',
-    'https://www.google.com/maps/embed?pb=!4v1740993387477!6m8!1m7!1sQy5XlyEFw47Qh5FzGKC0CQ!2m2!1d51.47867245009478!2d-0.2253952031610886!3f253.19073894612148!4f-2.23110410197782!5f1.9587109090973311'
+    'https://www.google.com/maps/embed?pb=!4v1740993013759!6m8!1m7!1sGz76EHNj-usIpkEw_53HxA!2m2!1d51.47751722208024!2d-0.2506622751974344!3f358.8312926662331!4f-3.9092282295517435!5f0.7820865974627469',
+    'https://www.google.com/maps/embed?pb=!4v1740993387477!6m8!1m7!1sQy5XlyEFw47Qh5FzGKC0CQ!2m2!1d51.47867245009478!2d-0.2253952031610886!3f253.19073894612148!4f-2.23110410197782!5f1.9587109090973311',
+    'https://www.google.com/maps/embed?pb=!4v1740992989025!6m8!1m7!1sS4nvotTAxX3OfqpiCyXaZw!2m2!1d51.47273697908322!2d-0.2537821746250593!3f19.61499272671466!4f0.4419032345348626!5f0.7820865974627469',
+    'https://www.google.com/maps/embed?pb=!4v1740937659682!6m8!1m7!1s7n-WTPtXECxAvFLXDrNsfw!2m2!1d51.47199119470677!2d-0.2211678208793883!3f315.0939529616098!4f-5.864996603455182!5f0.7820865974627469',
+    'https://www.google.com/maps/embed?pb=!4v1740937811578!6m8!1m7!1sbMfomb_2aR3XMm-QKQL1rQ!2m2!1d51.47894321344205!2d-0.2501845319736254!3f328.53376420842056!4f4.735363193930297!5f0.7820865974627469',
+    'https://www.google.com/maps/embed?pb=!4v1740937828663!6m8!1m7!1sARNMTaU6sXKEYCWDWY7pdQ!2m2!1d51.48780458749148!2d-0.2434770474349015!3f199.24679586930398!4f-0.447988281292254!5f0.7820865974627469',
+    'https://www.google.com/maps/embed?pb=!4v1740937791623!6m8!1m7!1s_JOvQy1AcO2irHu0JPfTFg!2m2!1d51.48937565474303!2d-0.236029361578029!3f267.28461971146044!4f4.750520231606188!5f0.7820865974627469',
+    'https://www.google.com/maps/embed?pb=!4v1740993045740!6m8!1m7!1sR3Di9l9x-KEtpZRJwY4TBA!2m2!1d51.48502796256749!2d-0.2477391471914139!3f302.7402791263707!4f-3.3762630236734594!5f0.4000000000000002'
 ]
 
 
@@ -208,6 +208,18 @@ def main(state=None):
     results = st.container()
     # segmented, submit, reset = st.columns((4, 1, 1))
     segmented, submit, reset = [st.container() for _ in range(3)]
+    col1, col2 = st.columns(2)
+    segmented = submit = col2
+
+    with segmented:
+        current = int(st.query_params.get('current', 0))
+        question = st.segmented_control(
+            "Choose location",
+            show_options,
+            default=show_options[current],
+        )
+        if question:
+            st.query_params['current'] = i = show_options.index(question)
 
     if all(answers.values()):
         with submit:
@@ -240,12 +252,18 @@ def main(state=None):
 
     else:
         st.query_params['completed'] = completed = 0
-        unanswered = ", ".join(q for q, a in answers.items() if not a)
+        unanswered_qs = [q for q, a in answers.items() if not a]
+        unanswered = ", ".join(unanswered_qs)
         with submit:
-            st.write(f"Unanswered questions: {unanswered}")
+            n_answered = n_points - len(unanswered_qs)
+            progress = n_answered / n_points
+            st.progress(
+                progress,
+                f"Answered {n_answered} / {n_points} locations, "
+                f"unanswered question(s): {unanswered}"
+            )
 
     if completed:
-
         answers = pd.concat([
             compare.answers.stack().sort_index(),
             compare.error.stack().sort_index()
@@ -276,18 +294,6 @@ def main(state=None):
             avg_error = compare.error.m.mean()
             st.write(f"Average error = {avg_error:.1f}")
 
-    col1, col2 = st.columns(2)
-
-    with segmented:
-        current = int(st.query_params.get('current', 0))
-        question = st.segmented_control(
-            "Choose location",
-            show_options,
-            default=show_options[current],
-        )
-        if question:
-            st.query_params['current'] = i = show_options.index(question)
-
     with reset:
         if not completed:
             if st.toggle("Reset answers") and st.button(
@@ -298,22 +304,32 @@ def main(state=None):
                 st.rerun()
 
     with col1:
-        i = show_options.index(question)
-        url = url_order[i]
+        if question:
+            i = show_options.index(question)
+            url = url_order[i]
 
-        attrs = dict(
-            src=url,
-            width="100%",
-            height=f"{height + 700}",
-            style="border:0; margin-top: -150px;",
-            allowfullscreen="",
-            loading="lazy",
-            referrerpolicy="no-referrer-when-downgrade",
-        )
+            st.header(f"{question} Location")
+            st.write(
+                "Click on the blue line on the map "
+                "where you think the closest point "
+                "to the picture below is"
+            )
 
-        embed_str = EMBED_TEMPLATE.format(
-            attrs=" ".join(f'{k}="{v}"' for k, v in attrs.items()))
-        components.html(embed_str, height=height)
+            attrs = dict(
+                src=url,
+                width="100%",
+                height=f"{height + 700}",
+                style="border:0; margin-top: -150px;",
+                allowfullscreen="",
+                loading="lazy",
+                referrerpolicy="no-referrer-when-downgrade",
+            )
+
+            embed_str = EMBED_TEMPLATE.format(
+                attrs=" ".join(f'{k}="{v}"' for k, v in attrs.items()))
+            components.html(embed_str, height=height)
+        else:
+            st.write("Please pick a location")
 
     if completed:
         fig = go.Figure()
