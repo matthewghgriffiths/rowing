@@ -284,7 +284,7 @@ def main(state=None):
         if submission_hash != st.session_state.get('hash'):
             with st.spinner("Submitting Results"):
                 sheet = get_gspread_sheet()
-                sheet.insert_row(list(to_submit), index=2)
+                sheet.insert_row(list(to_submit), index=3)
             st.session_state['hash'] = submission_hash
         else:
             print("Already submitted")
