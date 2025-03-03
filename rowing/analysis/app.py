@@ -643,7 +643,7 @@ def edit_landmarks(landmarks):
     return edited_landmarks
 
 
-def set_landmarks(gps_data=None, landmarks=None, title=True):
+def _set_landmarks(gps_data=None, landmarks=None, title=True):
     tab0, tab1, tab2 = st.tabs([
         "From Pieces",
         "Edit Landmarks",
