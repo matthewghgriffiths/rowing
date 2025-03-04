@@ -153,7 +153,7 @@ def main(state=None):
         error = (geodesy.haversine_km(qpos, qsol) * 1000).astype(int)
         qdraw = qpos.loc[plot_order].join(error.rename('error'))
         qdraw['label'] = qdraw.apply(
-            lambda ans: "Solution" if ans.name == 'Solution'
+            lambda ans: q if ans.name == 'Solution'
             else f"{ans.name.strip()}, {ans.error:.0f}m",
             axis=1
         )
