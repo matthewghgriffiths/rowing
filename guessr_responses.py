@@ -185,20 +185,20 @@ def main(state=None):
             else f"{ans.name.strip()}, {ans.error:.0f}m",
             axis=1
         )
-        fig.add_trace(go.Scattermapbox(
+        fig.add_trace(go.Scattermap(
             lat=[qsol.latitude],
             lon=[qsol.longitude],
             mode='markers',
             marker=dict(
                 size=max(20, error.mean() / error_scale),
-                color=to_rgba(*option_colors[q], 0.5)
+                color=to_rgba(*option_colors[q], 0.5),
             ),
             name=f"{q}",
             legendgroup='Solutions',
             legendgrouptitle_text='Solutions',
             textposition='bottom right',
         ))
-        fig.add_trace(go.Scattermapbox(
+        fig.add_trace(go.Scattermap(
             lat=qdraw.latitude,
             lon=qdraw.longitude,
             text=qdraw['label'],
@@ -221,7 +221,7 @@ def main(state=None):
 
     fig.update_layout(
         {"uirevision": True},
-        mapbox={
+        map={
             'style': map_style,
             'center': {'lon': lon, 'lat': lat},
             'zoom': zoom
