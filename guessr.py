@@ -98,6 +98,7 @@ def get_gspread_sheet():
     return sheet
 
 
+@st.cache_data
 def get_data():
     views = pd.Series(urls).rename('url').to_frame()
     views['latitude'] = views.url.str.extract(
@@ -281,13 +282,17 @@ def main(state=None):
         to_submit = pd.concat([info, answers])
         vals = tuple(to_submit)[1:]
         submission_hash = hash(vals)
-        if submission_hash != st.session_state.get('hash'):
-            with st.spinner("Submitting Results"):
-                sheet = get_gspread_sheet()
-                sheet.insert_row(list(to_submit), index=3)
-            st.session_state['hash'] = submission_hash
-        else:
-            print("Already submitted")
+        try:
+            if submission_hash != st.session_state.get('hash'):
+                with st.spinner("Submitting Results"):
+                    sheet = get_gspread_sheet()
+                    sheet.insert_row(list(to_submit), index=3)
+                st.session_state['hash'] = submission_hash
+            else:
+                print("Already submitted")
+        except Exception as e:
+            st.toast("Submission Failed, try again?")
+            completed = False
 
         with results:
             st.dataframe(compare)
