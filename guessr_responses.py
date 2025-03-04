@@ -146,6 +146,34 @@ def main(state=None):
     players = responses_positions.index.levels[0].difference(['Solution'])
     plot_order = sum(([p, 'Solution'] for p in players), [])
 
+    guesses = responses_positions.drop(index='Solution', level=0)
+    solution = responses_positions.loc['Solution']
+
+    guesses_avg = pd.concat([
+        guesses,
+        pd.concat({
+            'mean answer': guesses.groupby(level=1).mean(),
+            'median answer': guesses.groupby(level=1).median(),
+        })
+    ])
+
+    errors = (
+        guesses_avg.groupby(level=0).apply(
+            geodesy.haversine_km, pos2=solution
+        ).droplevel(0).unstack() * 1e3
+    ).round(1)[options]
+    errors.index.name = "Name"
+    errors['score'] = errors['avg'] = errors.mean(1).round(2)
+    errors = errors[['score'] + options + ['avg']]
+    errors['min'] = errors.min(1)
+    errors['max'] = errors.max(1)
+
+    st.header("Scores")
+    st.dataframe(
+        errors.sort_values("score")
+    )
+
+    st.header("Response Maps")
     fig = go.Figure()
     for q in options:
         qpos = responses_positions.xs(q, level=1)

@@ -298,6 +298,9 @@ def main(state=None):
             st.dataframe(compare)
             avg_error = compare.error.m.mean()
             st.write(f"Average error = {avg_error:.1f}")
+            st.markdown(
+                "[See what everyone else chose](https://tidewayguessr-responses.streamlit.app/)"
+            )
 
     with reset:
         if not completed:
