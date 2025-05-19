@@ -131,7 +131,8 @@ def parse_powerline_data(split_data, use_names=True, with_timings=True):
     rig_info = split_data['Rig Info']
 
     crew_list = crew_data.set_index("Position").Name
-    crew_list = crew_list.where(crew_list.notna(), crew_list.index).astype(str)
+    crew_list = crew_list.where(
+        crew_list.notna(), crew_list.index).astype('string')
     split_data['Crew List'] = crew_list
 
     for fmt in [

@@ -309,7 +309,7 @@ def main(state=None):
 
         template_col, *settings_cols = st.columns((1, 1, 1, 4))
         with template_col:
-            template_container = st.popover("Report template")
+            template_container = st.popover("Templates and Downloads")
 
         with template_container:
             use_default = st.toggle("Use default", True)
@@ -403,6 +403,7 @@ def main(state=None):
                         options=[
                             "Piece profile",
                             "Stroke profile",
+                            "Overlay multiple plots",
                             "Interval averages",
                             "Piece averages",
                             "Heatmap",
@@ -447,6 +448,14 @@ def main(state=None):
                         figures, tables = app.plot_boat_profile(
                             piece_information, default_height=height, key=key,
                             cols=cols)
+
+                elif plot_type == "Overlay multiple plots":
+                    figures, tables, plot_data_type = app.plot_multiple_profile(
+                        piece_information,
+                        settings_container=inputs,
+                        key=key + "multiple",
+                        height=height
+                    )
 
                 elif plot_type == "Interval averages":
                     with inputs:

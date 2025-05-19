@@ -70,6 +70,12 @@ REPORT = [
         'select plot': 'Stroke profile',
         'select stroke': 'Rower profile'},
     {
+        'Select x-axis': 'Normalized Time',
+        'Select y-axis': 'GateAngle',
+        'rower profile figure height': 600,
+        'select plot': 'Stroke profile',
+        'select stroke': 'Rower profile'},
+    {
         'select plot': 'Stroke profile',
         'select stroke': 'Boat profile',
         'select_boat_facets': [
@@ -2200,3 +2206,151 @@ def make_offline_static_report(report_outputs, file_name):
         file_name,
         mime='text/html',
     )
+
+
+def multiple_profile_settings(piece_information, settings_container=None, key='plot_multiple'):
+    filter_on = ['name', 'leg', 'Side', 'Position']
+
+    settings_container = settings_container or st.container()
+
+    with settings_container:
+        x_axis = st.selectbox(
+            "Select x-axis",
+            ['Distance', 'Normalized Time', 'GateAngle'],
+            index=0,
+            key=key + '_xaxis'
+        )
+        if x_axis == 'Distance':
+            data = piece_information['compare_power']
+            facets = data.columns[7:]
+            plot_facets = st.multiselect(
+                "Select facets to plot",
+                options=facets,
+                key=key + '_facets'
+            )
+        else:
+            data = piece_information['crew_profile']
+            plot_facets = data.columns.intersection(
+                ['GateAngle', 'GateAngleVel', 'GateForceX', 'GateForceY']
+            ).difference([x_axis])
+
+        if st.toggle("Filter inputs", key=key+"_filtertoggle"):
+            filters_data = inputs.filter_dataframe(
+                data[filter_on].value_counts().reset_index(),
+                column_order=filter_on,
+                key=key+"_filterinputs"
+            )
+            data = data[
+                pd.MultiIndex.from_frame(data[filter_on].astype(str)).isin(
+                    pd.MultiIndex.from_frame(
+                        filters_data[filter_on].astype(str))
+                )
+            ]
+
+    return data, x_axis, plot_facets
+
+
+def plot_multiple_profile(piece_information, height=800, settings_container=None, key='plot_multiple'):
+    data, x_axis, plot_facets = multiple_profile_settings(
+        piece_information,
+        settings_container=settings_container,
+        key=key
+    )
+    plot_data_type = ", ".join(plot_facets)
+    fig = make_overlays(
+        data, x_axis, plot_facets, height=height
+    )
+    tables = {}
+    if x_axis == "Distance":
+        piece_data_filter = piece_information['piece_data_filter']
+        for col in plot_facets:
+            interval_stats = piece_data_filter.get(f"Interval {col}")
+            if interval_stats is not None:
+                tables[f"Interval {col} Average"] = interval_stats
+        for col in plot_facets:
+            average_stats = piece_data_filter.get(f"Average {col}")
+            if average_stats is not None:
+                tables[f"Piece {col} Average"] = average_stats
+
+    figures = {
+        f"{plot_data_type} vs {x_axis}": fig
+    }
+
+    return figures, tables, plot_data_type
+
+
+def make_overlays(data, x_axis, plot_facets, height=800):
+    filter_on = ['name', 'leg', 'Side', 'Position']
+
+    to_plot = data.groupby(filter_on).first()
+    to_plot_colors = dict(zip(
+        to_plot.index, cycle(color_discrete_sequence)
+    ))
+
+    fig = go.Figure()
+    for (name, leg, side, position), ind_data in data.groupby(filter_on):
+        color = to_plot_colors[name, leg, side, position]
+        for i, facet in enumerate(plot_facets):
+            facet_data = ind_data.dropna(subset=facet)
+            if len(facet_data):
+                fig.add_trace(
+                    go.Scatter(
+                        x=facet_data[x_axis],
+                        y=facet_data[facet],
+                        name=f"{side}, {position}, {leg}",
+                        line_color=color,
+                        legendgroup=f"{facet}: {name}",
+                        legendgrouptitle_text=f"{facet}: {name}",
+                        yaxis='y' if i == 0 else f"y{i + 1}"
+                    )
+                )
+
+    # Get overlay ranges to avoid overlaps between different facets
+    facet_order = plot_facets[::-1]
+    facet_min = data[facet_order].quantile(0.01)
+    facet_max = data[facet_order].quantile(0.99)
+
+    facet_range = facet_max - facet_min
+
+    xaxis_data = data.groupby(pd.cut(data[x_axis], 100))
+    max_envelope = ((
+        xaxis_data[facet_order].max() - facet_min
+    ) / facet_range).clip(0, 1)
+    min_envelope = ((
+        xaxis_data[facet_order].min() - facet_min
+    ) / facet_range).clip(0, 1)
+    overlap = min_envelope - max_envelope.shift(axis=1) + 1
+    min_overlaps = overlap.min().fillna(0) - 0.2
+    shifts = np.arange(min_overlaps.size) - min_overlaps.cumsum()
+    smax = shifts.max() + 1.2
+    layout = dict(
+        height=height,
+        legend=dict(
+            itemclick='toggle',
+            itemdoubleclick='toggleothers',
+            groupclick='toggleitem',
+        )
+    )
+    for i, facet in enumerate(plot_facets):
+        s = shifts[facet]
+        flo = facet_min[facet]
+        fr = facet_range[facet]
+        r0 = flo - s * fr
+        frange = (r0, r0 + smax * fr)
+        yaxis_layout = dict(
+            title=facet,
+            range=frange,
+            showgrid=False
+        )
+        if i == 0:
+            layout['yaxis'] = yaxis_layout
+        else:
+            layout[f'yaxis{i+1}'] = {
+                'autoshift': True,
+                'anchor': 'free',
+                'overlaying': "y",
+                **yaxis_layout
+            }
+
+    fig.update_layout(**layout)
+    return fig
