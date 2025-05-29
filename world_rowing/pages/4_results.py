@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 try:
-    import _
+    import about
 except ModuleNotFoundError:
     pass
 finally:

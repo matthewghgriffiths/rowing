@@ -15,7 +15,7 @@ st.set_page_config(
 logger = logging.getLogger(__name__)
 
 try:
-    import _
+    import about
 except ModuleNotFoundError:
     pass
 finally:

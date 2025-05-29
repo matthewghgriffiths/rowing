@@ -18,7 +18,7 @@ DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)
 
 try:
-    import _
+    import about
 except ModuleNotFoundError:
     pass
 finally:

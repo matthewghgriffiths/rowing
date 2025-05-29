@@ -14,7 +14,7 @@ st.set_page_config(
     # page_icon=":rowing:",
 )
 try:
-    import _
+    import about
 except ModuleNotFoundError:
     pass
 finally:

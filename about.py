@@ -19,7 +19,7 @@ except (ImportError, ModuleNotFoundError):
 
 def main():
     st.set_page_config(
-        page_title="Other",
+        page_title="About",
         layout='wide'
     )
 

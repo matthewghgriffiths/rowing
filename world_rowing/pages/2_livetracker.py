@@ -2,7 +2,7 @@
 import streamlit as st
 
 try:
-    import _
+    import about
 except ModuleNotFoundError:
     pass
 finally:
