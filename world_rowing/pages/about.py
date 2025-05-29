@@ -16,12 +16,14 @@ except (ImportError, ModuleNotFoundError):
 
     import rowing
 
+st.set_page_config(
+    page_title="About",
+    layout='wide'
+)
+
 
 def main():
-    st.set_page_config(
-        page_title="About",
-        layout='wide'
-    )
+    st.title("About")
 
 
 if __name__ == "__main__":
