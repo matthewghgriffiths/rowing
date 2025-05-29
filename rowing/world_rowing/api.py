@@ -640,25 +640,29 @@ def get_live_race(fisa=True, competition=None):
     finished = False
     live_races = get_live_races(fisa=fisa, competition=competition)
     for _, race in live_races.iterrows():
-        data = get_worldrowing_data(
-            'livetracker', "live", race.race_id, cached=False
-        )
-        lanes = data['config'].get("lanes", [])
-        started = (
-            data.get('live')
-            or any(lane.get("live") for lane in lanes)
-        )
+        try:
+            data = get_worldrowing_data(
+                'livetracker',  "live",
+                race.race_id, cached=False
+            )
+            lanes = data['config'].get("lanes", [])
+            started = (
+                data.get('live')
+                or any(lane.get("live") for lane in lanes)
+            )
 
-        if started:
-            live_race = race
+            if started:
+                live_race = race
 
-            finished = all(lane['_finished'] for lane in lanes)
-            if not finished:
+                finished = all(lane['_finished'] for lane in lanes)
+                if not finished:
+                    break
+            elif finished:
                 break
-        elif finished:
-            break
-        else:
-            pass
+            else:
+                pass
+        except Exception as e:
+            logger.exception("%s experienced error %r", race.race_id, e)
 
     else:
         return None
@@ -865,19 +869,20 @@ def get_race_athletes(race_id):
         race_id, include=(
             'event.competition,raceStatus,racePhase,'
             'raceBoats.raceBoatIntermediates.distance,'
-            'event,raceBoats.raceBoatAthletes,'
+            'event,raceBoats,raceBoats.raceBoatAthletes,'
             'raceBoats.raceBoatAthletes.person'
         ))
     race_boats = pd.json_normalize(race.Boat)
-    race_boat_athletes = pd.json_normalize(
-        race_boats.raceBoatAthletes.sum()
-    ).join(
-        race_boats.set_index('id').DisplayName.rename("Boat"),
-        on='raceBoatId'
-    )
-    return race_boat_athletes.set_index(
-        ['Boat', 'boatPosition']
-    )['person.DisplayName'].unstack()
+    if 'raceBoatAthletes' in race_boats:
+        race_boat_athletes = pd.json_normalize(
+            race_boats.raceBoatAthletes.sum()
+        ).join(
+            race_boats.set_index('id').DisplayName.rename("Boat"),
+            on='raceBoatId'
+        )
+        return race_boat_athletes.set_index(
+            ['Boat', 'boatPosition']
+        )['person.DisplayName'].unstack()
 
 
 WBT_RECORDS = {
@@ -1017,6 +1022,15 @@ def merge_competition_results(
         race_wbts,
         left_on=fields.raceBoats_raceId, right_on=fields.race_id,
         suffixes=('', '_1'),
+    )
+    race_data[fields.race_distance] = race_data[fields.race_distance].where(
+        race_data[fields.race_distance].notna(),
+        race_data.groupby('event_id')[
+            fields.race_distance].transform('max')
+    )
+    race_data[fields.race_distance] = race_data[fields.race_distance].where(
+        race_data[fields.race_distance].notna(),
+        race_data[fields.race_distance].max()
     )
     race_data[fields.raceBoatIntermediates_Rank] = \
         race_data[fields.raceBoatIntermediates_Rank].astype(int)

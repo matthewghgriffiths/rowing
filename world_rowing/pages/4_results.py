@@ -74,7 +74,7 @@ def main(params=None):
             key='results',
         )
         full_results = fields.to_streamlit_dataframe(results)
-        full_results['PGMT'] = full_results['PGMT'].map("{:.2%}".format)
+        # full_results['PGMT'] = full_results['PGMT'].map("{:.2%}".format)
 
     with set_tables:
         column_order = st.selectbox(
@@ -124,6 +124,7 @@ def main(params=None):
             race_results = key_results.drop_duplicates(
                 ["Race", "Distance", column_order]
             ).set_index(["Race", "Distance", column_order])
+            race_results['PGMT'] = race_results['PGMT'].map("{:.2%}".format)
 
             table = race_results[
                 ['Boat'] + show_values
@@ -164,7 +165,6 @@ def main(params=None):
                     by=order_by,
                     ascending=ascending
                 ).index
-                print(order)
                 table = table.loc[order]
 
             st.markdown(

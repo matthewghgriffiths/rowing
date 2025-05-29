@@ -162,7 +162,10 @@ def main(params=None):
         with fig_plot:
             if fig is not None:
                 fig = plots.update_figure(fig, **fig_params)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(
+                    fig, use_container_width=True,
+                    key=time.time()
+                )
             else:
                 st.write("no live data could be loaded")
 

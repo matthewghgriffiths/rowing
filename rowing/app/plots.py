@@ -324,7 +324,7 @@ def show_lane_info(lane_info):
         speed_col,
     ]].sort_values(fields.lane_Lane).copy()
     lane_info[fields.split] = pd.to_timedelta(
-        500 / lane_info[speed_col], unit='s',
+        500 / lane_info[speed_col].replace(0, np.nan), unit='s',
     ) + pd.Timestamp(0)
     st.dataframe(
         lane_info,

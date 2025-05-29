@@ -2,6 +2,8 @@ from pathlib import Path
 import sys
 import os
 
+import streamlit as st
+
 DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)
 
@@ -13,3 +15,14 @@ except (ImportError, ModuleNotFoundError):
         sys.path.append(LIBPATH)
 
     import rowing
+
+
+def main():
+    st.set_page_config(
+        page_title="Other",
+        layout='wide'
+    )
+
+
+if __name__ == "__main__":
+    main()

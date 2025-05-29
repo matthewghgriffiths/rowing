@@ -194,7 +194,9 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
         live_time_data[(fields.split, c)] = pd.to_timedelta(
             500 / speed.replace(0, np.nan), unit='s', errors='coerce')
         live_time_data[(fields.avg_split, c)] = pd.to_timedelta(
-            500. / live_time_data[fields.avg_speed, c], unit='s', errors='coerce')
+            500. / live_time_data[fields.avg_speed, c].replace(0, np.nan),
+            unit='s', errors='coerce'
+        )
 
     live_data = live_time_data.stack(1).reset_index().join(
         lane_info[[
@@ -319,10 +321,12 @@ class RealTimeLivetracker:
         )
         self.livetracker_age = curr_time - age
         self.livetracker_max_age = max_age + self.livetracker_age
-
-        data = r.json()['data']
-        self.livetracker_history[curr_time] = data
-        return data
+        try:
+            data = r.json()['data']
+            self.livetracker_history[curr_time] = data
+            return data
+        except Exception as e:
+            logger.exception("%s experienced error %r", self.race_id, e)
 
     def wait_for_livetrack(self):
         max_age = self.livetracker_max_age
@@ -448,7 +452,7 @@ class LiveRaceData:
             self.lane_info = lane_update
             self.intermediates = inter_update
             if livetracker_update is not None:
-                track_count = livetracker_update[fields.live_trackCount].mean(
+                track_count = livetracker_update['Distance'].mean(
                     axis=1).sort_values()
                 self.livetracker = livetracker_update.loc[track_count.index]
                 self.new_points = livetracker_update.index.difference(
