@@ -12,9 +12,11 @@ realpaths = [os.path.realpath(p) for p in sys.path]
 if LIBPATH not in realpaths:
     sys.path.append(LIBPATH)
 
+
 st.set_page_config(
     page_title="Home",
 )
+
 st.title("World Rowing results visualisation app")
 
 st.markdown(

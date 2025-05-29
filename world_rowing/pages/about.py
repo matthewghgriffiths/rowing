@@ -14,12 +14,9 @@ except (ImportError, ModuleNotFoundError):
     if LIBPATH not in realpaths:
         sys.path.append(LIBPATH)
 
-    import rowing
+    print(sys.path)
 
-st.set_page_config(
-    page_title="About",
-    layout='wide'
-)
+    import rowing
 
 
 def main():
