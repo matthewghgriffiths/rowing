@@ -70,6 +70,10 @@ def main(params=None):
             f"No events could be loaded for {competition.competition}")
         st.stop()
 
+    comp_boat_athletes = comp_boat_athletes.dropna(
+        subset=['Event', "Boat", "Position", 'Athlete']
+    )
+
     event_entries = comp_boat_athletes.groupby('Event').apply(
         lambda data: data.Boat.drop_duplicates().reset_index(drop=True)
     ).unstack(fill_value='')
@@ -81,9 +85,12 @@ def main(params=None):
     )
 
     if not st.toggle("Entries By Event"):
+        print(comp_boat_athletes)
+
         boat_athlete_pos = comp_boat_athletes.set_index(
             ['Event', "Boat", "Position"]
         ).Athlete.unstack(fill_value='')
+
         st.dataframe(
             boat_athlete_pos,
             column_config={

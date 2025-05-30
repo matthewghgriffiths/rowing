@@ -17,7 +17,7 @@ def main():
 
         ## Pages
 
-        ### [1. GMTs](/GMTs)
+        ### [1. GMTs](/pgmts)
         Allows loading, filtering and visualisation of results and PGMTs from a FISA competition.
 
         ### [2. Livetracker](/livetracker)
