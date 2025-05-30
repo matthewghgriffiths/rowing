@@ -9,10 +9,10 @@ import logging
 import plotly.express as px
 import pandas as pd
 
-st.set_page_config(
-    page_title="Entries",
-    layout='wide'
-)
+# st.set_page_config(
+#     page_title="Entries",
+#     layout='wide'
+# )
 
 DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)

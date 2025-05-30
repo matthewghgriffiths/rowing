@@ -10,10 +10,10 @@ import logging
 import plotly.express as px
 import pandas as pd
 
-st.set_page_config(
-    page_title="Results",
-    layout='wide'
-)
+# st.set_page_config(
+#     page_title="Results",
+#     layout='wide'
+# )
 
 try:
     import about

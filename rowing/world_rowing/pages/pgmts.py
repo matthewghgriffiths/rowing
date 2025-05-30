@@ -7,10 +7,7 @@ import plotly.express as px
 import pandas as pd
 
 
-st.set_page_config(
-    page_title="PGMTs",
-    layout='wide'
-)
+# st.set_page_config(page_title="PGMTs", layout='wide')
 
 logger = logging.getLogger(__name__)
 

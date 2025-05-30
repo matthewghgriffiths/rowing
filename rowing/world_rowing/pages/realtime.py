@@ -8,11 +8,9 @@ import logging
 
 from tqdm.autonotebook import tqdm
 
-st.set_page_config(
-    page_title="World Rowing Realtime Livetracker",
-    layout='wide',
-    # page_icon=":rowing:",
-)
+# st.set_page_config(
+# page_title="World Rowing Realtime Livetracker", layout='wide')
+
 try:
     import about
 except ModuleNotFoundError:

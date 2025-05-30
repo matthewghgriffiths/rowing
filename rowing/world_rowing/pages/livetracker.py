@@ -10,11 +10,8 @@ finally:
     from rowing.world_rowing import fields
 
 
-st.set_page_config(
-    page_title="World Rowing livetracker",
-    layout='wide'
-    # page_icon="👋",
-)
+# st.set_page_config(
+#     page_title="World Rowing livetracker", layout='wide')
 
 
 def main(params=None):
