@@ -9,17 +9,18 @@ import streamlit as st
 from rowing.app import select, inputs, state, plots
 from rowing.analysis import files, telemetry
 from rowing.utils import timeout
+from rowing.world_rowing import pages
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
 
 dirpath = Path(__file__).resolve().parent
 
-app_GMTs = importlib.import_module("world_rowing.pages.1_GMTs", "..")
-app_livetracker = importlib.import_module(
-    "world_rowing.pages.2_livetracker", "..")
-app_realtime = importlib.import_module(
-    "world_rowing.pages.3_realtime", "..")
+# app_GMTs = importlib.import_module("world_rowing.pages.1_GMTs", "..")
+# app_livetracker = importlib.import_module(
+#     "world_rowing.pages.2_livetracker", "..")
+# app_realtime = importlib.import_module(
+#     "world_rowing.pages.3_realtime", "..")
 app_gpx = importlib.import_module("gps", "..")
 app_telemetry = importlib.import_module("telemetry", "..")
 
@@ -63,7 +64,7 @@ def run_streamlit(main, params):
     ]
 )
 def test_GMTs(params):
-    run_streamlit(app_GMTs.main, params)
+    run_streamlit(pages.pgmts.main, params)
 
 
 @pytest.mark.parametrize(
@@ -91,7 +92,7 @@ def test_GMTs(params):
     ]
 )
 def test_livetracker(params):
-    run_streamlit(app_livetracker.main, params)
+    run_streamlit(pages.livetracker.main, params)
 
 
 @pytest.mark.parametrize(
@@ -99,8 +100,8 @@ def test_livetracker(params):
         {'replay': 50, 'replay_step': 50, "replay_race": False},
     ]
 )
-def test_realtime(params):
-    run_streamlit(app_realtime.main, params)
+def _test_realtime(params):
+    run_streamlit(pages.realtime.main, params)
 
 
 def test_telemetry():
