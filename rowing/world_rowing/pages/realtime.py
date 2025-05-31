@@ -138,34 +138,37 @@ def main(params=None):
         plots.make_plots,
     ))
     for fig, *_ in pbar:
-        pbar.set_postfix(distance=live_race.distance)
-        if live_race.distance == last_dist:
-            elapsed = time.time() - last_time
-        else:
-            st.session_state["distance_completed"] = last_dist = live_race.distance
-            st.session_state["last_time_update"] = last_time = time.time()
-            elapsed = 0
-
-        completed.progress(
-            live_race.distance / live_race.race_distance,
-            f"Distance completed: {live_race.distance}m/{live_race.race_distance}m, "
-            f"{elapsed:0.1f}s out of date"
-        )
-
-        with show_intermediates:
-            if not live_race.lane_info.empty:
-                plots.show_lane_intermediates(
-                    live_race.lane_info, live_race.intermediates)
-
-        with fig_plot:
-            if fig is not None:
-                fig = plots.update_figure(fig, **fig_params)
-                st.plotly_chart(
-                    fig, use_container_width=True,
-                    key=time.time()
-                )
+        try:
+            pbar.set_postfix(distance=live_race.distance)
+            if live_race.distance == last_dist:
+                elapsed = time.time() - last_time
             else:
-                st.write("no live data could be loaded")
+                st.session_state["distance_completed"] = last_dist = live_race.distance
+                st.session_state["last_time_update"] = last_time = time.time()
+                elapsed = 0
+
+            completed.progress(
+                live_race.distance / live_race.race_distance,
+                f"Distance completed: {live_race.distance}m/{live_race.race_distance}m, "
+                f"{elapsed:0.1f}s out of date"
+            )
+
+            with show_intermediates:
+                if not live_race.lane_info.empty:
+                    plots.show_lane_intermediates(
+                        live_race.lane_info, live_race.intermediates)
+
+            with fig_plot:
+                if fig is not None:
+                    fig = plots.update_figure(fig, **fig_params)
+                    st.plotly_chart(
+                        fig, use_container_width=True,
+                        key=time.time()
+                    )
+                else:
+                    st.write("no live data could be loaded")
+        except Exception as e:
+            logger.exception("Encountered exception %s", e)
 
     select.wait_for_next_race(n=5)
     # state.update_query_params()

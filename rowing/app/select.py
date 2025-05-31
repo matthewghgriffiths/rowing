@@ -675,13 +675,14 @@ def set_livetracker_PGMT(live_data):
 
 
 def set_livetracker_paceboat(live_data, pace_percent=None):
+    distance = live_data[fields.live_raceBoatTracker_distanceTravelled]
     gmt_speed = (
         live_data[fields.race_distance]
         / live_data[fields.GMT].dt.total_seconds()
     )
     gmt_distance = live_data[fields.live_time] * gmt_speed
 
-    distance = live_data[fields.live_raceBoatTracker_distanceTravelled]
+    live_data[fields.PGMT] = distance / gmt_distance
     if not pace_percent:
         pace_percent = (distance / gmt_distance)[
             distance == live_data[fields.race_distance]

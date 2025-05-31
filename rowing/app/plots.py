@@ -183,9 +183,12 @@ def melt_livetracker_times(live_data, filter_distance=100):
         race_distance=plot_data[fields.race_distance],
         filter_distance=filter_distance,
         format={
-            fields.avg_speed: ":0.1f",
+            fields.avg_speed: ":0.2f",
+            'Speed': ":0.2f",
             fields.distance_from_paceboat: ":0.1f",
+            fields.PGMT: ':.1%',
             fields.PGMT_paceboat: ':.1%',
+            fields.GMT: "|%-M:%S.%L",
             fields.split: "|%-M:%S.%L",
             fields.avg_split: "|%-M:%S.%L",
             fields.lane_ResultTime: "|%-M:%S.%L",
