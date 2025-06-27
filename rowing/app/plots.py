@@ -3,7 +3,11 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from plotly.validators.scatter.marker import SymbolValidator
+try:
+    from plotly.validators.scatter.marker import SymbolValidator
+except ModuleNotFoundError:
+    from plotly.validator_cache import ValidatorCache
+    def SymbolValidator(): return ValidatorCache.get_validator("scatter.marker", "symbol")
 
 from rowing.world_rowing import fields
 from rowing import utils
