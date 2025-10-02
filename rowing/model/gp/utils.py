@@ -38,6 +38,11 @@ def load_params(obj, *args, **kwargs):
     return jax.tree_map(jnp.array, norm_params, is_leaf=is_list)
 
 
+def open_params(path="params.yaml"):
+    with open(path, "r") as f:
+        return load_params(f)
+
+
 def transform(func):
     return hk.without_apply_rng(hk.transform(func))
 

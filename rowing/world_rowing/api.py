@@ -149,6 +149,8 @@ BOATCLASSES = {
     'f7576033-2298-4549-ad10-cdbfc78417b0': 'CJM1x',
     'ff2aa19c-db81-4c8e-a523-b7a3ef50ce31': 'JW4-',
     'f8537158-5795-11ee-8bd7-0a6348fc80c7': 'PR3 CMix2x',
+    'fde6999f-0429-4765-9028-9da53b8d0795': 'Mix8+',
+    '4f8ecd09-a0b9-4e76-bf37-4959e7da4424': 'Mix2x'
 }
 
 RACE_PHASES = {
@@ -983,7 +985,7 @@ def get_raw_competition_results(competition_id=None, with_intermediates=True):
         race_results = get_race_results(competition_id=competition_id)
 
     boat_classes = get_boat_classes()
-    wbts = get_world_best_times().ResultTime
+    wbts = get_world_best_times()['Best Time']
     wbts.index.name, wbts.name = "id", "worldBestTime"
 
     return merge_competition_results(
@@ -1014,26 +1016,53 @@ def merge_competition_results(
         left_on=fields.race_eventId, right_on=fields.event_id,
         suffixes=('', '_1'),
     )
-    race_data = pd.merge(
-        race_results.loc[
-            race_results[fields.raceBoatIntermediates_Rank].notna()
-            & (race_results[fields.raceBoatIntermediates_ResultTime] > pd.Timedelta(0))
-        ],
-        race_wbts,
-        left_on=fields.raceBoats_raceId, right_on=fields.race_id,
-        suffixes=('', '_1'),
-    )
-    race_data[fields.race_distance] = race_data[fields.race_distance].where(
-        race_data[fields.race_distance].notna(),
-        race_data.groupby('event_id')[
-            fields.race_distance].transform('max')
-    )
-    race_data[fields.race_distance] = race_data[fields.race_distance].where(
-        race_data[fields.race_distance].notna(),
-        race_data[fields.race_distance].max()
-    )
-    race_data[fields.raceBoatIntermediates_Rank] = \
-        race_data[fields.raceBoatIntermediates_Rank].astype(int)
+    race_id = 'raceId'
+    if fields.raceBoats_raceId in race_results:
+        race_id = fields.raceBoats_raceId
+
+    if fields.raceBoatIntermediates_Rank in race_results:
+        race_data = pd.merge(
+            race_results.loc[
+                race_results[fields.raceBoatIntermediates_Rank].notna()
+                & (race_results[fields.raceBoatIntermediates_ResultTime] > pd.Timedelta(0))
+            ],
+            race_wbts,
+            left_on=race_id, right_on=fields.race_id,
+            suffixes=('', '_1'),
+        )
+    elif 'ResultTime' in race_results:
+        race_data = pd.merge(
+            race_results.loc[
+                race_results[fields.Rank].notna()
+                & (race_results['ResultTime'] > pd.Timedelta(0))
+            ],
+            race_wbts,
+            left_on=race_id, right_on=fields.race_id,
+            suffixes=('', '_1'),
+        )
+    else:
+        race_data = pd.merge(
+            race_results.loc[
+                race_results[fields.Rank].notna()
+            ],
+            race_wbts,
+            left_on=race_id, right_on=fields.race_id,
+            suffixes=('', '_1'),
+        )
+
+    if fields.race_distance in race_data:
+        race_data[fields.race_distance] = race_data[fields.race_distance].where(
+            race_data[fields.race_distance].notna(),
+            race_data.groupby('event_id')[
+                fields.race_distance].transform('max')
+        )
+        race_data[fields.race_distance] = race_data[fields.race_distance].where(
+            race_data[fields.race_distance].notna(),
+            race_data[fields.race_distance].max()
+        )
+    if fields.raceBoatIntermediates_Rank in race_data:
+        race_data[fields.raceBoatIntermediates_Rank] = \
+            race_data[fields.raceBoatIntermediates_Rank].astype(int)
     if fields.raceBoatIntermediates_distance in race_data.columns:
         race_data[fields.PGMT] = (
             race_data[fields.GMT].dt.total_seconds()
@@ -1041,19 +1070,21 @@ def merge_competition_results(
             * race_data[fields.Distance] / race_data[fields.race_distance]
         )
     else:
+        time_col = "ResultTime"
+        if fields.ResultTime in race_data:
+            time_col = fields.ResultTime
         race_data[fields.PGMT] = (
             race_data[fields.GMT].dt.total_seconds()
-            / race_data[fields.ResultTime].dt.total_seconds()
+            / race_data[time_col].dt.total_seconds()
         )
 
-    race_data[fields.GMT] = race_data[fields.GMT]
-
+    # race_data[fields.GMT] = race_data[fields.GMT]
     # for col in race_data.columns[race_data.columns.str.contains("DisplayName")]:
     #     n = col.rsplit(".")[-2]
     #     race_data[n] = race_data[col]
-
-    race_data = race_data.dropna(subset=[fields.Distance])
-    race_data[fields.Distance] = race_data[fields.Distance].astype(int)
+    if fields.Distance in race_data:
+        race_data = race_data.dropna(subset=[fields.Distance])
+        race_data[fields.Distance] = race_data[fields.Distance].astype(int)
 
     return race_data
 
@@ -1065,20 +1096,21 @@ def get_competition_results(competition_id=None, with_intermediates=True):
     )
     if with_intermediates:
         race_summaries = race_data.set_index(
-            ['DisplayName_boat', 'DisplayName_event',
-                'DisplayName', 'Progression', 'distance', 'Rank']
-        )[['Country', 'Lane', 'ResultTime', 'PGMT']].sort_index()
-        race_summaries.index.names = [
-            'BoatClass', 'Event', 'Race', 'Progression', 'Distance', 'Rank'
-        ]
+            ['Boat Class', 'Event', 'Race', 'Phase', 'distance', 'Rank']
+        )[['Country', 'Lane', 'ResultTime', 'PGMT', 'Race Start', 'Day', 'race_id', 'boatId',]].sort_index()
+        # race_summaries.index.names = [
+        #     'BoatClass', 'Event', 'Race', 'Progression', 'Distance', 'Rank'
+        # ]
     else:
         race_summaries = race_data.set_index(
-            ['DisplayName_boat', 'DisplayName_event',
-                'DisplayName', 'Progression', 'Rank']
-        )[['Country', 'Lane', 'ResultTime', 'worldBestTime', 'PGMT', 'Date']].sort_index()
-        race_summaries.index.names = [
-            'BoatClass', 'Event', 'Race', 'Progression', 'Rank'
-        ]
+            ['Boat Class', 'Event', 'Race', 'Phase', 'Rank']
+        )[[
+            'Country', 'Lane', 'ResultTime', 'GMT', 'PGMT',
+            'Race Start', 'Day', 'race_id', 'boatId',
+        ]].sort_index()
+        # race_summaries.index.names = [
+        #     'BoatClass', 'Event', 'Race', 'Progression', 'Rank'
+        # ]
     return race_summaries
 
 
@@ -1088,7 +1120,7 @@ def get_competition_pgmts(competition_id=None, finals_only=False):
     competition_events = get_events(competition_id)
     competition_results = get_race_results(competition_id=competition_id)
     boat_classes = get_boat_classes()
-    wbts = get_world_best_times().ResultTime
+    wbts = get_world_best_times()['Best Time']
     wbts.index.name, wbts.name = "id", "worldBestTime"
 
     if competition_results.empty:

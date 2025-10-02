@@ -130,6 +130,9 @@ dmypy.json
 
 .vscode/
 
+cubc/
+scratch/
+utrc/
 garmin-data/ 
 ludum-data/
 weather-data/

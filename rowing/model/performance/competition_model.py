@@ -40,13 +40,8 @@ def year_to_date(year):
 
 def get_athlete_kernel():
     return kernels.SumKernel(
-        # kernels.IntSEKernel(name="athlete_intse_0"),
-        # kernels.IntSEKernel(name="athlete_int_kernel2"),
         kernels.SEKernel(name="athlete_se_0"),
-        # kernels.SEKernel(name="athlete_se_1"),
-        # kernels.Matern12(name="athlete_matern12"),
-        # kernels.Matern32(name="athlete_matern32"),
-        kernels.Matern52(name="athlete_matern52"),
+        kernels.Matern32(name="athlete_matern32", scale=1),
         kernels.Bias(name='athlete_bias')
     )
 
@@ -68,6 +63,14 @@ def get_weather_kernel(n_features):
         # kernels.DotProduct(name='weather_dot_2')**3,
         # kernels.Matern32(name='weather_matern32_0', shape=(n_features,)),
         # kernels.Matern52(name='weather_matern52_0', shape=(n_features,)),
+    )
+
+
+def get_lane_kernel():
+    return kernels.SumKernel(
+        kernels.SEKernel(name='lane_kernel0', scale=2),
+        # kernels.Matern12(name='lane_matern12_0', scale=3),
+        # kernels.Bias(name='race_bias'),
     )
 
 
@@ -217,9 +220,16 @@ class PerformanceModel(NamedTuple):
         )
 
     @classmethod
-    def from_data(cls, results, seats, athletes, **kwargs):
+    def from_data(
+        cls, results, seats, athletes,
+        athlete_kernel=get_athlete_kernel,
+        race_kernel=get_race_kernel,
+        lane_kernel=None,
+        **kwargs
+    ):
         seats = seats.join(
-            1 / seats.groupby(level=0).size().rename("seat_weight"),
+            1 /
+            seats.groupby('athletes_raceBoatId').size().rename("seat_weight"),
             on='athletes_raceBoatId'
         ).join(
             results['Boat Type'], on='athletes_raceBoatId'
@@ -270,12 +280,15 @@ class PerformanceModel(NamedTuple):
             gram_venue=grams['race_event_competition_venueId'],
             gram_boatclass=grams['Boat Class'],
             gram_lane=grams['lane'],
+            race_kernel=race_kernel,
+            lane_kernel=lane_kernel,
         )
         athlete_model = AthleteModel(
             years=years,
             year0=year0,
             W_athlete=Ws["athlete"],
             gram_athlete=grams['athlete'],
+            athlete_kernel=athlete_kernel,
         )
 
         return cls(
@@ -284,6 +297,7 @@ class PerformanceModel(NamedTuple):
             y=results.PGMT.values,
             metadata={
                 "weights": weights,
+                "results": results,
             },
         )
 
@@ -514,6 +528,86 @@ def gp_system(self):
 def loss(self):
     return self.gp_system().loss()
 
+
+def predict_athletes_scores(model, times, params, athletes_index=None, system=None):
+    if system is None:
+        system = gp_utils.transform(model.gp_system).apply(params)
+
+    K_athlete_pred = gp_utils.transform(
+        lambda times: model.athlete_model.athlete_kernel().K(
+            times, model.athlete_model.years
+        )
+    ).apply(params, times)
+
+    return pd.DataFrame(
+        jnp.einsum(
+            "ij,jk,j->ki",
+            K_athlete_pred,
+            model.athlete_model.W_athlete,
+            system.a
+        ),
+        index=athletes_index,
+        columns=times
+    )
+
+
+def predict_athletes_score(model, start, params, system=None):
+    if system is None:
+        system = gp_utils.transform(model.gp_system).apply(params)
+
+    k_athlete_pred = gp_utils.transform(
+        lambda times: model.athlete_model.athlete_kernel().K(
+            times, model.athlete_model.years
+        )
+    ).apply(params, np.r_[start])[0]
+    k00_athlete_pred = gp_utils.transform(
+        lambda start: model.athlete_model.athlete_kernel().K(
+            np.r_[start], np.r_[start]
+        )
+    ).apply(params, start)
+
+    y_ath = jnp.einsum(
+        "j,jk,j->k",
+        k_athlete_pred,
+        model.athlete_model.W_athlete,
+        system.a
+    )
+    Cov_ath = (
+        k00_athlete_pred * np.eye(model.athlete_model.W_athlete.shape[1])
+        - jnp.einsum(
+            "j,ji,jk,kl,k->il",
+            k_athlete_pred,
+            model.athlete_model.W_athlete,
+            system.inv_K(),
+            model.athlete_model.W_athlete,
+            k_athlete_pred,
+        )
+    )
+    return y_ath, Cov_ath
+
+
+def predict_boat_scores(y_ath, cov_ath, athletes, athlete_ids, noise=1e-4):
+
+    boat_ids = pd.Index(athletes.boatId.unique()).sort_values()
+
+    boat_athlete_W = np.zeros((boat_ids.size, athlete_ids.size))
+    boat_athlete_W[
+        boat_ids.get_indexer_for(
+            athletes[athletes.athletePosition != 'c'].boatId),
+        athlete_ids.get_indexer_for(
+            athletes[athletes.athletePosition != 'c'].personId)
+    ] = 1
+    w1 = boat_athlete_W.sum(1, keepdims=True)
+    boat_athlete_W /= np.where(w1 > 0, w1, 1)
+
+    y_boat = pd.Series(
+        boat_athlete_W @ y_ath, index=boat_ids)
+    cov_boat = pd.DataFrame(
+        boat_athlete_W @ cov_ath @ boat_athlete_W.T +
+        np.eye(len(boat_ids)) * noise,
+        index=boat_ids, columns=boat_ids)
+
+    return y_boat, cov_boat
 
 # class CompetitionModel(NamedTuple):
 #     hours0: np.ndarray

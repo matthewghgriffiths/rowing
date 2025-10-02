@@ -1,0 +1,19 @@
+athlete_bias:
+  log_var: -9.584109401600351
+athlete_matern32:
+  log_var: -9.296020903331906
+athlete_se_0:
+  log_scale: 2.5398502634894373
+  log_var: -8.236253478583919
+lane_kernel0:
+  log_scale: 11.497421878710046
+  log_var: -12.952681165108563
+race_kernel0:
+  log_scale: 8.64046029093248
+  log_var: -9.961628791420555
+race_matern12_0:
+  log_scale: 1.8185914662595803
+  log_var: -6.973478280112052
+'~':
+  Boat Type: -0.13302887018968762
+  log_noise: -9.428046273070873
