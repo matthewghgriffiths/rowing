@@ -85,9 +85,9 @@ def main(state=None):
         ])
         with tabs[0]:
             uploaded_files = st.file_uploader(
-                "Upload peach-data files",
+                "Upload peach-data and peach-data-index files",
                 accept_multiple_files=True,
-                type=['peach-data', 'peach-data-index'],
+                # type=['peach-data', 'peach-data-index'],
             )
             telemetry_data.update(
                 app.parse_peach_data_files(uploaded_files)

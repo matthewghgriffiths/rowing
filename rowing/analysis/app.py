@@ -321,8 +321,6 @@ def parse_peach_data_files(uploaded_files, use_names=True, with_timings=True):
     }
     uploaded_filenames = set(
         k for k, end in uploaded if end.lower() == 'peach-data')
-    print(uploaded)
-    print(uploaded_filenames)
     uploaded_data = {
         k: (
             uploaded[k, 'peach-data'],
@@ -330,15 +328,6 @@ def parse_peach_data_files(uploaded_files, use_names=True, with_timings=True):
         )
         for k in uploaded_filenames
     }
-    # uploaded_data = {
-    #     file.name.rsplit(".", 1)[0]: file
-    #     # file.read().decode()
-    #     for file in uploaded_files
-    # }
-    # data = {
-    #     k: parse_peach_data(*file)
-    #     for k, file in uploaded_data.items()
-    # }
     data, errs = utils.map_concurrent(
         parse_peach_data,
         uploaded_data,
