@@ -79,9 +79,21 @@ def main(state=None):
         use_names = st.checkbox("Use crew list", True)
         with_timings = st.checkbox("Calc timings", True)
         tabs = st.tabs([
-            "Upload", "Upload text", "Upload csv", "Upload xlsx", "Upload Zip"
+            'Upload peach-data',
+            "Upload", "Upload text", "Upload csv",
+            "Upload xlsx", "Upload Zip",
         ])
         with tabs[0]:
+            uploaded_files = st.file_uploader(
+                "Upload peach-data files",
+                accept_multiple_files=True,
+                type=['peach-data', 'peach-data-index'],
+            )
+            telemetry_data.update(
+                app.parse_peach_data_files(uploaded_files)
+            )
+
+        with tabs[1]:
             uploaded_files = st.file_uploader(
                 "Upload Data Export from PowerLine",
                 accept_multiple_files=True,
@@ -103,7 +115,7 @@ def main(state=None):
                 app.parse_telemetry_files(
                     uploaded_files, use_names=use_names, with_timings=with_timings))
 
-        with tabs[1]:
+        with tabs[2]:
             uploaded_files = st.file_uploader(
                 "Upload All Data Export from PowerLine (tab separated)",
                 accept_multiple_files=True,
@@ -126,7 +138,7 @@ def main(state=None):
                     uploaded_files, use_names=use_names, sep='\t', with_timings=with_timings
                 )
             )
-        with tabs[2]:
+        with tabs[3]:
             uploaded_files = st.file_uploader(
                 "Upload All Data Export from PowerLine (comma separated)",
                 accept_multiple_files=True,
@@ -148,7 +160,7 @@ def main(state=None):
                     uploaded_files, use_names=use_names, sep=',', with_timings=with_timings
                 )
             )
-        with tabs[3]:
+        with tabs[4]:
             uploaded_files = st.file_uploader(
                 "Upload Data Export from PowerLine",
                 accept_multiple_files=True,
@@ -159,7 +171,7 @@ def main(state=None):
                     uploaded_files, use_names=use_names
                 )
             )
-        with tabs[4]:
+        with tabs[5]:
             uploaded_files = st.file_uploader(
                 "Upload Zip of Data Exports",
                 accept_multiple_files=True,

@@ -177,10 +177,10 @@ def parse_powerline_data(split_data, use_names=True, with_timings=True):
 
     if not positions.empty:
         positions = files.process_latlontime(positions)
-        positions['timeDelta'] = (
-            positions.time.shift(-1) - positions.time).fillna(pd.Timedelta(0))
-        positions['metrePerSeconds'] = positions.distanceDelta * \
-            1000 / positions['timeDelta'].dt.total_seconds()
+        # positions['timeDelta'] = (
+        #     positions.time.shift(-1) - positions.time).fillna(pd.Timedelta(0))
+        # positions['metrePerSeconds'] = positions.distanceDelta * \
+        #     1000 / positions['timeDelta'].dt.total_seconds()
 
     power = power_data.copy()
     power.columns = set_rower_sides(power.columns, rig_info)
@@ -376,8 +376,9 @@ def interp_series(s, x, **kwargs):
 
 
 def norm_stroke_profile(stroke_profile, n_res):
-    stroke_norm_time = stroke_profile[
-        ('Normalized Time', 'Boat', 'Boat')].squeeze()
+    # stroke_norm_time = stroke_profile[
+    #     ('Normalized Time', 'Boat', 'Boat')].squeeze()
+    stroke_norm_time = stroke_profile['Normalized Time'].squeeze()
     stroke = (
         stroke_norm_time.diff() < 0
     ).cumsum()
@@ -425,9 +426,12 @@ def compare_piece_telemetry(telemetry_data, piece_data, gps_data, landmark_dista
         power_distance = power.copy()  # .rename(columns={"Time": "Distance"})
         power_distance['Distance'] = power_adjusted_distance
 
+        dcol = power_distance[['Distance']].columns
+
         power_distance = power_distance[
-            power_distance.Distance.notna()
-        ].set_index("Distance")
+            power_distance.Distance.squeeze().notna()
+        ].set_index(list(dcol))
+        power_distance.index.names = 'Distance',
         power_distance.columns.names = 'Measurement', 'Position', 'Side'
         telemetry_distance_data[piece] = power_distance
 
@@ -452,9 +456,10 @@ def get_interval_averages(piece_timestamps, telemetry_data):
             timestamps
         )
         for k in avgP.columns.remove_unused_levels().levels[0]:
-            avg_telem.setdefault(k, {})[name, leg] = avgP[k].T
+            avg_telem.setdefault(k, {})[name, leg] = avgP[[k]].T.droplevel(0)
         for k in intervalP.columns.remove_unused_levels().levels[0]:
-            interval_telem.setdefault(k, {})[name, leg] = intervalP[k].T
+            interval_telem.setdefault(
+                k, {})[name, leg] = intervalP[[k]].T.droplevel(0)
 
     piece_data = {}
     for k, data in avg_telem.items():

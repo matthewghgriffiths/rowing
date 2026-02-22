@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
 
-from rowing.analysis import splits, files, geodesy, telemetry, static
+from rowing.analysis import splits, files, geodesy, telemetry, static, peach
 from rowing import utils
 from rowing.app import threads, inputs
 
@@ -299,21 +299,57 @@ def parse_telemetry_excel(uploaded_files, use_names=True, with_timings=True):
 def parse_telemetry_zip(uploaded_files):
     telem_data = {}
     for file in uploaded_files:
-        telem_data.update(
-            telemetry.load_zipfile(file)
-        )
-        # with zipfile.ZipFile(file) as z:
-        #     for f in z.filelist:
-        #         name, key = f.filename.removesuffix(
-        #             ".parquet").split("/")
-        #         data = pd.read_parquet(
-        #             z.open(f.filename)
-        #         )
-        #         if data.columns.str.contains("\(").any():
-        #             data.columns = data.columns.map(ast.literal_eval)
-        #         telem_data.setdefault(name, {})[key] = data
+        telem_data.update(telemetry.load_zipfile(file))
 
     return telem_data
+
+
+@st.cache_data
+def parse_peach_data(file, index_file=None, use_names=True, with_timings=True):
+    index_bytes = index_file.read() if index_file else None
+    data = peach.PeachData.from_bytes(
+        file.read(), index_bytes, file.name)
+    return data.app_data(use_names, with_timings)
+
+
+@st.cache_data
+def parse_peach_data_files(uploaded_files, use_names=True, with_timings=True):
+    uploaded = {
+        tuple(file.name.rsplit(".", 1)): file
+        # file.read().decode()
+        for file in uploaded_files
+    }
+    uploaded_filenames = set(
+        k for k, end in uploaded if end.lower() == 'peach-data')
+    print(uploaded)
+    print(uploaded_filenames)
+    uploaded_data = {
+        k: (
+            uploaded[k, 'peach-data'],
+            uploaded.get((k, 'peach-data-index'))
+        )
+        for k in uploaded_filenames
+    }
+    # uploaded_data = {
+    #     file.name.rsplit(".", 1)[0]: file
+    #     # file.read().decode()
+    #     for file in uploaded_files
+    # }
+    # data = {
+    #     k: parse_peach_data(*file)
+    #     for k, file in uploaded_data.items()
+    # }
+    data, errs = utils.map_concurrent(
+        parse_peach_data,
+        uploaded_data,
+        # singleton=True,
+        use_names=use_names,
+        with_timings=with_timings,
+    )
+    if errs:
+        logging.error(errs)
+
+    return data
 
 
 @st.cache_data
@@ -1093,6 +1129,7 @@ def make_stroke_profiles(telemetry_data, piece_data, nres=101):
         profile = telemetry_data[name]['Periodic'].sort_index(axis=1)
         start_time = piece_times.min()
         finish_time = piece_times.max()
+
         piece_profile = profile[
             profile.Time.dt.tz_localize(None).between(start_time, finish_time)
         ].set_index('Time').dropna(axis=1, how='all')
@@ -1358,24 +1395,29 @@ def make_telemetry_distance_figure(compare_power, landmark_distances, col, facet
     else:
         fig = go.Figure()
         for (file, leg), data in compare_power.groupby(["name", "leg"]):
-            cols = data[[col]].columns
-            pos_power = data.dropna(
-                subset=cols, how='all'
-            ).groupby(["Position", 'Side'])
+            if col in data:
+                cols = data[[col]].columns
+                pos_power = data.dropna(
+                    subset=cols, how='all'
+                ).groupby(["Position", 'Side'])
 
-            for (pos, side), pos_data in pos_power:
-                name = f"{file} {side}" if n_legs[file] == 1 else f"{file} {side} {leg=}"
-                for c in cols:
-                    fig.add_trace(
-                        go.Scatter(
-                            x=pos_data["Distance"],
-                            y=pos_data[c],
-                            legendgroup=f"{file} {leg} {side}",
-                            legendgrouptitle_text=name,
-                            name=f"{pos}",
-                            mode='lines',
+                for (pos, side), pos_data in pos_power:
+                    name = f"{file} {side}" if n_legs[file] == 1 else f"{file} {side} {leg=}"
+                    for c in cols:
+                        fig.add_trace(
+                            go.Scatter(
+                                x=pos_data["Distance"],
+                                y=pos_data[c],
+                                legendgroup=f"{file} {leg} {side}",
+                                legendgrouptitle_text=name,
+                                name=f"{pos}",
+                                mode='lines',
+                            )
                         )
-                    )
+            else:
+                print(f"{col} not in data")
+                print(data.columns)
+
         fig.update_layout(
             xaxis_title="Distance (km)",
             yaxis_title=col,

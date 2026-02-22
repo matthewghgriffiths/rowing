@@ -83,9 +83,13 @@ def process_latlontime(positions, min_speed=0.5):
     positions.loc[first, 'bearing_r'] = positions.bearing_r[positions.index[1]]
     positions['bearing'] = np.rad2deg(positions.bearing_r)
 
+    positions['timeDelta'] = (
+        positions.time.shift(-1) - positions.time).fillna(pd.Timedelta(0))
+    # positions['metrePerSeconds'] = positions.distanceDelta * \
+    #     1000 / positions['timeDelta'].dt.total_seconds()
     positions['metrePerSecond'] = np.gradient(
-        positions.distance * 1000, positions.timeElapsed.dt.total_seconds()
-    )
+        positions.distance * 1000, positions.timeElapsed.dt.total_seconds())
+    
     if 'velocity_smooth' in positions:
         positions['split'] = pd.to_timedelta(
             500 /

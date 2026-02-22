@@ -47,7 +47,6 @@ from typing import Mapping
 import logging
 
 import numpy as np
-from optax import per_example_global_norm_clip
 import pandas as pd
 from scipy import stats
 
@@ -112,8 +111,8 @@ _BOAT_CHANNEL_CODES = {1, 3, 6, 7, 8, 27, 28}
 BOAT_PERIODIC_NAMES = [
     'Speed',       # code 3
     'Accel',       # code 1
-    'Distance2',   # code 6 — secondary distance counter (internal)
-    'Counter',     # code 7 — internal counter (internal)
+    'Normalized Time',   # code 6 — secondary distance counter (internal)
+    'StrokeNumber',     # code 7 — internal counter (internal)
     'Roll Angle',  # code 8
     'Pitch Angle',  # code 27
     'Yaw Angle',   # code 28
@@ -227,7 +226,8 @@ EXPORT_EXTRA_COLS = [
     'Chanb885', 'GPS RTCM', 'UTC Time',
     'GateAngleVel', 'Angle Max F', 'Work PC Q4', 'Drive Time',
     'Angle 0.7 F', 'Work PC Q3', 'Work PC Q1', 'Rower Swivel Power',
-    'Recovery Time', 'Max Force PC', 'Work PC Q2', 'Normalized Time',
+    'Recovery Time', 'Max Force PC', 'Work PC Q2',
+    'Normalized Time',
     'P GateAngleVel', 'S GateAngleVel', 'P Angle 0.7 F', 'P Angle Max F',
     'P Drive Time', 'P Max Force PC', 'P Min Angle', 'P Recovery Time',
     'P Swivel Power', 'P Work PC Q1', 'P Work PC Q2', 'P Work PC Q3',
@@ -597,13 +597,6 @@ def _parse_raw(
     gps['lat'] = gps[[6, 7]] @ C14
     gps['long'] = gps[[8, 9]] @ C14
 
-    lat0, lon0 = gps_coords  # self.metadata['gps_coords']
-    long_scale = _GPS_SCALE * np.cos(np.deg2rad(lat0))
-    gps['latitude'] = (gps['lat'] / _GPS_SCALE +
-                       lat0).where(gps['lat'] != 0)
-    gps['longitude'] = (gps['long'] / long_scale +
-                        lon0).where(gps['long'] != 0)
-
     raw['GPS'] = gps.set_index('Time')
 
     # ── Stroke (0x800A) ───────────────────────────────────────────────────
@@ -651,9 +644,25 @@ def _parse_raw(
     periodic['Time'] = periodic[3] = (
         periodic[3] + (np.arange(len(periodic)) % 50) * 20)
     periodic['Distance'] = periodic[[8, 9]] @ C14 / 256 - 16385 / 256
+    periodic = periodic[periodic[4] == 1000].set_index('Time')
+
+    periodic['StrokeNumber'] = 0
+    periodic.loc[
+        stroke.index.intersection(periodic.index), 'StrokeNumber'
+    ] = 1
+    strokenum = periodic.StrokeNumber = periodic.StrokeNumber.cumsum().squeeze()
+    timestamp = periodic.index.to_series().astype(int)
+
+    stroke_end = timestamp.groupby(strokenum).max()
+    stroke_start = stroke_end.shift().fillna(0)
+    stroke_length = stroke_end.diff(1)
+    stroke_length.iloc[0] = stroke_end.iloc[0]
+    norm = (timestamp * 1. - strokenum.map(stroke_start)) / \
+        strokenum.map(stroke_length)
+    periodic['Normalized Time', 'Boat'] = (norm - 0.5) * 100
 
     # Keep only groups where the validity flag is 1000.
-    raw['periodic'] = periodic[periodic[4] == 1000].set_index('Time')
+    raw['periodic'] = periodic  # [periodic[4] == 1000].set_index('Time')
     return raw
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -672,6 +681,57 @@ def _map_channels(raw_data, metadata) -> tuple[pd.DataFrame, pd.DataFrame, pd.Da
         r['stroke'], m['stroke info'], keep_cols=['Distance'])
     periodic = map_data(
         r['periodic'], m['periodic info'], keep_cols=['Distance'])
+
+    lat0, lon0 = metadata['gps_coords']
+    long_scale = _GPS_SCALE * np.cos(np.deg2rad(lat0))
+    gps[('latitude', 'Boat')] = (
+        gps['lat'] / _GPS_SCALE + lat0).where(gps['lat'] != 0)
+    gps[('longitude', 'Boat')] = (
+        gps['long'] / long_scale + lon0).where(gps['long'] != 0)
+
+    for side in ['', 'P ', 'S ']:
+        if f'{side}MaxAngle' in stroke:
+            length = \
+                stroke[f'{side}MaxAngle'] - stroke[f'{side}MinAngle']
+            effect = length - \
+                stroke[side + 'CatchSlip'] - stroke[side + 'FinishSlip']
+            new_stroke_data = pd.concat({
+                side + "Length": length, side + "Effective": effect}, axis=1
+            ).rename_axis(columns=stroke.columns.names)
+
+            stroke = pd.concat([
+                stroke, new_stroke_data
+            ], axis=1)
+
+        if (ga := side + 'GateAngle') in periodic:
+            gateangelvel = np.gradient(
+                periodic[ga], periodic.index / 1000, axis=0
+            ) + periodic[ga] * 0
+            periodic = pd.concat([
+                periodic,
+                pd.concat({side + 'GateAngleVel': gateangelvel}, axis=1)
+                .rename_axis(columns=periodic.columns.names)
+            ], axis=1)
+
+    # if 'MaxAngle' in stroke:
+    #     stroke_length = stroke.MaxAngle - stroke.MinAngle
+    #     effect = stroke_length - stroke.CatchSlip - stroke.FinishSlip
+    #     stroke = pd.concat([
+    #         stroke,
+    #         pd.concat({"Length": stroke_length, "Effective": effect}, axis=1)
+    #     ], axis=1)
+    #     gateangelvel = np.gradient(
+    #         periodic.GateAngle, periodic.index / 1000, axis=0
+    #     ) + periodic.GateAngle * 0
+    #     periodic = pd.concat([
+    #         periodic,
+    #         pd.concat({'GateAngleVel': gateangelvel}, axis=1)
+    #         .rename_axis(columns=periodic.columns.names)
+    #     ], axis=1)
+    # elif 'P MaxAngle' in stroke:
+    #     for side in ['P', 'S']:
+    #         pass
+
     return gps, stroke, periodic
 
 
@@ -743,7 +803,8 @@ def parse_crew_from_index(index_data: bytes) -> pd.DataFrame:
 
         if pos not in records or name is not None:
             records[pos] = dict(
-                position=int(pos), side=side,
+                position=int(pos),
+                side=side,
                 name=name if name is not None else f'Seat {pos}',
             )
 
@@ -761,7 +822,8 @@ def _load_crew(peach_path: str) -> pd.DataFrame:
         with open(idx, 'rb') as f:
             return parse_crew_from_index(f.read())
     except FileNotFoundError:
-        return pd.DataFrame(columns=['position', 'side', 'name'])
+        return None
+        # return pd.DataFrame(columns=['position', 'side', 'name'])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -850,7 +912,16 @@ class PeachData:
         bin_u16 = np.frombuffer(raw_bytes, dtype=np.uint16)
 
         self = cls(peach_path)._load_from_bin(bin_u16)
-        self.crew = _load_crew(self.path)
+        self._crew = _load_crew(self.path)
+
+        return self
+
+    @classmethod
+    def from_bytes(cls, raw_bytes, index_bytes=None, path=None):
+        bin_u16 = np.frombuffer(raw_bytes, dtype=np.uint16)
+        self = cls(path)._load_from_bin(bin_u16)
+        if index_bytes:
+            self._crew = parse_crew_from_index(index_bytes)
 
         return self
 
@@ -868,21 +939,97 @@ class PeachData:
 
         return self
 
-    # ── Repr ─────────────────────────────────────────────────────────────────
+    def add_details(self, names=True, side=True):
+        if (self.crew is not None) and ('position' in self.crew):
+            crew_list = self.crew.astype(str).set_index('position')
+            crew_list.loc['Boat'] = pd.Series({
+                'side': 'Boat', 'name': 'Boat'})
+
+            cols = ['channel', 'name' if names else 'position']
+            if side:
+                cols.append('side')
+
+            if self.is_sculling:
+                def _add_details(df):
+                    merged = (
+                        df.columns.to_frame(index=False).astype(str)
+                        .join(crew_list, on='position', how='left')
+                    )
+                    merged['side'] = (
+                        merged.channel.str.extract("^(P|S)\s")[0]
+                        .replace({'P': 'Port', 'S': 'Stbd'})
+                        .fillna('Boat')
+                    )
+                    merged['channel'] = merged.channel.str.replace(
+                        "^(P |S )", "", regex=True)
+
+                    new_df = df.copy(False)
+                    new_df.columns = pd.MultiIndex.from_frame(merged[cols])
+                    return new_df
+
+            else:
+                def _add_details(df):
+                    merged = (
+                        df.columns.to_frame(index=False).astype(str)
+                        .join(crew_list, on='position', how='left')
+                    )
+
+                    new_df = df.copy(False)
+                    new_df.columns = pd.MultiIndex.from_frame(merged[cols])
+                    return new_df
+        else:
+            def _add_details(x):
+                return x
+
+        updated = type(self)()
+        updated.path = self.path
+        updated.metadata = self.metadata
+        updated.record_locs = self.record_locs
+        updated.raw_data = self.raw_data
+        updated.gps = self.gps
+        if self.stroke is not None:
+            updated.stroke = _add_details(self.stroke)
+        if self.periodic is not None:
+            updated.periodic = _add_details(self.periodic)
+        updated.crew = self.crew
+
+        return updated
+
+        # ── Repr ─────────────────────────────────────────────────────────────────
 
     def __repr__(self):
         if self.metadata is None:
             return 'PeachData(unloaded)'
 
+        try:
+            from rowing import utils
+            duration = utils.format_timedelta_hours(
+                self.duration, hundreths=False)
+        except (ImportError, AttributeError):
+            duration = self.duration
+
         return (
             "PeachData("
             f"id={self.id}, boat={self.boat_type}, distance={self.distance}, "
-            f"strokes={self.n_strokes}, date={self.date}, "
-            f"periodic_rows={self.n_periodic}"
+            f"duration={duration}, strokes={self.n_strokes}, date={self.date}"
             ")"
         )
 
     # ── Convenience properties ────────────────────────────────────────────────
+    @property
+    def crew(self):
+        if self._crew is None:
+            return pd.DataFrame(dict(
+                position=self.seats,
+                name=self.seats,
+                side=['Port'] * len(self.seats),  # TODO Fix
+            ))
+        return self._crew
+
+    @crew.setter
+    def crew(self, crew):
+        self._crew = crew
+
     @property
     def oar_type(self):
         if self.metadata:
@@ -913,13 +1060,13 @@ class PeachData:
     @property
     def distance(self) -> int:
         if self.gps is not None:
-            return self.gps.Distance.Boat.iloc[-1].astype(int)
+            return int(self.gps.Distance.iloc[-1, 0])
         return 0
 
     @property
     def n_strokes(self) -> int:
         if self.stroke is not None:
-            return int(self.stroke.StrokeNumber.Boat.iloc[-1])
+            return int(self.stroke.StrokeNumber.iloc[-1, 0])
         return 0
 
     @property
@@ -996,6 +1143,65 @@ class PeachData:
                 stroke=self.stroke,
                 periodic=self.periodic
             )
+
+    def app_data(self, names=True, with_timings=True):
+        from rowing.analysis import files, telemetry
+        detailed = self.add_details(names=names, side=True)
+        app_data = {
+            # 'power':
+            'details': detailed.details,
+            'Crew Info': detailed.crew,
+            'Parameter Info': detailed.params
+            .rename_axis('Parameter')
+            .rename(columns={'value': 'Value'})
+            .reset_index(),
+            'Sensor Info': detailed.sensor_table,
+        }
+        positions = (
+            detailed.gps.reset_index()
+            .droplevel(1, axis=1)
+            .dropna(subset=['latitude', 'longitude'])
+        )
+        positions['time'] = detailed.date + \
+            pd.to_timedelta(positions.Time, unit='ms')
+        app_data['positions'] = files.process_latlontime(positions)
+
+        app_data['Periodic'] = periodic = (
+            detailed.periodic.reset_index()
+            .rename_axis(columns=['channel', 'rower', 'side'])
+        )
+        periodic['timestamp', 'Boat', 'Boat'] = periodic.Time
+        periodic['Time'] = detailed.date + \
+            pd.to_timedelta(periodic.Time, unit='ms')
+
+        power = detailed.stroke.reset_index().rename_axis(
+            columns=['channel', 'rower', 'side'])
+        power['timestamp', 'Boat', 'Boat'] = power.Time
+        power['Time'] = detailed.date + \
+            pd.to_timedelta(power.Time, unit='ms')
+
+        if self.is_sculling:
+            rower_power = (
+                power.SwivelPower
+                .xs('Stbd', level=1, axis=1, drop_level=False)
+                + power.SwivelPower
+                .xs('Port', level=1, axis=1, drop_level=True)
+            )
+        else:
+            rower_power = power.SwivelPower
+
+        app_data['power'] = pd.concat([
+            power, pd.concat({'Rower Swivel Power': rower_power}, axis=1)
+        ], axis=1)
+        if with_timings:
+            app_data['power'] = telemetry.add_timings(app_data)
+
+        return app_data
+
+    @property
+    def crew_list(self):
+        if self.crew is not None:
+            return self.crew.set_index('position').Name.rename(index=str)
 
     def save(self, base_path):
         base = Path(base_path)
