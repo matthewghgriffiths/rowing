@@ -8,7 +8,7 @@ from scipy import linalg
 
 import jax
 from jax import numpy as jnp, scipy as jsp
-from jax.experimental import host_callback
+# from jax.experimental import host_callback
 
 # flake8: noqa: E741
 
@@ -416,7 +416,8 @@ def banded_matmul(ab, b, check_finite=False):
 
 @jax.custom_vjp
 def _banded_matmul(ab: BandedMatrix, b, check_finite=False):
-    return host_callback.call(
+    # return host_callback.call(
+    return jax.pure_callback(
         partial(_blas_banded_matmul, check_finite=check_finite),
         (*ab, b, 1),
         result_shape=jax.ShapeDtypeStruct(b.shape, b.dtype)
@@ -444,7 +445,8 @@ def _scipy_solve_banded(l_and_u, arg, check_finite=False):
 
 
 def _solve_banded(ab: BandedMatrix, b: Array, check_finite=False):
-    return host_callback.call(
+    # return host_callback.call(
+    return jax.pure_callback(
         partial(_scipy_solve_banded, (-ab.l, ab.u), check_finite=check_finite),
         (ab.bands, b),
         result_shape=jax.ShapeDtypeStruct(b.shape, b.dtype)
@@ -479,7 +481,8 @@ def solve_triangular_banded(ab: _Banded, b, check_finite=False) -> jax.Array:
 
 @jax.custom_vjp
 def _solve_triangular_banded(ab: BandedMatrix, b, check_finite=False):
-    return host_callback.call(
+    return jax.pure_callback(
+        # return host_callback.call(
         partial(
             _blas_solve_triangular_banded, check_finite=check_finite),
         (ab, b),
@@ -533,7 +536,8 @@ def banded_triangular_matmul(ab: BandedMatrix, b, check_finite=False) -> jax.Arr
 
 @jax.custom_vjp
 def _banded_triangular_matmul(ab: BandedMatrix, b, check_finite=False,):
-    return host_callback.call(
+    return jax.pure_callback(
+        # return host_callback.call(
         partial(
             _blas_banded_triangular_matmul, check_finite=check_finite),
         (*ab, b),
@@ -583,7 +587,8 @@ def cholesky_banded(ab: BandedMatrix):
         raise ValueError(
             "Only lower or upper triangular matrices are supported")
 
-    chol = host_callback.call(
+    chol = jax.pure_callback(
+        # chol = host_callback.call(
         partial(
             _cholesky_banded,
             lower=bool(ab.l), check_finite=False, overwrite_ab=False
