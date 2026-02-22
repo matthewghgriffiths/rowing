@@ -5,7 +5,6 @@ from scipy import linalg
 
 import jax
 from jax import numpy as jnp, scipy as jsp
-from jax.experimental import host_callback
 
 
 from rowing.model import banded
