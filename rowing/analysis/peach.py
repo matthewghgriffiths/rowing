@@ -802,21 +802,23 @@ def parse_crew_from_index(index_data: bytes) -> pd.DataFrame:
             )
 
     if not records:
-        return pd.DataFrame(columns=['position', 'side', 'name'])
+        return pd.DataFrame(
+            columns=['position', 'side', 'name']).set_index('position')
+
     return (pd.DataFrame(records.values())
             .sort_values('position')
-            .reset_index(drop=True))
+            .set_index('position'))
 
 
 def _load_crew(peach_path: str) -> pd.DataFrame:
     """Try to load the crew index file alongside *peach_path*."""
-    idx = re.sub(r'\.peach-data$', '.peach-data-index', peach_path)
+    idx = re.sub(r'\.peach-data$', '.peach-data-index', str(peach_path))
     try:
         with open(idx, 'rb') as f:
             return parse_crew_from_index(f.read())
     except FileNotFoundError:
-        return None
-        # return pd.DataFrame(columns=['position', 'side', 'name'])
+        return pd.DataFrame(
+            columns=['position', 'side', 'name']).set_index('position')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -933,8 +935,8 @@ class PeachData:
         return self
 
     def add_details(self, names=True, side=True):
-        if (self.crew is not None) and ('position' in self.crew):
-            crew_list = self.crew.astype(str).set_index('position')
+        if self.crew is not None:
+            crew_list = self.crew.astype(str).rename(index=str)
             crew_list.loc['Boat'] = pd.Series({
                 'side': 'Boat', 'name': 'Boat'})
 
@@ -1011,13 +1013,18 @@ class PeachData:
     # ── Convenience properties ────────────────────────────────────────────────
     @property
     def crew(self):
+        all_seats = self.all_seats
         if self._crew is None:
             return pd.DataFrame(dict(
-                position=self.seats,
-                name=self.seats,
-                side=['Port'] * len(self.seats),  # TODO Fix
-            ))
-        return self._crew
+                position=all_seats,
+                name=all_seats,
+                side=['Stbd'] * len(all_seats),  # TODO Fix
+            )).set_index('position')
+
+        crew = self._crew.reindex(all_seats)
+        crew['side'] = crew['side'].fillna('Stbd')
+        crew['name'] = crew['name'].combine_first(crew.index.to_series())
+        return crew
 
     @crew.setter
     def crew(self, crew):
@@ -1030,6 +1037,11 @@ class PeachData:
         return ''
 
     @property
+    def coxed(self):
+        if self._crew is not None:
+            return 9 in self._crew.index
+
+    @property
     def boat_type(self) -> str:
         if self.metadata:
             nrower = self.seats[-1]
@@ -1038,7 +1050,7 @@ class PeachData:
                 mod = 'x'
             elif nrower == 8:
                 mod = '+'
-            elif len(self.crew) and (self.crew.name.iloc[-1] != 'Seat 9'):
+            elif len(self.crew) and self.coxed:
                 mod = '+'
 
             return f"{nrower}{mod}"
@@ -1114,7 +1126,7 @@ class PeachData:
             details['duration'] = self.duration
             crew = (
                 self.crew
-                .set_index('position')
+                # .set_index('position')
                 .stack().swaplevel().sort_index()
                 .to_frame().T
             )
@@ -1194,7 +1206,7 @@ class PeachData:
     @property
     def crew_list(self):
         if self.crew is not None:
-            return self.crew.set_index('position').Name.rename(index=str)
+            return self.crew.name.rename(index=str)
 
     def save(self, base_path):
         base = Path(base_path)
@@ -1223,6 +1235,10 @@ class PeachData:
         if self.metadata:
             st = self.sensor_table
             return sorted(int(s) for s in st.loc[~st['is_boat'], 'seat'].dropna().unique())
+
+    @property
+    def all_seats(self):
+        return (self.seats + [9]) if self.coxed else self.seats
 
     @property
     def is_sculling(self) -> bool | None:
