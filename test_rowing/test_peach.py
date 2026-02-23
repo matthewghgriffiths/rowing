@@ -37,6 +37,9 @@ DEFAULT_DATA_DIR = Path(__file__).parent / "../data/peach"
 
 def discover_files(data_dir):
     pairs = []
+    if not os.path.isdir(data_dir):
+        return pairs
+
     for fname in sorted(os.listdir(data_dir)):
         if fname.endswith('.peach-data'):
             stem = fname[:-len('.peach-data')]
