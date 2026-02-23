@@ -52,7 +52,7 @@ from scipy import stats
 
 
 _UTF_RE = re.compile(b'(?:[\x20-\x7E]\x00){4,}')
-ascii_pattern = re.compile(b'(?:[\x20-\x7E]){4,}')
+_ASCII_RE = re.compile(b'(?:[\x20-\x7E]){4,}')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Channel / sensor metadata tables  (pure functions of the sensor list)
@@ -64,27 +64,10 @@ ascii_pattern = re.compile(b'(?:[\x20-\x7E]){4,}')
 # is the reverse of the metadata order, so names are assigned by fixed position
 # in BOAT_PERIODIC_NAMES rather than by code lookup.
 CHANNEL_TYPE_NAMES = {
-    1: 'Speed',
-    3: 'Accel',
-    8: 'Roll Angle',
-    27: 'Pitch Angle',
-    28: 'Yaw Angle',
-    # Sweep oarlock sensors
-    2: 'GateForceX',
-    4: 'GateAngle',
-    # Sculling oarlock sensors (P/S pairs; higher code = Port)
-    9: ('S', 'GateForceY'),
-    10: ('P', 'GateForceY'),
-    11: ('S', 'GateForceX'),
-    12: ('P', 'GateForceX'),
-    14: ('P', 'GateAngle'),
-    13: ('S', 'GateAngle'),
-    # Boat-logger
-}
-CHANNEL_TYPE_NAMES = {
     # Gate / oarlock sensor codes — sweep (one sensor per seat)
-    4: 'GateAngle',
     2: 'GateForceX',
+    4: 'GateAngle',
+    5: 'GateForceY',
     # Gate / oarlock sensor codes — sculling (two sensors per seat: P and S)
     # Codes appear in pairs; higher code = Port, lower = Starboard within each type.
     # GateAngle pair:
@@ -108,16 +91,13 @@ _BOAT_CHANNEL_CODES = {1, 3, 6, 7, 8, 27, 28}
 
 # The boat-logger periodic channels always appear in this fixed stream order,
 # regardless of the order they are listed in the sensor metadata.
-BOAT_PERIODIC_NAMES = [
-    'Speed',       # code 3
-    'Accel',       # code 1
-    'Normalized Time',   # code 6 — secondary distance counter (internal)
-    'StrokeNumber',     # code 7 — internal counter (internal)
-    'Roll Angle',  # code 8
-    'Pitch Angle',  # code 27
-    'Yaw Angle',   # code 28
-]
-
+BOAT_PERIODIC_ORDER = {
+    6: 'Speed',       # code 3
+    7: 'Accel',       # code 1
+    10: 'Roll Angle',  # code 8
+    11: 'Pitch Angle',  # code 27
+    12: 'Yaw Angle',   # code 28
+}
 # Physical-unit scaling applied as: value = (raw + 1) * scale - shift
 # Channels absent from these dicts are passed through unscaled.
 PERIODIC_SCALES = {
@@ -132,7 +112,6 @@ PERIODIC_SHIFT = {
     'Pitch Angle': 128, 'Roll Angle': 128, 'Yaw Angle': 128,
     'GateAngle': 512, 'GateForceX': 512, 'GateForceY': 512,
 }
-
 STROKE_SCALES = {
     'SwivelPower': 1, 'Rower Swivel Power': 1,
     'MinAngle': 1/16, 'MaxAngle': 1/16,
@@ -187,7 +166,6 @@ _STROKE_HEADER_COLS = {
     5: 'StrokeNumber', 6: 'Rating', 7: 'AvgBoatSpeed',
     9: 'Dist/Stroke',  10: 'Average Power',
 }
-
 # Per-seat column offsets within each stroke seat block
 _STROKE_SEAT_SWEEP = {      # 7-column sweep block (offset 6 is a SwivelPower repeat)
     0: 'SwivelPower', 1: 'MinAngle', 2: 'MaxAngle',
@@ -438,24 +416,34 @@ def infer_periodic_table(st: pd.DataFrame) -> pd.DataFrame:
     Column indices start at 6; the first six columns come from the group
     header and are handled separately in _parse_raw.
     """
-    gate = st[~st['is_boat']].copy()
-    boat = st[st['is_boat']].copy()
+    gate = st[~st['is_boat']].set_index('seat').rename(index=int)
+    gate['order'] = gate['channel'].replace({
+        5: -1  # GateForceY comes last
+    })
+    boat = st[st['is_boat']].set_index('name')
 
-    col, rows = 6, {}
-
+    rows = {}
     # Boat channels in fixed stream order (independent of metadata order)
-    for name in BOAT_PERIODIC_NAMES[:len(boat)]:
-        rows[col] = dict(channel=name, position='Boat', name=name, side=None)
-        col += 1
+    for col, name in BOAT_PERIODIC_ORDER.items():
+        rows[col] = dict(
+            channel=name, position='Boat',
+            name=name, side=None,
+            sn=boat.sn[name],
+            code=boat.channel[name],
+        )
 
+    col = 13
     # Gate channels interleaved per seat ascending
-    for seat in sorted(gate['seat'].dropna().unique().astype(int)):
-        for _, r in gate[gate['seat'] == seat].sort_values('channel', ascending=False).iterrows():
+    for seat in sorted(gate.index.dropna().unique()):
+        for _, r in gate.loc[seat].sort_values('order', ascending=False).iterrows():
             side = r['side_prefix']
             ch = r['name']
             rows[col] = dict(
                 channel=f'{side} {ch}' if side else ch,
-                position=str(seat), name=ch, side=side)
+                position=str(seat), name=ch, side=side,
+                sn=r.sn,
+                code=r.channel,
+            )
             col += 1
 
     df = pd.DataFrame.from_dict(rows, orient='index')
@@ -604,7 +592,7 @@ def _parse_raw(
     stroke = extract_aperiodic(bin_u16, rl['stroke_starts'] + 3, sw, 10)
     stroke['Time'] = stroke[[1, 2]] @ C16
     stroke['Distance'] = stroke[[3, 4]] @ C16 / 256 - 16385 / 256
-    raw['stroke'] = stroke.set_index('Time')
+    raw['stroke'] = stroke = stroke.set_index('Time')
 
     # ── Periodic (50 Hz) ──────────────────────────────────────────────────
     pw = rl['periodic_width']
@@ -657,9 +645,11 @@ def _parse_raw(
     stroke_start = stroke_end.shift().fillna(0)
     stroke_length = stroke_end.diff(1)
     stroke_length.iloc[0] = stroke_end.iloc[0]
-    norm = (timestamp * 1. - strokenum.map(stroke_start)) / \
-        strokenum.map(stroke_length)
-    periodic['Normalized Time', 'Boat'] = (norm - 0.5) * 100
+    norm = (
+        (timestamp * 1. - strokenum.map(stroke_start))
+        / strokenum.map(stroke_length)
+    )
+    periodic['Normalized Time'] = (norm - 0.5) * 100
 
     # Keep only groups where the validity flag is 1000.
     raw['periodic'] = periodic  # [periodic[4] == 1000].set_index('Time')
@@ -679,8 +669,11 @@ def _map_channels(raw_data, metadata) -> tuple[pd.DataFrame, pd.DataFrame, pd.Da
         r['GPS'], m['gps info'], keep_cols=['Distance', 'latitude', 'longitude'],)
     stroke = map_data(
         r['stroke'], m['stroke info'], keep_cols=['Distance'])
+
     periodic = map_data(
-        r['periodic'], m['periodic info'], keep_cols=['Distance'])
+        r['periodic'], m['periodic info'],
+        keep_cols=['Distance', 'Normalized Time', 'StrokeNumber']
+    )
 
     lat0, lon0 = metadata['gps_coords']
     long_scale = _GPS_SCALE * np.cos(np.deg2rad(lat0))
@@ -842,7 +835,7 @@ def check_alignment(parsed: pd.DataFrame, ref: pd.DataFrame):
     regs = {}
     for c, v in r.items():
         if v.std() > 0:
-            x, y = v.dropna().align(p[c].dropna())
+            x, y = v.dropna().align(p[c].dropna(), join='inner')
             regs[c] = pd.Series(stats.linregress(x, y)._asdict())
     cal = pd.concat(regs, names=['reference', 'parsed']).unstack()
     cal['rmse'] = np.square(p - r).mean() ** 0.5
