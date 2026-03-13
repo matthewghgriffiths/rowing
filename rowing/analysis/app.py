@@ -32,7 +32,7 @@ color_discrete_sequence = [
     '#FECB52'
 ]
 
-REPORT = [
+_DEFAULT_REPORT = [
     {'select plot': 'Heatmap'},
     {'select piece': 'Pace Boat', 'select plot': 'Piece profile'},
     {'select piece': 'AvgBoatSpeed', 'select plot': 'Piece profile'},
@@ -82,30 +82,38 @@ REPORT = [
             'Speed', 'Accel', 'Roll Angle', 'Pitch Angle', 'Yaw Angle'],
         'select_boat_heigh': 1000}
 ]
-DEFAULT_REPORT = {f"report_{i}": v for i, v in enumerate(REPORT)}
+DEFAULT_REPORT = {f"report_{i}": v for i, v in enumerate(_DEFAULT_REPORT)}
 DEFAULT_REPORT["report_setup"] = {
     "figure_height": 1000,
-    "nview": len(REPORT),
+    "nview": len(_DEFAULT_REPORT),
     "toggleother": False,
     "window": 10
 }
-REPORT = [
+_TIMING_REPORT = [
     {'select piece': 'catch_lag', 'select plot': 'Piece profile'},
     {'select piece': 'finish_lag', 'select plot': 'Piece profile'},
-    # {'select piece': 'drive_angle', 'select plot': 'Piece profile'},
-    # {'select piece': 'drive_finish_angle', 'select plot': 'Piece profile'},
-    # {'select piece': 'min_angle_time', 'select plot': 'Piece profile'},
-    # {'select piece': 'max_angle_time', 'select plot': 'Piece profile'},
+    {'select piece': 'drive_angle', 'select plot': 'Piece profile'},
+    {'select piece': 'drive_finish_angle', 'select plot': 'Piece profile'},
+    {'select piece': 'min_angle_time', 'select plot': 'Piece profile'},
+    {'select piece': 'max_angle_time', 'select plot': 'Piece profile'},
     {'select piece': 'drive_start_time', 'select plot': 'Piece profile'},
     {'select piece': 'max_force_time', 'select plot': 'Piece profile'},
     {'select piece': 'drive_finish_time', 'select plot': 'Piece profile'},
     # {'select piece': 'predrive_start_time', 'select plot': 'Piece profile'},
     {'select piece': 'max_force', 'select plot': 'Piece profile'},
 ]
-TIMINGS_REPORT = {f"report_{i}": v for i, v in enumerate(REPORT)}
+TIMINGS_REPORT = {f"report_{i}": v for i, v in enumerate(_TIMING_REPORT)}
 TIMINGS_REPORT["report_setup"] = {
     "figure_height": 1000,
-    "nview": len(REPORT),
+    "nview": len(_TIMING_REPORT),
+    "toggleother": False,
+    "window": 10
+}
+COMBINED_REPORT = {
+    f"report_{i}": v for i, v in enumerate(_DEFAULT_REPORT + _TIMING_REPORT)}
+COMBINED_REPORT["report_setup"] = {
+    "figure_height": 1000,
+    "nview": len(_DEFAULT_REPORT + _TIMING_REPORT),
     "toggleother": False,
     "window": 10
 }
@@ -1030,7 +1038,7 @@ def draw_gps_landmarks(gps_data, set_landmarks, new_landmarks, map_style='open-s
         gps_data, set_landmarks, new_landmarks, map_style=map_style, height=height)
     state = st.plotly_chart(
         fig,
-        use_container_width=True,
+        width='stretch',
         selection_mode=['points'],
     )
     return state
@@ -1039,7 +1047,7 @@ def draw_gps_landmarks(gps_data, set_landmarks, new_landmarks, map_style='open-s
 @st.fragment
 def draw_gps_data(gps_data, locations, index=None):
     fig = make_gps_figure(gps_data, locations, index)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     return fig
 
 
@@ -1391,7 +1399,7 @@ def make_telemetry_distance_figure(compare_power, landmark_distances, col, facet
                 ).groupby(["Position", 'Side'])
 
                 for (pos, side), pos_data in pos_power:
-                    name = f"{file} {side}" if n_legs[file] == 1 else f"{file} {side} {leg=}"
+                    name = f"{file} {side}" if n_legs[file] == 1 else f"{file} {side} {leg=:d}"
                     for c in cols:
                         fig.add_trace(
                             go.Scatter(
@@ -1649,7 +1657,7 @@ def plot_piece_data(piece_information, show_rowers, all_plots, height):
                     height=_height,
                     input_container=cols[1],
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 st.subheader("Time behind pace boat")
                 st.dataframe(time_behind)
                 telemetry_figures[
@@ -1697,7 +1705,7 @@ def plot_piece_data(piece_information, show_rowers, all_plots, height):
                     )
                 )
 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 st.write(
                     "Click on legend to toggle traces, "
                     "double click to select only one piece"
@@ -1743,13 +1751,13 @@ def plot_piece_data(piece_information, show_rowers, all_plots, height):
                     key=col, input_container=cols[1]
                 )
                 for c, fig in figures.items():
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                     piece_figures['piece', c] = fig
 
                 piece_tables.update(tables)
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(table, use_container_width=True)
+                    st.dataframe(table, width='stretch')
 
     return piece_figures, piece_tables
 
@@ -1807,7 +1815,7 @@ def plot_rower_profiles(piece_information, default_height=600, key="rower_", inp
             y=y,
             color='Position',
             line_dash='Side',
-            title=f"{name}, leg={leg}",
+            title=f"{name}, leg={leg:d}",
             template="plotly_white",
         )
         # fig.update_yaxes(
@@ -1817,8 +1825,8 @@ def plot_rower_profiles(piece_information, default_height=600, key="rower_", inp
             height=height,
             template=pio.templates.default,
         )
-        figures[f"{name}, leg={leg}: {x}-{y}"] = fig
-        # st.plotly_chart(fig, use_container_width=True)
+        figures[f"{name}, leg={leg:d}: {x}-{y}"] = fig
+        # st.plotly_chart(fig, width='stretch')
 
     return figures, {}
 
@@ -1883,7 +1891,7 @@ def plot_crew_profile(piece_information, default_height=600, key='', input_conta
             groupclick='toggleitem',
         )
     )
-    # st.plotly_chart(fig, use_container_width=True)
+    # st.plotly_chart(fig, width='stretch')
 
     return {f'{x}-{y}': fig}, {}
 
@@ -1965,7 +1973,7 @@ def plot_piece_col(col, piece_information, default_height=600, key='piece', inpu
         )
         figures[col] = fig
         tables["Time behind pace boat"] = time_behind
-        # st.plotly_chart(fig, use_container_width=True)
+        # st.plotly_chart(fig, width='stretch')
         # st.subheader("Time behind pace boat")
         # st.dataframe(time_behind)
     else:
@@ -2020,7 +2028,7 @@ def plot_piece_col(col, piece_information, default_height=600, key='piece', inpu
         if average_stats is not None:
             tables[f"Piece {col} Average"] = average_stats
         # tables["Time behind pace boat"] = time_behind
-        # st.plotly_chart(fig, use_container_width=True)
+        # st.plotly_chart(fig, width='stretch')
 
     return figures, tables
     # return {(col, f"{start_landmark} to {finish_landmark}"): fig}

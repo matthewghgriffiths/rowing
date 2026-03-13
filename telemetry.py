@@ -220,7 +220,7 @@ def main(state=None):
             cols[0], cols[1], heat_map_settings,
             key='_primary',
         )
-        st.plotly_chart(fig, use_container_width=True, theme=None)
+        st.plotly_chart(fig, width='stretch', theme=None)
 
         with heat_map_settings:
             if st.toggle(":inbox_tray: Download Heatmap"):
@@ -326,7 +326,15 @@ def main(state=None):
         with template_container:
             use_default = st.toggle("Use default", True)
             show_timings = st.toggle("Use timings default", False)
-            if show_timings:
+            show_all = st.toggle("Use default+timings", False)
+
+            if show_all:
+                for k0, vs in app.COMBINED_REPORT.items():
+                    for k1, v in vs.items():
+                        k = ".".join([k0, k1])
+                        st.session_state[k] = v
+
+            elif show_timings:
                 for k0, vs in app.TIMINGS_REPORT.items():
                     for k1, v in vs.items():
                         k = ".".join([k0, k1])
@@ -395,7 +403,7 @@ def main(state=None):
                     st.dataframe(
                         table,
                         height=(len(table) + 1) * 35 + 3,
-                        use_container_width=True
+                        width='stretch'
                     )
                     outputs[-1, 'table', 'Piece profile', t] = table
 
@@ -516,7 +524,7 @@ def main(state=None):
                 for c, fig in figures.items():
                     st.subheader(c)
                     fig_key = i, 'figure', plot_type, plot_data_type, c
-                    st.plotly_chart(fig, use_container_width=True, key=fig_key)
+                    st.plotly_chart(fig, width='stretch', key=fig_key)
                     outputs[fig_key] = fig
 
                 for t, table in tables.items():
@@ -524,7 +532,7 @@ def main(state=None):
                     st.dataframe(
                         table,
                         height=(len(table) + 1) * 35 + 3,
-                        use_container_width=True
+                        width='stretch'
                     )
                     outputs[i, 'table', plot_type, plot_data_type, t] = table
 
@@ -579,10 +587,10 @@ def main(state=None):
                             key=col, input_container=cols[1]
                         )
                         for c, fig in figures.items():
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, width='stretch')
                         for t, table in tables.items():
                             st.subheader(t)
-                            st.dataframe(table, use_container_width=True)
+                            st.dataframe(table, width='stretch')
 
     with st.expander("Plot Stroke Profiles"):
         st.subheader("Plot Stroke Profiles")
@@ -601,28 +609,28 @@ def main(state=None):
                     piece_information, default_height=default_height)
 
                 for c, fig in figures.items():
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(table, use_container_width=True)
+                    st.dataframe(table, width='stretch')
 
             with tabs[1]:
                 figures, tables = app.plot_boat_profile(
                     piece_information, default_height=default_height)
                 for c, fig in figures.items():
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(table, use_container_width=True)
+                    st.dataframe(table, width='stretch')
 
             with tabs[2]:
                 figures, tables = app.plot_crew_profile(
                     piece_information, default_height=default_height)
                 for c, fig in figures.items():
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(table, use_container_width=True)
+                    st.dataframe(table, width='stretch')
 
     logger.info("Download data")
     with st.expander("Download Data"):
