@@ -125,7 +125,6 @@ def test_alignment():
 
 
 if __name__ == '__main__':
-
     DATA_DIR = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_DATA_DIR
     errors = run_tests(DATA_DIR)
     sys.exit(0 if errors else 1)
