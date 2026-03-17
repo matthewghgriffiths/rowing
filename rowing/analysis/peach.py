@@ -13,6 +13,8 @@ Processing pipeline (all contained in PeachData.from_path):
       (0x8013 / 0x800A).  Locates periodic records by constructing the per-file
       flag from the sensor count. Returns start positions and widths for all 
       three stream types.
+      flag from the sensor count. Returns start positions and widths for all 
+      three stream types.
 
   Stage 3 — _parse_raw(bin, record_locs)
       Extracts the three raw DataFrames (GPS, stroke, periodic) and stores them
@@ -786,6 +788,9 @@ def _map_data(raw: pd.DataFrame, meta: pd.DataFrame, keep_cols=()) -> pd.DataFra
 # position byte 1-9 only
 _CREW_RECORD_RE = re.compile(b'\x05\x00\x00\x00\xe0([\x01-\x09])\x00')
 _NAME_RE = re.compile(b'\x80([\x01-\x30])\x80([\x20-\x7E]+)')
+# position byte 1-9 only
+_CREW_RECORD_RE = re.compile(b'\x05\x00\x00\x00\xe0([\x01-\x09])\x00')
+_NAME_RE = re.compile(b'\x80([\x01-\x30])\x80([\x20-\x7E]+)')
 
 _CREW_FIELD_GUIDS = {
     '96544694-0526-46AF-A944-023B066D721B': 'last_name',
@@ -899,6 +904,8 @@ def _parse_crew_from_index(index_data: bytes) -> pd.DataFrame:
             records[pos_byte] = dict(
                 position=int(pos_byte),
                 side=side,
+                guid=guid,
+                name=name if name is not None else f'Seat {int(pos_byte)}',
                 guid=guid,
                 name=name if name is not None else f'Seat {int(pos_byte)}',
             )
