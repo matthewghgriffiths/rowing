@@ -906,8 +906,6 @@ def _parse_crew_from_index(index_data: bytes) -> pd.DataFrame:
                 side=side,
                 guid=guid,
                 name=name if name is not None else f'Seat {int(pos_byte)}',
-                guid=guid,
-                name=name if name is not None else f'Seat {int(pos_byte)}',
             )
 
     if not records:
