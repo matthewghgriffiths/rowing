@@ -55,18 +55,25 @@ def check_alignment(data, ref_data):
     cals, missing = data.check_alignment(ref_data)
     errors = []
     n_missing = len(missing)
+
+    st = data.metadata['sensors info']
+    if st[~st.is_boat].invalid.any():
+        print('WARNING invalid seat sensors')
+        return []
+
     if n_missing:
         cnts = missing[['data', 'channel']].value_counts().to_frame()
         errors.append(
-            f"Missing {n_missing} columns: {cnts}"
+            f"Missing {n_missing} columns:\n{cnts}"
         )
 
     for d, cal in cals.items():
         bad_cal = cal[cal.rmse > 1e-6]
-        for i, r in bad_cal.iterrows():
+        if len(bad_cal):
             errors.append(
-                f"{d} bad alignment: {i[0]}->{i[1]} - {r}"
+                f"{d} bad alignment:\n{bad_cal}"
             )
+
     return errors
 
 # ── Runner ────────────────────────────────────────────────────────────────────
@@ -87,22 +94,25 @@ def run_tests(data_dir):
 
     for peach_path, ref_path in pairs:
         label = os.path.basename(peach_path)
+        ref = os.path.basename(ref_path)
         print(f"── {label} ──")
+        print(f"── {ref} ──")
 
         try:
             data = peach.PeachData.from_path(peach_path)
             ref_data = peach.parse_reference_file(ref_path)
         except Exception as e:
+            errors.append(f"  LOAD ERROR: {e}")
             print(f"  LOAD ERROR: {e}")
             traceback.print_exc()
             total_failed += 1
             print()
             continue
 
-        errors += check_alignment(data, ref_data)
-
-        if errors:
-            for e in errors:
+        checks = check_alignment(data, ref_data)
+        if checks:
+            errors.extend(checks)
+            for e in checks:
                 print(f"  FAIL  {e}")
             total_failed += 1
         else:

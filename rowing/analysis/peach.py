@@ -57,21 +57,28 @@ _ASCII_RE = re.compile(b'(?:[\x20-\x7E]){4,}')
 # ─────────────────────────────────────────────────────────────────────────────
 # Channel / sensor metadata tables  (pure functions of the sensor list)
 # ─────────────────────────────────────────────────────────────────────────────
-
-_CHANNEL_TYPE_NAMES = {
+_BOAT_CHANNEL_CODES = {
     # Boat channels
-    1: (None, 'Speed'),
-    3: (None, 'Accel'),
-    8: (None, 'Roll Angle'),
-    27: (None, 'Pitch Angle'),
-    28: (None, 'Yaw Angle'),
-
+    1: 'Speed',
+    3: 'Accel',
+    4: 'Rudder',
+    8: 'Roll Angle',
+    27: 'Pitch Angle',
+    28: 'Yaw Angle',
+}
+_ROWER_CHANNEL_CODES = {
     # Sweep channels
     2: (None, 'GateForceX'),
+    3: (None, 'HandleForce'),
     4: (None, 'GateAngle'),
     5: (None, 'GateForceY'),
 
+    # Other
+    6: (None, 'StretcherForceX'),
+
     # Sculling channels
+    7: ('S', 'GateForceR'),
+    8: ('P', 'GateForceR'),
     9:  ('S', 'GateForceY'),
     10: ('P', 'GateForceY'),
     11: ('S', 'GateForceX'),
@@ -79,13 +86,13 @@ _CHANNEL_TYPE_NAMES = {
     13: ('S', 'GateAngle'),
     14: ('P', 'GateAngle'),
 }
-_BOAT_CHANNEL_CODES = {1, 3, 6, 7, 8, 27, 28}
 
 # The boat-logger periodic channels always appear in this fixed stream order,
 # regardless of the order they are listed in the sensor metadata.
 _BOAT_PERIODIC_ORDER = {
     6: 'Speed',       # code 3
     7: 'Accel',       # code 1
+    # 8: 'Rudder',
     10: 'Roll Angle',  # code 8
     11: 'Pitch Angle',  # code 27
     12: 'Yaw Angle',   # code 28
@@ -96,11 +103,13 @@ _PERIODIC_SCALES = {
     'GateAngle': 1/16, 'GateForceX': 1/16, 'GateForceY': 1/16,
     'GateAngleVel': 1/16,
     'Speed': 1/256, 'Accel': 1/256,
+    'Rudder': 1/64,
     'Roll Angle': 1/64, 'Pitch Angle': 1/64, 'Yaw Angle': 1/64,
 }
 _PERIODIC_SHIFT = {
     'Distance': 0,
     'Accel': 32, 'Speed': 32,
+    'Rudder': 128,
     'Pitch Angle': 128, 'Roll Angle': 128, 'Yaw Angle': 128,
     'GateAngle': 512, 'GateForceX': 512, 'GateForceY': 512,
 }
@@ -429,20 +438,26 @@ def _locate_records(bin_u16: np.ndarray, n_sensors: int) -> dict | None:
     # Periodic flag encodes width and header size.
     # We only need to search from where the data records begin.
     datastart = int(min(gps_starts[0], stroke_starts[0]))
+    flag = int(np.round(n_sensors * 100 / 16 + 2)) * 16
+    cands, = search(bin_u16[datastart:], [flag, 0]).nonzero()
+    periodic_starts = cands + datastart
+    periodic_hdr_words = flag - n_sensors * 100
 
-    periodic_starts = None
-    periodic_hdr_words = None
-    for h_words in (18, 14):               # 36-byte header is more common
-        flag = n_sensors * 100 + h_words * 2
-        cands, = search(bin_u16[datastart:], [flag, 0]).nonzero()
-        if len(cands) > 10:
-            periodic_starts = cands + datastart
-            periodic_hdr_words = h_words
-            break
+    # periodic_starts = None
+    # periodic_hdr_words = None
+    # for h_words in (18, 14):               # 36-byte header is more common
+    #     flag = n_sensors * 100 + h_words * 2
+    #     cands, = search(bin_u16[datastart:], [flag, 0]).nonzero()
+    #     if len(cands) > 10:
+    #         periodic_starts = cands + datastart
+    #         periodic_hdr_words = h_words
+    #         break
+    # print("h_words", n_sensors, h_words, flag,
+    #       np.round(n_sensors * 100 / 16 + 2) * 16)?:?:>_P
 
-    if periodic_starts is None:
-        logging.info("Could not locate GPS/stroke records")
-        return
+    # if periodic_starts is None:
+    #     logging.info("Could not locate GPS/stroke records")
+    #     return
 
     return dict(
         gps_starts=gps_starts,
@@ -515,7 +530,9 @@ def _parse_raw(
     # Column 3 is the group base time (ms); add per-sample offset (20 ms each).
     periodic['Time'] = periodic[3] = (
         periodic[3] + (np.arange(len(periodic)) % 50) * 20)
-    periodic['Distance'] = periodic[[8, 9]] @ _C14 / 256 - 16385 / 256
+    periodic['Distance'] = (
+        periodic[[8, 9]] @ _C14 / 256 - 16385 / 256
+    ).where(periodic[[8, 9]].sum(axis=1) > 0)
     periodic = periodic[periodic[4] == 1000].set_index('Time')
 
     periodic['StrokeNumber'] = 0
@@ -562,9 +579,14 @@ def _infer_sensor_table(sensors_raw: pd.DataFrame) -> pd.DataFrame:
         code = int(row['channel'])
         sn = int(row['S/N'])
         seat = int(row['seat'])
-        is_boat = code in _BOAT_CHANNEL_CODES
-        side_prefix, channel_name = _CHANNEL_TYPE_NAMES.get(
-            code, (None, f'Chan {code:04X}'))
+        is_boat = seat == 0
+        # is_boat = code in _BOAT_CHANNEL_CODES
+        if is_boat:
+            side_prefix = None
+            channel_name = _BOAT_CHANNEL_CODES.get(code, f'Chan {code:04X}')
+        else:
+            side_prefix, channel_name = _ROWER_CHANNEL_CODES.get(
+                code, (None, f'Chan {code:04X}'))
 
         rows.append(dict(
             sensor_index=i, seat=seat, channel=code,
@@ -577,6 +599,11 @@ def _infer_sensor_table(sensors_raw: pd.DataFrame) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     gate = df[~df['is_boat']].sort_values('seat').reset_index(drop=True)
     boat = df[df['is_boat']].reset_index(drop=True)
+
+    logger_id, = boat.sn.unique()
+    gate['invalid'] = gate.sn == logger_id
+    boat['invalid'] = boat.name.str.startswith("Chan ")
+
     return pd.concat([gate, boat], ignore_index=True)
 
 
@@ -588,32 +615,44 @@ def _infer_periodic_table(st: pd.DataFrame) -> pd.DataFrame:
     """
     gate = st[~st['is_boat']].set_index('seat').rename(index=int)
     gate['order'] = gate['channel'].replace({
-        5: -1  # GateForceY comes last
+        5: -1,  # GateForceY comes last
+        6: -2
     })
     boat = st[st['is_boat']].set_index('name')
+    boat['order'] = boat['channel'].replace({
+        4: 7.5  # Rudder comes after distance
+    })
 
     rows = {}
-    # Boat channels in fixed stream order (independent of metadata order)
-    for col, name in _BOAT_PERIODIC_ORDER.items():
-        rows[col] = dict(
-            channel=name, position='Boat',
-            name=name, side=None,
-            sn=boat.sn[name],
-            code=boat.channel[name],
-        )
+    col = 6
+    for name, sensor in boat.sort_values('order').iterrows():
+        if not sensor.invalid:
+            rows[col] = dict(
+                channel=name,
+                position='Boat',
+                name=name,
+                side=None,
+                sn=sensor.sn,
+                code=sensor.channel,
+                invalid=sensor.invalid,
+            )
+        col += 1
 
-    col = 13
     # Gate channels interleaved per seat ascending
     for seat in sorted(gate.index.dropna().unique()):
-        for _, r in gate.loc[seat].sort_values('order', ascending=False).iterrows():
+        seat_sensors = gate.loc[[seat]].sort_values('order', ascending=False)
+        for _, r in seat_sensors.iterrows():
             side = r['side_prefix']
             ch = r['name']
-            rows[col] = dict(
-                channel=f'{side} {ch}' if side else ch,
-                position=str(seat), name=ch, side=side,
-                sn=r.sn,
-                code=r.channel,
-            )
+            if not r.invalid:
+                rows[col] = dict(
+                    channel=f'{side} {ch}' if side else ch,
+                    position=str(seat), name=ch, side=side,
+                    sn=r.sn,
+                    code=r.channel,
+                    invalid=r.invalid,
+                )
+
             col += 1
 
     df = pd.DataFrame.from_dict(rows, orient='index')
@@ -705,25 +744,6 @@ def _map_channels(raw_data, metadata) -> tuple[pd.DataFrame, pd.DataFrame, pd.Da
                 .rename_axis(columns=periodic.columns.names)
             ], axis=1)
 
-    # if 'MaxAngle' in stroke:
-    #     stroke_length = stroke.MaxAngle - stroke.MinAngle
-    #     effect = stroke_length - stroke.CatchSlip - stroke.FinishSlip
-    #     stroke = pd.concat([
-    #         stroke,
-    #         pd.concat({"Length": stroke_length, "Effective": effect}, axis=1)
-    #     ], axis=1)
-    #     gateangelvel = np.gradient(
-    #         periodic.GateAngle, periodic.index / 1000, axis=0
-    #     ) + periodic.GateAngle * 0
-    #     periodic = pd.concat([
-    #         periodic,
-    #         pd.concat({'GateAngleVel': gateangelvel}, axis=1)
-    #         .rename_axis(columns=periodic.columns.names)
-    #     ], axis=1)
-    # elif 'P MaxAngle' in stroke:
-    #     for side in ['P', 'S']:
-    #         pass
-
     return gps, stroke, periodic
 
 
@@ -807,12 +827,11 @@ def _parse_crew_fields(index_data: bytes) -> dict:
                             'ascii', errors='replace').strip()
                         try:
                             guid = str(uuid.UUID(bytes_le=guid_bytes)).upper()
+                            field = _CREW_FIELD_GUIDS.get(guid)
+                            fields.setdefault(seat, {})[field] = text
                         except Exception:
                             guid = None
-                        field = _CREW_FIELD_GUIDS.get(guid) if guid else None
 
-                        if field:
-                            fields.setdefault(seat, {})[field] = text
         pos = idx + 1
     return fields
 
@@ -885,7 +904,10 @@ def _parse_crew_from_index(index_data: bytes) -> pd.DataFrame:
             )
 
     if not records:
-        return pd.DataFrame(columns=['position', 'side', 'name']).set_index('position')
+        return pd.DataFrame(
+            columns=['position', 'side', 'guid', 'name',
+                     'first_name', 'last_name', 'squad']
+        ).set_index('position')
 
     # Merge extended per-seat attributes (first_name, last_name, squad).
     ext = _parse_crew_fields(index_data)
@@ -930,7 +952,8 @@ def check_alignment(parsed: pd.DataFrame, ref: pd.DataFrame):
     for c, v in r.items():
         if v.std() > 0:
             x, y = v.dropna().align(p[c].dropna(), join='inner')
-            regs[c] = pd.Series(stats.linregress(x, y)._asdict())
+            if len(x):
+                regs[c] = pd.Series(stats.linregress(x, y)._asdict())
     cal = pd.concat(regs, names=['reference', 'parsed']).unstack()
     cal['rmse'] = np.square(p - r).mean() ** 0.5
     return cal, missing
@@ -1104,10 +1127,9 @@ class PeachData:
                 return rig
 
             crew = self._crew.combine_first(rig)
-            if len(crew):
-                crew['side'] = crew['side'].fillna('Stbd')
-                crew['name'] = crew['name'].combine_first(
-                    crew.index.to_series())
+            crew['side'] = crew['side'].fillna('Stbd')
+            crew['name'] = crew['name'].combine_first(
+                crew.index.to_series().astype(str))
 
             return crew
 

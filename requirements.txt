@@ -18,6 +18,6 @@ requests>=2.0
 seaborn>=0.13.2
 scipy>=1.14
 stravalib>=2.0
-streamlit>=1.39
+streamlit==1.54.0
 streamlit-plotly-mapbox-events>=0.1.2
 tqdm>=4.0

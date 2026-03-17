@@ -115,20 +115,22 @@ def piece_averages(data, **kwargs):
         / durations.groupby(piece).sum()
     ).T
 
-    piece_avg[('Start', 'Boat')] = data.Distance.Boat.groupby(
-        piece).min().round()
-    piece_avg[('Strokes', 'Boat')] = data.Distance.Boat.groupby(piece).size()
-    piece_avg[('Distance', 'Boat')] = data.Distance.Boat.groupby(
+    piece_avg[('Timestamp', 'Boat')] = pd.to_timedelta(
+        data.index.to_series().groupby(piece).min(), unit='ms')
+    piece_avg[('Start', 'm')] = data.Distance.Boat.groupby(
+        piece).min().round(2)
+    piece_avg[('Strokes', 'count')] = data.Distance.Boat.groupby(piece).size()
+    piece_avg[('Length', 'm')] = data.Distance.Boat.groupby(
         piece).apply(np.ptp)
-    piece_avg[('Duration', 'Boat')] = durations.groupby(piece).sum()
-    piece_avg[('Max Rating', 'Boat')] = data.Rating.Boat.groupby(piece).max()
-    piece_avg[('Min Rating', 'Boat')] = data.Rating.Boat.groupby(piece).min()
-    piece_avg[('AvgBoatSpeed', 'Boat')] = piece_avg[(
-        'Distance', 'Boat')] / piece_avg[('Duration', 'Boat')]
+    piece_avg[('Duration', 's')] = durations.groupby(piece).sum()
+    piece_avg[('Max Rating', '/min')] = data.Rating.Boat.groupby(piece).max()
+    piece_avg[('Min Rating', '/min')] = data.Rating.Boat.groupby(piece).min()
+    piece_avg[('AvgBoatSpeed', 'm/s')] = piece_avg[('Length', 'm')
+                                                   ] / piece_avg[('Duration', 's')]
     boat_col_order = [
-        'Start', 'Distance', 'Duration', 'Rating', 'Average Power', 'AvgBoatSpeed',
+        'Timestamp', 'Length', 'Duration', 'Rating', 'Average Power', 'AvgBoatSpeed',
         'Min Rating', 'Max Rating',
-        'Dist/Stroke', 'StrokeNumber', 'Strokes'
+        'Dist/Stroke', 'StrokeNumber', 'Start', 'Strokes'
     ]
     rower_col_order = [
         'SwivelPower', 'MinAngle', 'MaxAngle', 'CatchSlip', 'FinishSlip',
