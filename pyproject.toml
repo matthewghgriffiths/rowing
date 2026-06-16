@@ -1,0 +1,10 @@
+# NOTE: This file currently holds only tool configuration (pytest).
+# Build metadata still lives in setup.py and is migrated here in a later step.
+
+[tool.pytest.ini_options]
+testpaths = ["test_rowing"]
+addopts = "-ra"
+markers = [
+    "network: test requires access to external network services (deselected unless --run-network is passed)",
+    "slow: test is slow to run",
+]

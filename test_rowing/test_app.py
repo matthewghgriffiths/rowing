@@ -5,6 +5,8 @@ import logging
 
 import pytest
 
+pytest.importorskip("streamlit")
+
 import streamlit as st
 from rowing.app import select, inputs, state, plots
 from rowing.analysis import files, telemetry

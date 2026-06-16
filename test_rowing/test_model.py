@@ -7,6 +7,11 @@ from scipy import stats
 
 import jax
 
+import pytest
+
+# rowing.model.gp pulls in haiku/flax; skip cleanly when they are absent.
+pytest.importorskip("haiku")
+
 from rowing.model.gp import linalg
 
 

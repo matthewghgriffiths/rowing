@@ -8,6 +8,9 @@ from rowing.utils import timeout
 
 TIMEOUT = 30
 
+# Every test in this module hits the live World Rowing API.
+pytestmark = pytest.mark.network
+
 
 @timeout(TIMEOUT)
 def test_data_retrieval():
