@@ -1,5 +1,79 @@
-# NOTE: This file currently holds only tool configuration (pytest).
-# Build metadata still lives in setup.py and is migrated here in a later step.
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rowing"
+version = "0.4.0"
+description = "Library for analysing a variety of rowing data"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Matthew Griffiths", email = "matthewghgriffiths@gmail.com" }]
+
+# Core runtime dependencies. Lower bounds are kept consistent with the
+# previously divergent requirements.txt (numpy>=2.0, scipy>=1.14, ...), which
+# now defers to this file as the single source of truth.
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "pandas>=2.0",
+    "matplotlib>=3.0",
+    "tqdm>=4.0",
+    "requests>=2.0",
+]
+
+[project.optional-dependencies]
+worldrowing = [
+    "streamlit==1.54.0",
+    "plotly>=5.0",
+    "seaborn>=0.13.2",
+    "streamlit-plotly-mapbox-events>=0.1.2",
+    "pyarrow>=17.0.0",
+    "click>=8.0",
+]
+garmin = ["garminconnect>=0.2", "garth>=0.4"]
+gpx = ["gpxpy>=1.6", "fitparse>=1.2"]
+strava = ["stravalib>=2.0"]
+model = ["jax>=0.4", "jaxlib>=0.4", "flax>=0.9", "dm-haiku>=0.0"]
+sheets = ["gspread_pandas>=3.3.0"]
+io = ["openpyxl>=3.1", "pydantic>=2.9", "pyarrow>=17.0.0"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.6", "build>=1"]
+all = ["rowing[worldrowing,garmin,gpx,strava,model,sheets,io]"]
+
+[project.urls]
+Homepage = "https://github.com/matthewghgriffiths/rowing"
+
+[project.scripts]
+# NOTE: rowing.analysis.garmin has no main() entry point, so no `garmin`
+# console script is exposed (the old egg-info that referenced one was stale).
+gpx = "rowing.analysis.files:main"
+worldrowing = "rowing.world_rowing.app:main"
+
+[tool.setuptools.packages.find]
+# Previously setup.py used packages=['rowing'], which shipped only the
+# top-level package and silently omitted rowing.analysis / rowing.model /
+# rowing.world_rowing / rowing.app from installs.
+include = ["rowing*"]
+
+# NOTE: library data (location TSVs, iso_country.json, flags, the Strava SVG)
+# currently lives in <repo>/data, outside the package, and is resolved at
+# runtime via __file__. It therefore is not bundled into a wheel yet; moving it
+# under rowing/data and switching to importlib.resources is a tracked follow-up.
+
+[tool.ruff]
+line-length = 127
+target-version = "py310"
+extend-exclude = ["*.ipynb", "env310", "pyenv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+# Line length is reported by the formatter; the existing code has many long
+# lines that are not worth churning in this pass.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
 
 [tool.pytest.ini_options]
 testpaths = ["test_rowing"]

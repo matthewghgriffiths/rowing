@@ -1,4 +1,5 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# This workflow installs the package, lints with ruff and runs the test suite
+# across the supported Python versions.
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
 name: Test package
@@ -10,12 +11,30 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install ruff
+      run: python -m pip install ruff
+    - name: Fail on real errors (syntax, undefined names)
+      run: ruff check . --select E9,F63,F7,F82
+    - name: Lint (advisory)
+      run: ruff check .
+      continue-on-error: true
+    - name: Formatting (advisory)
+      run: ruff format --check .
+      continue-on-error: true
+
+  test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", 3.11, 3.12]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
@@ -23,29 +42,11 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+    - name: Install package with all extras
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest setuptools wheel twine
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        python -m pip install -e .[all,dev]
     - name: Test with pytest
-      run: |
-        pytest
-      env: 
-        PYTHONPATH: /home/runner/work/rowing/rowing
-        
-    # - name: Build and publish
-    #   run: |
-    #     python setup.py sdist bdist_wheel
-    # - uses: actions/upload-artifact@v2
-    #   with:
-    #     path: dist/*.tar.gz
-    # - uses: actions/upload-artifact@v2
-    #   with:
-    #     path: dist/*.whl
+      # Network tests are deselected by default (conftest skips them unless
+      # --run-network is passed).
+      run: pytest --cov=rowing --cov-report=term-missing
