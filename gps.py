@@ -1,27 +1,24 @@
-
 import dis
-import streamlit as st
 import io
-import warnings
-
 import logging
+import warnings
 
 # import numpy as np
 import pandas as pd
-
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
+
 from rowing import utils
-from rowing.analysis import app, strava, garmin, splits
+from rowing.analysis import app, garmin, splits, strava
 from rowing.world_rowing.fields import is_timedelta64_dtype
 
-
 DEFAULT_FACETS = [
-    'velocity_smooth',
-    'heart_rate',
-    'cadence',
-    'split',
-    'bearing',
+    "velocity_smooth",
+    "heart_rate",
+    "cadence",
+    "split",
+    "bearing",
 ]
 
 logger = logging.getLogger(__name__)
@@ -70,11 +67,7 @@ def main(state=None):
     data = state.pop("gpx_data", {})
     st.session_state.update(state)
 
-    st.set_page_config(
-        page_title="Rowing GPS Analysis",
-        layout='wide',
-        initial_sidebar_state='collapsed'
-    )
+    st.set_page_config(page_title="Rowing GPS Analysis", layout="wide", initial_sidebar_state="collapsed")
     st.title("Rowing GPS Analysis")
     with st.sidebar:
         if st.button("Reset State"):
@@ -82,17 +75,24 @@ def main(state=None):
             st.cache_resource.clear()
 
     with st.expander("Load Data", expanded=True):
-        if 'code' in st.query_params or 'strava' in st.query_params:
-            strava_tab, gpx_tab, garmin_tab = st.tabs([
-                "Load Strava Activities",
-                "Upload GPX",
-                "Connect Garmin",
-            ])
+        if "code" in st.query_params or "strava" in st.query_params:
+            strava_tab, gpx_tab, garmin_tab = st.tabs(
+                [
+                    "Load Strava Activities",
+                    "Upload GPX",
+                    "Connect Garmin",
+                ]
+            )
         else:
-            gpx_tab, garmin_tab, = st.tabs([
-                "Upload GPX",
-                "Connect Garmin",
-            ])
+            (
+                gpx_tab,
+                garmin_tab,
+            ) = st.tabs(
+                [
+                    "Upload GPX",
+                    "Connect Garmin",
+                ]
+            )
             strava_tab = gpx_tab
 
         st.divider()
@@ -104,7 +104,7 @@ def main(state=None):
         uploaded_files = st.file_uploader(
             "Upload GPX files",
             accept_multiple_files=True,
-            type=['gpx'],
+            type=["gpx"],
         )
         gpx_data, errors = utils.map_concurrent(
             app.parse_gpx,
@@ -114,11 +114,7 @@ def main(state=None):
 
     with garmin_tab:
         garmin_client = garmin.login(*st.columns(3))
-        uploaded_fits = st.file_uploader(
-            "(optional) Upload .fit files",
-            type='fit',
-            accept_multiple_files=True
-        )
+        uploaded_fits = st.file_uploader("(optional) Upload .fit files", type="fit", accept_multiple_files=True)
         fit_data, errors = utils.map_concurrent(
             garmin.parse_garmin_fit,
             {file.name.rsplit(".", 1)[0]: file for file in uploaded_fits},
@@ -128,8 +124,7 @@ def main(state=None):
         gpx_data.update(fit_data)
 
         if garmin_client:
-            activities_tab, stats_tab = st.tabs(
-                ["Load Activities", "Load Health Stats"])
+            activities_tab, stats_tab = st.tabs(["Load Activities", "Load Health Stats"])
             with activities_tab:
                 garmin_data = garmin.garmin_activities_app(garmin_client)
                 if garmin_data:
@@ -153,7 +148,7 @@ def main(state=None):
 
     analyse_gps_data(gpx_data)
 
-    st.button("Logout", key='logout2', on_click=clear_state)
+    st.button("Logout", key="logout2", on_click=clear_state)
 
 
 @st.fragment
@@ -163,8 +158,11 @@ def plot_activity_data(gps_data):
     with st.popover("Figure settings"):
         height = st.number_input(
             "Set profile figure height",
-            100, None, 600, step=50,
-            key='plot_activity_data_height',
+            100,
+            None,
+            600,
+            step=50,
+            key="plot_activity_data_height",
         )
 
     for tab, (name, data) in zip(tabs, gps_data.items()):
@@ -176,24 +174,24 @@ def plot_activity_data(gps_data):
             with col0:
                 smooth = st.number_input(
                     "Smooth data over",
-                    0, None, value=0, step=5,
-                    key=f'{name}_activity_data_smooth',
+                    0,
+                    None,
+                    value=0,
+                    step=5,
+                    key=f"{name}_activity_data_smooth",
                 )
             if smooth:
                 data = plot_data.set_index("timeElapsed")
-                number_data = data.select_dtypes('number', "timedelta").rolling(
-                    f"{smooth}s"
-                ).mean().reset_index()
-                dt_data = data.select_dtypes('timedelta').apply(
-                    lambda s: s.dt.total_seconds()
-                ).rolling(
-                    f"{smooth}s"
-                ).mean().apply(
-                    pd.to_timedelta, unit='s'
-                ).reset_index()
-                plot_data = pd.concat([
-                    number_data, dt_data, plot_data.select_dtypes(["datetime"])
-                ], axis=1)
+                number_data = data.select_dtypes("number", "timedelta").rolling(f"{smooth}s").mean().reset_index()
+                dt_data = (
+                    data.select_dtypes("timedelta")
+                    .apply(lambda s: s.dt.total_seconds())
+                    .rolling(f"{smooth}s")
+                    .mean()
+                    .apply(pd.to_timedelta, unit="s")
+                    .reset_index()
+                )
+                plot_data = pd.concat([number_data, dt_data, plot_data.select_dtypes(["datetime"])], axis=1)
             with col1:
                 left_axis = st.multiselect(
                     "Plot on left axis",
@@ -212,32 +210,16 @@ def plot_activity_data(gps_data):
 
             fig = go.Figure()
             for c in left_axis:
-                fig = app.scatter(
-                    plot_data, 'distance', c, fig=fig
-                )
+                fig = app.scatter(plot_data, "distance", c, fig=fig)
             for c2 in right_axis:
-                fig = app.scatter(
-                    plot_data, 'distance', c2, fig=fig, yaxis='y2'
-                )
+                fig = app.scatter(plot_data, "distance", c2, fig=fig, yaxis="y2")
 
             fig.update_layout(
                 height=height,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1
-                ),
-                yaxis=dict(
-                    title="+".join(left_axis)
-                ),
-                yaxis2=dict(
-                    title=" + ".join(right_axis)
-                ),
-                xaxis=dict(
-                    title='Distance (km)'
-                )
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                yaxis=dict(title="+".join(left_axis)),
+                yaxis2=dict(title=" + ".join(right_axis)),
+                xaxis=dict(title="Distance (km)"),
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -269,17 +251,15 @@ def analyse_gps_data(gpx_data):
     #     app.draw_gps_data(gpx_data, locations)
 
     with st.spinner("Processing Crossing Times"):
-        crossing_times = app.get_crossing_times(
-            gpx_data, locations=locations)
+        crossing_times = app.get_crossing_times(gpx_data, locations=locations)
         if crossing_times:
-            all_crossing_times = pd.concat(crossing_times, names=['name'])
+            all_crossing_times = pd.concat(crossing_times, names=["name"])
         else:
             all_crossing_times = pd.DataFrame([])
 
     with st.expander("Piece selecter", expanded=True):
         st.subheader("Piece selecter")
-        piece_information = app.select_pieces(
-            all_crossing_times)
+        piece_information = app.select_pieces(all_crossing_times)
 
         if piece_information is None:
             st.write("No valid pieces could be found")
@@ -294,64 +274,53 @@ def analyse_gps_data(gpx_data):
                 options=options,
                 default=options.intersection(DEFAULT_FACETS),
             )
-            average_cols = ['time'] + keep
-            piece_information['piece_data'].update(
+            average_cols = ["time"] + keep
+            piece_information["piece_data"].update(
                 splits.get_pieces_interval_averages(
-                    piece_information['piece_data']['Timestamp'],
-                    {k: d[[c for c in average_cols if c in d]]
-                        for k, d in gpx_data.items()},
-                    time='time'
+                    piece_information["piece_data"]["Timestamp"],
+                    {k: d[[c for c in average_cols if c in d]] for k, d in gpx_data.items()},
+                    time="time",
                 )
             )
 
-            app.show_piece_data(piece_information['piece_data'])
+            app.show_piece_data(piece_information["piece_data"])
 
     if piece_information:
         with st.expander("Plot Piece Profile"):
             st.subheader("Plot Piece Profile")
-            plot_piece_profiles(
-                piece_information, gpx_data, [app.PACE_TIME_COL] + keep)
+            plot_piece_profiles(piece_information, gpx_data, [app.PACE_TIME_COL] + keep)
 
     with st.expander("Timings summary"):
         st.subheader("Timings summary")
         if crossing_times:
-            timings_fragment(
-                all_crossing_times, crossing_times, gpx_data, piece_information, locations)
+            timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_information, locations)
 
 
 @st.fragment
 def plot_piece_profiles(piece_information, gpx_data, keep=None):
 
-    piece_data = piece_information['piece_data']
+    piece_data = piece_information["piece_data"]
 
-    piece_times = piece_data['Elapsed Time'].apply(
-        lambda x: (x + pd.Timestamp(0)).dt.time
-    )
+    piece_times = piece_data["Elapsed Time"].apply(lambda x: (x + pd.Timestamp(0)).dt.time)
     use_pieces = piece_times.reset_index()
-    use_pieces = app.inputs.filter_dataframe(
-        use_pieces,
-        key='filter plot_piece_profiles',
-        disabled=use_pieces.columns,
-        filters=True,
-        select_all=True,
-        column_config={
-            c: st.column_config.TimeColumn(format="m:ss")
-            for c in piece_times.columns
-        }
-    ).set_index(piece_times.index.names).index
+    use_pieces = (
+        app.inputs.filter_dataframe(
+            use_pieces,
+            key="filter plot_piece_profiles",
+            disabled=use_pieces.columns,
+            filters=True,
+            select_all=True,
+            column_config={c: st.column_config.TimeColumn(format="m:ss") for c in piece_times.columns},
+        )
+        .set_index(piece_times.index.names)
+        .index
+    )
 
-    landmark_distances = piece_data['Distance Travelled'].loc[
-        use_pieces
-    ].mean()[
-        piece_data['Total Distance'].columns]
-    pace_boat_time = piece_data[
-        'Elapsed Time'].loc[use_pieces].max(1).min()
+    landmark_distances = piece_data["Distance Travelled"].loc[use_pieces].mean()[piece_data["Total Distance"].columns]
+    pace_boat_time = piece_data["Elapsed Time"].loc[use_pieces].max(1).min()
 
     aligned_data = app.align_pieces(
-        gpx_data, piece_data,
-        landmark_distances=landmark_distances,
-        pace_boat_time=pace_boat_time,
-        pieces=use_pieces
+        gpx_data, piece_data, landmark_distances=landmark_distances, pace_boat_time=pace_boat_time, pieces=use_pieces
     )
     if aligned_data.empty:
         return
@@ -360,13 +329,14 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
     with settings:
         height = st.number_input(
             "Set profile figure height",
-            100, None, 600, step=50,
+            100,
+            None,
+            600,
+            step=50,
             key="height piece profile",
         )
         keep = st.multiselect(
-            "Select data to plot",
-            options=aligned_data.columns,
-            default=aligned_data.columns.intersection(keep or [])
+            "Select data to plot", options=aligned_data.columns, default=aligned_data.columns.intersection(keep or [])
         )
 
     tabs = st.tabs(keep)
@@ -374,52 +344,45 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
         plot_data = aligned_data[c].reset_index()
         fig = px.line(
             plot_data,
-            x='distance', y=c,
-            color='name',
-            line_dash='leg',
+            x="distance",
+            y=c,
+            color="name",
+            line_dash="leg",
         )
         fig.update_layout(height=height)
         with tab:
-            c2 = st.selectbox(
-                "Plot on right axis",
-                key=f"{c}_plotright",
-                index=None,
-                options=keep
-            )
+            c2 = st.selectbox("Plot on right axis", key=f"{c}_plotright", index=None, options=keep)
             if c2:
                 fig2 = px.line(
                     aligned_data[c2].reset_index(),
-                    x='distance', y=c2,
-                    color='name',
-                    line_dash='leg',
+                    x="distance",
+                    y=c2,
+                    color="name",
+                    line_dash="leg",
                 )
                 fig2.update_traces(opacity=0.5)
 
                 for tr in fig2.data:
-                    tr.yaxis = 'y2'
+                    tr.yaxis = "y2"
                     tr.showlegend = False
                     fig.add_trace(tr)
 
-                fig.update_layout({
-                    "yaxis2": dict(
-                        title=dict(text=c2),
-                        side='right',
-                        tickmode="sync",
-                        overlaying="y",
-                        autoshift=True,
-                        automargin=True,
-                    )
-                })
+                fig.update_layout(
+                    {
+                        "yaxis2": dict(
+                            title=dict(text=c2),
+                            side="right",
+                            tickmode="sync",
+                            overlaying="y",
+                            autoshift=True,
+                            automargin=True,
+                        )
+                    }
+                )
 
             fig.update_layout(
                 height=height,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1
-                ),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -428,63 +391,66 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
 def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_information, locations):
 
     with st.spinner("Processing split timings"):
-        location_timings = app.get_location_timings(
-            gpx_data, locations=locations)
+        location_timings = app.get_location_timings(gpx_data, locations=locations)
 
     with st.spinner("Processing fastest times"):
         best_times = app.get_fastest_times(gpx_data)
 
-    piece_data = piece_information['piece_data']
+    piece_data = piece_information["piece_data"]
 
     names = list(crossing_times)
     data_names = list(piece_data)
-    tab_all, *name_tabs = st.tabs(['All Crossing Times'] + names + data_names)
-    tabs, data_tabs = name_tabs[:len(names)], name_tabs[len(names):]
+    tab_all, *name_tabs = st.tabs(["All Crossing Times"] + names + data_names)
+    tabs, data_tabs = name_tabs[: len(names)], name_tabs[len(names) :]
     with tab_all:
-        show_times = pd.concat({
-            "date": all_crossing_times.dt.normalize(),
-            "time": all_crossing_times,
-        }, axis=1)
+        show_times = pd.concat(
+            {
+                "date": all_crossing_times.dt.normalize(),
+                "time": all_crossing_times,
+            },
+            axis=1,
+        )
         st.dataframe(
-            show_times.reset_index(), hide_index=True,
+            show_times.reset_index(),
+            hide_index=True,
             column_config={
                 "date": st.column_config.DateColumn("Date"),
-                "time": st.column_config.TimeColumn(
-                    "Time", format="HH:mm:ss.S"
-                )
-            }
+                "time": st.column_config.TimeColumn("Time", format="HH:mm:ss.S"),
+            },
         )
         app.download_csv("all-crossings.csv", show_times)
 
     for tab, (name, crossings) in zip(tabs, crossing_times.items()):
         with tab:
-            show_crossings = pd.concat({
-                "date": crossings.dt.normalize(),
-                "time": crossings,
-            }, axis=1)
+            show_crossings = pd.concat(
+                {
+                    "date": crossings.dt.normalize(),
+                    "time": crossings,
+                },
+                axis=1,
+            )
             st.subheader("Crossing times")
             st.dataframe(
-                show_crossings.reset_index(), hide_index=True,
+                show_crossings.reset_index(),
+                hide_index=True,
                 column_config={
                     "date": st.column_config.DateColumn("Date"),
-                    "time": st.column_config.TimeColumn(
-                        "Time", format="HH:mm:ss.S"
-                    )
+                    "time": st.column_config.TimeColumn("Time", format="HH:mm:ss.S"),
                 },
             )
             app.download_csv(f"{name}-crossings.csv", show_crossings)
 
     for tab, (name, timings) in zip(tabs, location_timings.items()):
         with tab:
-            upload_timings = timings.droplevel(
-                "location"
-            ).droplevel("location", axis=1).rename_axis(
-                ["", 'leg', 'landmark', 'distance']
-            ).rename_axis(
-                ["", 'leg', 'landmark', 'distance'], axis=1
-            ).map(
-                utils.format_timedelta, hours=True
-            ).replace("00:00:00.00", "").T
+            upload_timings = (
+                timings.droplevel("location")
+                .droplevel("location", axis=1)
+                .rename_axis(["", "leg", "landmark", "distance"])
+                .rename_axis(["", "leg", "landmark", "distance"], axis=1)
+                .map(utils.format_timedelta, hours=True)
+                .replace("00:00:00.00", "")
+                .T
+            )
 
             st.subheader("Timing Matrix")
             st.dataframe(upload_timings.reset_index(), hide_index=True)
@@ -497,33 +463,22 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_informa
         show_times = times + pd.Timestamp(0)
         with tab:
             st.subheader("Best Times")
-            order = show_times.groupby(
-                'length').time.min().sort_values(ascending=False)
+            order = show_times.groupby("length").time.min().sort_values(ascending=False)
             st.dataframe(
                 show_times.loc[order.index].reset_index(),
                 column_config={
-                    "split": st.column_config.TimeColumn(
-                        "Split", format="m:ss.SS"
-                    ),
-                    "time": st.column_config.TimeColumn(
-                        "Time", format="m:ss.SS"
-                    )
-                }
+                    "split": st.column_config.TimeColumn("Split", format="m:ss.SS"),
+                    "time": st.column_config.TimeColumn("Time", format="m:ss.SS"),
+                },
             )
-            app.download_csv(
-                f"{name}-fastest.csv",
-                times.map(
-                    utils.format_timedelta, hours=True
-                ).replace("00:00:00.00", "")
-            )
+            app.download_csv(f"{name}-fastest.csv", times.map(utils.format_timedelta, hours=True).replace("00:00:00.00", ""))
 
     app.show_piece_data(piece_data, data_tabs)
 
     st.divider()
 
     with st.spinner("Generating excel file"):
-        excel_export_fragment(
-            crossing_times, location_timings, best_times, piece_information)
+        excel_export_fragment(crossing_times, location_timings, best_times, piece_information)
 
 
 @st.fragment()
@@ -538,34 +493,26 @@ def excel_export_fragment(crossing_times, location_timings, best_times, piece_in
 
         for name, crossings in crossing_times.items():
             crossings = crossings.rename("time").dt.tz_localize(None)
-            crossings.to_frame().to_excel(
-                xlf,
-                sheet_name=f"{utils.safe_name(name)}-crossings"
-            )
+            crossings.to_frame().to_excel(xlf, sheet_name=f"{utils.safe_name(name)}-crossings")
 
         for name, timings in location_timings.items():
-            upload_timings = timings.droplevel(
-                "location"
-            ).droplevel("location", axis=1).rename_axis(
-                ["", 'leg', 'landmark', 'distance']
-            ).rename_axis(
-                ["", 'leg', 'landmark', 'distance'], axis=1
-            ).map(
-                utils.format_timedelta, hours=True
-            ).replace("00:00:00.00", "").T
-            upload_timings.to_excel(
-                xlf,
-                sheet_name=f"{utils.safe_name(name)}-timings"
+            upload_timings = (
+                timings.droplevel("location")
+                .droplevel("location", axis=1)
+                .rename_axis(["", "leg", "landmark", "distance"])
+                .rename_axis(["", "leg", "landmark", "distance"], axis=1)
+                .map(utils.format_timedelta, hours=True)
+                .replace("00:00:00.00", "")
+                .T
             )
+            upload_timings.to_excel(xlf, sheet_name=f"{utils.safe_name(name)}-timings")
 
         for name, times in best_times.items():
-            times.map(
-                utils.format_timedelta, hours=True
-            ).replace("00:00:00.00", "").to_excel(
+            times.map(utils.format_timedelta, hours=True).replace("00:00:00.00", "").to_excel(
                 xlf, f"{utils.safe_name(name)}-fastest"
             )
 
-        for key, data in piece_information['piece_data'].items():
+        for key, data in piece_information["piece_data"].items():
             data = data.copy()
             for c, col in data.items():
                 if pd.api.types.is_timedelta64_dtype(col.dtype):

@@ -11,9 +11,9 @@ Processing pipeline (all contained in PeachData.from_path):
   Stage 2 — _locate_records(bin, n_sensors)
       Finds GPS and stroke record starts using their fixed 2-word magic headers
       (0x8013 / 0x800A).  Locates periodic records by constructing the per-file
-      flag from the sensor count. Returns start positions and widths for all 
+      flag from the sensor count. Returns start positions and widths for all
       three stream types.
-      flag from the sensor count. Returns start positions and widths for all 
+      flag from the sensor count. Returns start positions and widths for all
       three stream types.
 
   Stage 3 — _parse_raw(bin, record_locs)
@@ -41,94 +41,113 @@ that is not stored anywhere we have found in the binary.  Raw column 10 is
 therefore exposed as 'GPS Fix Counter' rather than absolute UTC time.
 """
 
-import re
 import io
-from pathlib import Path
-from typing import Mapping
-import uuid
 import logging
+import re
+import uuid
+from collections.abc import Mapping
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-
-_UTF_RE = re.compile(b'(?:[\x20-\x7E]\x00){4,}')
-_ASCII_RE = re.compile(b'(?:[\x20-\x7E]){4,}')
+_UTF_RE = re.compile(b"(?:[\x20-\x7e]\x00){4,}")
+_ASCII_RE = re.compile(b"(?:[\x20-\x7e]){4,}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Channel / sensor metadata tables  (pure functions of the sensor list)
 # ─────────────────────────────────────────────────────────────────────────────
 _BOAT_CHANNEL_CODES = {
     # Boat channels
-    1: 'Speed',
-    3: 'Accel',
-    4: 'Rudder',
-    8: 'Roll Angle',
-    27: 'Pitch Angle',
-    28: 'Yaw Angle',
+    1: "Speed",
+    3: "Accel",
+    4: "Rudder",
+    8: "Roll Angle",
+    27: "Pitch Angle",
+    28: "Yaw Angle",
 }
 _ROWER_CHANNEL_CODES = {
     # Sweep channels
-    2: (None, 'GateForceX'),
-    3: (None, 'HandleForce'),
-    4: (None, 'GateAngle'),
-    5: (None, 'GateForceY'),
-
+    2: (None, "GateForceX"),
+    3: (None, "HandleForce"),
+    4: (None, "GateAngle"),
+    5: (None, "GateForceY"),
     # Other
-    6: (None, 'StretcherForceX'),
-
+    6: (None, "StretcherForceX"),
     # Sculling channels
-    7: ('S', 'GateForceR'),
-    8: ('P', 'GateForceR'),
-    9:  ('S', 'GateForceY'),
-    10: ('P', 'GateForceY'),
-    11: ('S', 'GateForceX'),
-    12: ('P', 'GateForceX'),
-    13: ('S', 'GateAngle'),
-    14: ('P', 'GateAngle'),
+    7: ("S", "GateForceR"),
+    8: ("P", "GateForceR"),
+    9: ("S", "GateForceY"),
+    10: ("P", "GateForceY"),
+    11: ("S", "GateForceX"),
+    12: ("P", "GateForceX"),
+    13: ("S", "GateAngle"),
+    14: ("P", "GateAngle"),
 }
 
 # The boat-logger periodic channels always appear in this fixed stream order,
 # regardless of the order they are listed in the sensor metadata.
 _BOAT_PERIODIC_ORDER = {
-    6: 'Speed',       # code 3
-    7: 'Accel',       # code 1
+    6: "Speed",  # code 3
+    7: "Accel",  # code 1
     # 8: 'Rudder',
-    10: 'Roll Angle',  # code 8
-    11: 'Pitch Angle',  # code 27
-    12: 'Yaw Angle',   # code 28
+    10: "Roll Angle",  # code 8
+    11: "Pitch Angle",  # code 27
+    12: "Yaw Angle",  # code 28
 }
 # Physical-unit scaling applied as: value = (raw + 1) * scale - shift
 # Channels absent from these dicts are passed through unscaled.
 _PERIODIC_SCALES = {
-    'GateAngle': 1/16, 'GateForceX': 1/16, 'GateForceY': 1/16,
-    'GateAngleVel': 1/16,
-    'Speed': 1/256, 'Accel': 1/256,
-    'Rudder': 1/64,
-    'Roll Angle': 1/64, 'Pitch Angle': 1/64, 'Yaw Angle': 1/64,
+    "GateAngle": 1 / 16,
+    "GateForceX": 1 / 16,
+    "GateForceY": 1 / 16,
+    "GateAngleVel": 1 / 16,
+    "Speed": 1 / 256,
+    "Accel": 1 / 256,
+    "Rudder": 1 / 64,
+    "Roll Angle": 1 / 64,
+    "Pitch Angle": 1 / 64,
+    "Yaw Angle": 1 / 64,
 }
 _PERIODIC_SHIFT = {
-    'Distance': 0,
-    'Accel': 32, 'Speed': 32,
-    'Rudder': 128,
-    'Pitch Angle': 128, 'Roll Angle': 128, 'Yaw Angle': 128,
-    'GateAngle': 512, 'GateForceX': 512, 'GateForceY': 512,
+    "Distance": 0,
+    "Accel": 32,
+    "Speed": 32,
+    "Rudder": 128,
+    "Pitch Angle": 128,
+    "Roll Angle": 128,
+    "Yaw Angle": 128,
+    "GateAngle": 512,
+    "GateForceX": 512,
+    "GateForceY": 512,
 }
 _STROKE_SCALES = {
-    'SwivelPower': 1, 'Rower Swivel Power': 1,
-    'MinAngle': 1/16, 'MaxAngle': 1/16,
-    'CatchSlip': 1/16, 'FinishSlip': 1/16,
-    'Drive Start T': 1,
-    'Rating': 1/2, 'AvgBoatSpeed': 1/256,
-    'StrokeNumber': 1, 'Dist/Stroke': 1/256, 'Average Power': 1,
+    "SwivelPower": 1,
+    "Rower Swivel Power": 1,
+    "MinAngle": 1 / 16,
+    "MaxAngle": 1 / 16,
+    "CatchSlip": 1 / 16,
+    "FinishSlip": 1 / 16,
+    "Drive Start T": 1,
+    "Rating": 1 / 2,
+    "AvgBoatSpeed": 1 / 256,
+    "StrokeNumber": 1,
+    "Dist/Stroke": 1 / 256,
+    "Average Power": 1,
 }
 _STROKE_SHIFT = {
-    'Average Power': 1002, 'SwivelPower': 1002,
-    'AvgBoatSpeed': 1/128, 'Dist/Stroke': 1/128,
-    'CatchSlip': 512, 'FinishSlip': 512,
-    'MaxAngle': 512, 'MinAngle': 512,
-    'Drive Start T': 2, 'Rating': 1, 'StrokeNumber': 1,
+    "Average Power": 1002,
+    "SwivelPower": 1002,
+    "AvgBoatSpeed": 1 / 128,
+    "Dist/Stroke": 1 / 128,
+    "CatchSlip": 512,
+    "FinishSlip": 512,
+    "MaxAngle": 512,
+    "MinAngle": 512,
+    "Drive Start T": 2,
+    "Rating": 1,
+    "StrokeNumber": 1,
 }
 
 _AVG_EARTH_RADIUS_KM = 6371.0088
@@ -140,81 +159,137 @@ _GPS_SCALE = _AVG_EARTH_RADIUS_KM * 1000 * np.pi / 180
 # It cannot be converted to wall-clock UTC without a session-specific offset
 # that is not present in the binary, so it is exposed as-is.
 _GPS_NAMED_COLS = {
-    'lat': 'lat', 'long': 'long',
-    6:  'GPS X Lo',  7:  'GPS X Hi',
-    8:  'GPS Y Lo',  9:  'GPS Y Hi',
-    10: 'GPS Fix Counter',   # sequential; not absolute UTC time
-    11: 'GPS Status',
-    12: 'Chanb880', 13: 'Chanb881', 14: 'Chanb882',
+    "lat": "lat",
+    "long": "long",
+    6: "GPS X Lo",
+    7: "GPS X Hi",
+    8: "GPS Y Lo",
+    9: "GPS Y Hi",
+    10: "GPS Fix Counter",  # sequential; not absolute UTC time
+    11: "GPS Status",
+    12: "Chanb880",
+    13: "Chanb881",
+    14: "Chanb882",
 }
 _GPS_SCALES = {
-    'GPS X Hi': 64, 'GPS Y Hi': 64,
-    'GPS X Lo': 1/256, 'GPS Y Lo': 1/256,
-    'lat': 1/256, 'long': 1/256,
-    'Chanb880': 1,
-    'Chanb881': 1/16,
-    'Chanb882': 1,
+    "GPS X Hi": 64,
+    "GPS Y Hi": 64,
+    "GPS X Lo": 1 / 256,
+    "GPS Y Lo": 1 / 256,
+    "lat": 1 / 256,
+    "long": 1 / 256,
+    "Chanb880": 1,
+    "Chanb881": 1 / 16,
+    "Chanb882": 1,
 }
 _GPS_SHIFT = {
-    'GPS X Lo': 1/128, 'GPS Y Lo': 1/128,
-    'GPS X Hi': 524352, 'GPS Y Hi': 524352,
-    'lat': 524288 + 1/128, 'long': 524288 + 1/128,
-    'Chanb880': 8193,
-    'Chanb881': 512 + 1/16,
-    'Chanb882': 8192,
+    "GPS X Lo": 1 / 128,
+    "GPS Y Lo": 1 / 128,
+    "GPS X Hi": 524352,
+    "GPS Y Hi": 524352,
+    "lat": 524288 + 1 / 128,
+    "long": 524288 + 1 / 128,
+    "Chanb880": 8193,
+    "Chanb881": 512 + 1 / 16,
+    "Chanb882": 8192,
 }
 
 # Fixed stroke header column positions (0-indexed uint16 columns in each record)
 _STROKE_HEADER_COLS = {
-    5: 'StrokeNumber', 6: 'Rating', 7: 'AvgBoatSpeed',
-    9: 'Dist/Stroke',  10: 'Average Power',
+    5: "StrokeNumber",
+    6: "Rating",
+    7: "AvgBoatSpeed",
+    9: "Dist/Stroke",
+    10: "Average Power",
 }
 # Per-seat column offsets within each stroke seat block
-_STROKE_SEAT_SWEEP = {      # 7-column sweep block (offset 6 is a SwivelPower repeat)
-    0: 'SwivelPower', 1: 'MinAngle', 2: 'MaxAngle',
-    3: 'CatchSlip', 4: 'FinishSlip', 5: 'Drive Start T',
+_STROKE_SEAT_SWEEP = {  # 7-column sweep block (offset 6 is a SwivelPower repeat)
+    0: "SwivelPower",
+    1: "MinAngle",
+    2: "MaxAngle",
+    3: "CatchSlip",
+    4: "FinishSlip",
+    5: "Drive Start T",
 }
-_STROKE_SEAT_SCULL = {      # 12-column sculling block (P then S for each channel)
-    0:  ('P', 'SwivelPower'), 1:  ('S', 'SwivelPower'),
-    2:  ('P', 'MinAngle'),    3:  ('S', 'MinAngle'),
-    4:  ('P', 'MaxAngle'),    5:  ('S', 'MaxAngle'),
-    6:  ('P', 'CatchSlip'),   7:  ('S', 'CatchSlip'),
-    8:  ('P', 'FinishSlip'),  9:  ('S', 'FinishSlip'),
-    10: ('P', 'Drive Start T'), 11: ('S', 'Drive Start T'),
+_STROKE_SEAT_SCULL = {  # 12-column sculling block (P then S for each channel)
+    0: ("P", "SwivelPower"),
+    1: ("S", "SwivelPower"),
+    2: ("P", "MinAngle"),
+    3: ("S", "MinAngle"),
+    4: ("P", "MaxAngle"),
+    5: ("S", "MaxAngle"),
+    6: ("P", "CatchSlip"),
+    7: ("S", "CatchSlip"),
+    8: ("P", "FinishSlip"),
+    9: ("S", "FinishSlip"),
+    10: ("P", "Drive Start T"),
+    11: ("S", "Drive Start T"),
 }
 
 # uint32 basis vectors for combining two consecutive uint16 words
-_C16 = np.r_[1, 2 ** 16].astype(np.uint32)   # full 32-bit recombination
-_C14 = np.r_[1, 2 ** 14].astype(np.uint32)   # 14-bit GPS coordinate words
+_C16 = np.r_[1, 2**16].astype(np.uint32)  # full 32-bit recombination
+_C14 = np.r_[1, 2**14].astype(np.uint32)  # 14-bit GPS coordinate words
 
 # Fixed binary sequence used to locate the GPS init-coordinate block
-_GPS_LOC_FLAG = np.r_[
-    20, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 17
-].astype(np.uint16)
+_GPS_LOC_FLAG = np.r_[20, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 17].astype(np.uint16)
 
 _PARAM_NAMES = [
-    'Impeller Scaling', 'Average Rating over', 'Sweep Drive Start',
-    'Sweep Recovery', 'Sweep Oar Inboard', 'Sweep Oar Length',
-    'Scull Drive Start', 'Scull Recovery', 'Scull Oar Inboard',
-    'Scull Oar Length',
+    "Impeller Scaling",
+    "Average Rating over",
+    "Sweep Drive Start",
+    "Sweep Recovery",
+    "Sweep Oar Inboard",
+    "Sweep Oar Length",
+    "Scull Drive Start",
+    "Scull Recovery",
+    "Scull Oar Inboard",
+    "Scull Oar Length",
 ]
-_PARAM_UNITS = ['%', 'strokes', 'kg', 'kg', 'cm', 'cm', 'kg', 'kg', 'cm', 'cm']
+_PARAM_UNITS = ["%", "strokes", "kg", "kg", "cm", "cm", "kg", "kg", "cm", "cm"]
 _PARAM_SCALES = [100, 1, 100, 100, 10, 10, 100, 100, 10, 10]
 
 # for processing reference/export files
-_ALLOWED_POSITIONS = ['Boat'] + [str(i) for i in range(1, 9)]
+_ALLOWED_POSITIONS = ["Boat"] + [str(i) for i in range(1, 9)]
 _EXPORT_EXTRA_COLS = [
-    'Chanb885', 'GPS RTCM', 'UTC Time',
-    'GateAngleVel', 'Angle Max F', 'Work PC Q4', 'Drive Time',
-    'Angle 0.7 F', 'Work PC Q3', 'Work PC Q1', 'Rower Swivel Power',
-    'Recovery Time', 'Max Force PC', 'Work PC Q2',
-    'Normalized Time',
-    'P GateAngleVel', 'S GateAngleVel', 'P Angle 0.7 F', 'P Angle Max F',
-    'P Drive Time', 'P Max Force PC', 'P Min Angle', 'P Recovery Time',
-    'P Swivel Power', 'P Work PC Q1', 'P Work PC Q2', 'P Work PC Q3',
-    'P Work PC Q4', 'S Angle 0.7 F', 'S Angle Max F', 'S Drive Time',
-    'S Max Force PC', 'S Min Angle', 'S Recovery Time', 'S Swivel Power',
-    'S Work PC Q1', 'S Work PC Q2', 'S Work PC Q3', 'S Work PC Q4'
+    "Chanb885",
+    "GPS RTCM",
+    "UTC Time",
+    "GateAngleVel",
+    "Angle Max F",
+    "Work PC Q4",
+    "Drive Time",
+    "Angle 0.7 F",
+    "Work PC Q3",
+    "Work PC Q1",
+    "Rower Swivel Power",
+    "Recovery Time",
+    "Max Force PC",
+    "Work PC Q2",
+    "Normalized Time",
+    "P GateAngleVel",
+    "S GateAngleVel",
+    "P Angle 0.7 F",
+    "P Angle Max F",
+    "P Drive Time",
+    "P Max Force PC",
+    "P Min Angle",
+    "P Recovery Time",
+    "P Swivel Power",
+    "P Work PC Q1",
+    "P Work PC Q2",
+    "P Work PC Q3",
+    "P Work PC Q4",
+    "S Angle 0.7 F",
+    "S Angle Max F",
+    "S Drive Time",
+    "S Max Force PC",
+    "S Min Angle",
+    "S Recovery Time",
+    "S Swivel Power",
+    "S Work PC Q1",
+    "S Work PC Q2",
+    "S Work PC Q3",
+    "S Work PC Q4",
 ]
 # ─────────────────────────────────────────────────────────────────────────────
 # Low-level binary search helper
@@ -227,8 +302,8 @@ def search(arr, seq):
     n = len(arr)
     pairs = seq.items() if isinstance(seq, Mapping) else enumerate(seq)
     for i, v in pairs:
-        match[:n - i] &= (arr[i:] == v)
-        match[n - i:] = False
+        match[: n - i] &= arr[i:] == v
+        match[n - i :] = False
     return match
 
 
@@ -236,24 +311,21 @@ def search(arr, seq):
 # Raw block extraction
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _extract_aperiodic(bin_u16, starts, n_cols, n_rows=10):
     """Extract n_rows × n_cols uint16 blocks at each offset in *starts*."""
     return pd.concat(
-        [pd.DataFrame(bin_u16[s:s + n_cols * n_rows].reshape(n_rows, n_cols))
-         for s in starts],
+        [pd.DataFrame(bin_u16[s : s + n_cols * n_rows].reshape(n_rows, n_cols)) for s in starts],
         ignore_index=True,
     )
 
 
 def _extract_aperiodic32(bin_u16, starts, n_cols, n_rows=1):
     """Like extract_aperiodic but interprets uint16 pairs as uint32."""
-    return pd.concat([
-        pd.DataFrame(
-            bin_u16[s:s + 2 * n_cols * n_rows]
-            .view(np.uint32)
-            .reshape(n_rows, n_cols)
-        ) for s in starts
-    ], ignore_index=True)
+    return pd.concat(
+        [pd.DataFrame(bin_u16[s : s + 2 * n_cols * n_rows].view(np.uint32).reshape(n_rows, n_cols)) for s in starts],
+        ignore_index=True,
+    )
 
 
 def _extract_periodic(bin_u16, starts, n_cols, n_rows=50):
@@ -262,17 +334,13 @@ def _extract_periodic(bin_u16, starts, n_cols, n_rows=50):
     for g, s in enumerate(starts):
         sn = s + n_cols * n_rows
         if sn < bin_u16.size:
-            groups[g] = pd.DataFrame(
-                bin_u16[s:sn].reshape(n_cols, n_rows).T)
+            groups[g] = pd.DataFrame(bin_u16[s:sn].reshape(n_cols, n_rows).T)
 
-    return pd.concat(
-        groups, names=['group']
-    ).droplevel(1).reset_index().set_index('group', append=True)
+    return pd.concat(groups, names=["group"]).droplevel(1).reset_index().set_index("group", append=True)
 
 
 def _parse_block(
-        data_u8: np.ndarray, header_len: int, row_width: int,
-        dtype: np.dtype = np.uint8
+    data_u8: np.ndarray, header_len: int, row_width: int, dtype: np.dtype = np.uint8
 ) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     """Split *data_u8* into (records_df, header_bytes, tail_bytes)."""
     n_rows = (data_u8.size - header_len) // row_width
@@ -306,9 +374,9 @@ def _load_header(bin_u16: np.ndarray) -> dict | None:
     flags = [
         # 'Bo' UTF-16 → 'Boat'
         # np.array([66, 0, 111, 0], dtype=np.uint8),
-        np.frombuffer('Boat'.encode('utf-16le'), np.uint8),
-        np.frombuffer(b'Logger', dtype=np.uint8),
-        np.frombuffer(b'Boat',   dtype=np.uint8),
+        np.frombuffer("Boat".encode("utf-16le"), np.uint8),
+        np.frombuffer(b"Logger", dtype=np.uint8),
+        np.frombuffer(b"Boat", dtype=np.uint8),
         np.array([0x8013, 10], dtype=np.uint16).view(np.uint8),  # GPS magic
         np.array([0x800A, 10], dtype=np.uint16).view(np.uint8),  # stroke magic
     ]
@@ -320,60 +388,61 @@ def _load_header(bin_u16: np.ndarray) -> dict | None:
             sep_mask |= np.repeat(search(sbin, flag.view(np.uint16)), 2)
 
     section_names = [
-        'Header', 'ParamHeader', 'Parameters',
-        'VersionsHeader', 'Sensors', 'EventsHeader', 'Events',
+        "Header",
+        "ParamHeader",
+        "Parameters",
+        "VersionsHeader",
+        "Sensors",
+        "EventsHeader",
+        "Events",
     ]
-    sections = dict(zip(section_names, np.split(
-        sbin_u8, sep_mask.nonzero()[0])))
+    sections = dict(zip(section_names, np.split(sbin_u8, sep_mask.nonzero()[0])))
     if len(sections) != len(section_names):
         return
 
     meta = {}
 
     # ── Session timestamp ─────────────────────────────────────────────────────
-    hdr = sections['Header']
-    meta['Header'] = hdr
-    meta['serial'], meta['session'] = map(int, hdr[40:48].view(np.uint32))
-    meta['timestamp'] = int(hdr[24:28].view(np.uint32)[0])
-    meta['date'] = pd.Timestamp(meta['timestamp'], unit='s')
+    hdr = sections["Header"]
+    meta["Header"] = hdr
+    meta["serial"], meta["session"] = map(int, hdr[40:48].view(np.uint32))
+    meta["timestamp"] = int(hdr[24:28].view(np.uint32)[0])
+    meta["date"] = pd.Timestamp(meta["timestamp"], unit="s")
 
     # ── Boat parameters ───────────────────────────────────────────────────────
-    params, *_ = _parse_block(sections['Parameters'], 27, 8, dtype=np.uint16)
+    params, *_ = _parse_block(sections["Parameters"], 27, 8, dtype=np.uint16)
     params.index = _PARAM_NAMES
-    params['value'] = params[2] / _PARAM_SCALES
-    params['unit'] = _PARAM_UNITS
-    meta['params'] = params
+    params["value"] = params[2] / _PARAM_SCALES
+    params["unit"] = _PARAM_UNITS
+    meta["params"] = params
 
     # ── Sensor list ───────────────────────────────────────────────────────────
-    sensors, *_ = _parse_block(sections['Sensors'], 24, 20)
-    sensors['seat'] = sensors[0]
-    sensors['channel'] = sensors[2]
-    sensors['version'] = (
-        sensors[[4, 5, 6, 7]] % 128).astype(str).apply('.'.join, axis=1)
-    sensors['S/N'] = sensors[[16, 17]].values.copy().view(np.uint16)
-    meta['sensors'] = sensors
+    sensors, *_ = _parse_block(sections["Sensors"], 24, 20)
+    sensors["seat"] = sensors[0]
+    sensors["channel"] = sensors[2]
+    sensors["version"] = (sensors[[4, 5, 6, 7]] % 128).astype(str).apply(".".join, axis=1)
+    sensors["S/N"] = sensors[[16, 17]].values.copy().view(np.uint16)
+    meta["sensors"] = sensors
 
     # Derived tables used by stages 2–4
-    meta['sensors info'] = _infer_sensor_table(sensors)
-    meta['stroke info'] = _infer_stroke_table(meta['sensors info'])
-    meta['periodic info'] = _infer_periodic_table(meta['sensors info'])
-    meta['gps info'] = _infer_gps_table()
+    meta["sensors info"] = _infer_sensor_table(sensors)
+    meta["stroke info"] = _infer_stroke_table(meta["sensors info"])
+    meta["periodic info"] = _infer_periodic_table(meta["sensors info"])
+    meta["gps info"] = _infer_gps_table()
 
     # ── Event log ─────────────────────────────────────────────────────────────
-    ev_start = search(
-        sections['Events'], [1, 64, 0, 0, 0, 0, 128, 59]).argmax()
-    events, *_ = _parse_block(
-        sections['Events'], ev_start, 16, dtype=np.uint16)
-    meta['events'] = events
+    ev_start = search(sections["Events"], [1, 64, 0, 0, 0, 0, 128, 59]).argmax()
+    events, *_ = _parse_block(sections["Events"], ev_start, 16, dtype=np.uint16)
+    meta["events"] = events
 
     # ── Rig Info ─────────────────────────────────────────────────────────────
-    rig_loc, = search(sbin_u8, (17, 129, 1, 0, 0, 0, 0, 0)).nonzero()
+    (rig_loc,) = search(sbin_u8, (17, 129, 1, 0, 0, 0, 0, 0)).nonzero()
     if rig_loc.size:
         i = rig_loc[0] + 9
-        meta['rig'] = (
-            pd.Series(sbin_u8[i:i + 8], range(1, 9), name='side')
-            .rename_axis('position')
-            .map({1: 'Port', 3: 'Port', 5: 'Stbd', 7: 'Scull', 0: None})
+        meta["rig"] = (
+            pd.Series(sbin_u8[i : i + 8], range(1, 9), name="side")
+            .rename_axis("position")
+            .map({1: "Port", 3: "Port", 5: "Stbd", 7: "Scull", 0: None})
             .dropna()
             .reset_index()
         )
@@ -381,19 +450,20 @@ def _load_header(bin_u16: np.ndarray) -> dict | None:
     # ── GPS initialisation coordinates ────────────────────────────────────────
     # A fixed 16-word pattern in the binary precedes the init GPS fix.
     # Bytes 25–32 of a small surrounding block hold (lat, lon) as int32 / 2^23.
-    init_pos, = search(bin_u16, _GPS_LOC_FLAG).nonzero()
+    (init_pos,) = search(bin_u16, _GPS_LOC_FLAG).nonzero()
     coords = np.r_[np.nan, np.nan]
     if init_pos.size:
         i = init_pos[0]
-        gps_init_u8 = bin_u16[i + 7: i + 31].view(np.uint8)
-        coords = gps_init_u8[25:33].view(np.int32) / 2 ** 23  # (lat, lon) °
-    meta['latitude'], meta['longitude'] = meta['gps_coords'] = coords
+        gps_init_u8 = bin_u16[i + 7 : i + 31].view(np.uint8)
+        coords = gps_init_u8[25:33].view(np.int32) / 2**23  # (lat, lon) °
+    meta["latitude"], meta["longitude"] = meta["gps_coords"] = coords
     return meta
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2 — locate data records
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _locate_records(bin_u16: np.ndarray, n_sensors: int) -> dict | None:
     """Stage 2: find start positions for GPS, stroke, and periodic records.
@@ -423,8 +493,8 @@ def _locate_records(bin_u16: np.ndarray, n_sensors: int) -> dict | None:
         periodic_width    — uint16 columns per periodic sample (= n_sensors)
         periodic_hdr_words — uint16 words in the periodic record header (14 or 18)
     """
-    gps_starts,    = search(bin_u16, [0x8013, 10]).nonzero()
-    stroke_starts, = search(bin_u16, [0x800A, 10]).nonzero()
+    (gps_starts,) = search(bin_u16, [0x8013, 10]).nonzero()
+    (stroke_starts,) = search(bin_u16, [0x800A, 10]).nonzero()
     if not (gps_starts.size and stroke_starts.size):
         logging.info("Could not locate GPS/stroke records")
         return
@@ -441,7 +511,7 @@ def _locate_records(bin_u16: np.ndarray, n_sensors: int) -> dict | None:
     # We only need to search from where the data records begin.
     datastart = int(min(gps_starts[0], stroke_starts[0]))
     flag = int(np.round(n_sensors * 100 / 16 + 2)) * 16
-    cands, = search(bin_u16[datastart:], [flag, 0]).nonzero()
+    (cands,) = search(bin_u16[datastart:], [flag, 0]).nonzero()
     periodic_starts = cands + datastart
     periodic_hdr_words = flag - n_sensors * 100
 
@@ -466,81 +536,66 @@ def _locate_records(bin_u16: np.ndarray, n_sensors: int) -> dict | None:
         stroke_starts=stroke_starts,
         periodic_starts=periodic_starts,
         stroke_width=stroke_width,
-        periodic_width=n_sensors,           # one uint16 sample per sensor
+        periodic_width=n_sensors,  # one uint16 sample per sensor
         periodic_hdr_words=periodic_hdr_words,
     )
 
 
-def _parse_raw(
-        bin_u16: np.ndarray, rl: dict[str, np.ndarray], gps_coords: tuple[float, float]
-) -> dict[str, pd.DataFrame]:
+def _parse_raw(bin_u16: np.ndarray, rl: dict[str, np.ndarray], gps_coords: tuple[float, float]) -> dict[str, pd.DataFrame]:
     """Stage 3: extract raw DataFrames.  Populates ``self.raw_data``."""
     # rl = self.record_locs
     raw = {}
 
     # ── GPS (0x8013) ──────────────────────────────────────────────────────
     # Record layout: 3-word header | 16 uint16 columns × 10 rows
-    gps = _extract_aperiodic(bin_u16, rl['gps_starts'] + 3, 16, 10)
-    gps['Time'] = gps[[1, 2]] @ _C16
-    gps['Distance'] = gps[[3, 4]] @ _C16 / 256 - 16385 / 256
-    gps['lat'] = gps[[6, 7]] @ _C14
-    gps['long'] = gps[[8, 9]] @ _C14
+    gps = _extract_aperiodic(bin_u16, rl["gps_starts"] + 3, 16, 10)
+    gps["Time"] = gps[[1, 2]] @ _C16
+    gps["Distance"] = gps[[3, 4]] @ _C16 / 256 - 16385 / 256
+    gps["lat"] = gps[[6, 7]] @ _C14
+    gps["long"] = gps[[8, 9]] @ _C14
 
-    raw['GPS'] = gps.set_index('Time')
+    raw["GPS"] = gps.set_index("Time")
 
     # ── Stroke (0x800A) ───────────────────────────────────────────────────
-    sw = rl['stroke_width']
-    stroke = _extract_aperiodic(bin_u16, rl['stroke_starts'] + 3, sw, 10)
-    stroke['Time'] = stroke[[1, 2]] @ _C16
-    stroke['Distance'] = stroke[[3, 4]] @ _C16 / 256 - 16385 / 256
-    raw['stroke'] = stroke = stroke.set_index('Time')
+    sw = rl["stroke_width"]
+    stroke = _extract_aperiodic(bin_u16, rl["stroke_starts"] + 3, sw, 10)
+    stroke["Time"] = stroke[[1, 2]] @ _C16
+    stroke["Distance"] = stroke[[3, 4]] @ _C16 / 256 - 16385 / 256
+    raw["stroke"] = stroke = stroke.set_index("Time")
 
     # ── Periodic (50 Hz) ──────────────────────────────────────────────────
-    pw = rl['periodic_width']
+    pw = rl["periodic_width"]
     # h_off = rl['periodic_hdr_words']  # uint16 words to skip per record
     h_off = 14
     # Group header: 6 uint32 words at offset +2 from the record start.
     # Column 4 of the group header is the validity flag: 1000 = valid data,
     # other values indicate that this slot was occupied by a GPS or stroke
     # record rather than a full periodic group.
-    raw['periodic_group'] = groups = _extract_aperiodic32(
-        bin_u16, rl['periodic_starts'] + 2, 6, 1)
+    raw["periodic_group"] = groups = _extract_aperiodic32(bin_u16, rl["periodic_starts"] + 2, 6, 1)
 
     # Sensor data: pw columns × 50 rows, stored column-major.
-    periodic = _extract_periodic(
-        bin_u16, rl['periodic_starts'] + h_off, pw, 50)
+    periodic = _extract_periodic(bin_u16, rl["periodic_starts"] + h_off, pw, 50)
 
     # Gate sensor values use the top bit as a sign/overflow flag; strip it.
     for c in periodic.columns[7:]:
-        periodic[c] = periodic[c] % 2 ** 15
+        periodic[c] = periodic[c] % 2**15
 
     # Distance is stored as two uint16 words in a non-standard interleaved
     # byte order; permute to restore the correct uint32 value.
-    periodic.loc[:, [2, 3]] = (
-        np.permute_dims(
-            periodic[[2, 3]].values.reshape(-1, 2, 25, 2), (0, 3, 1, 2)
-        ).reshape(-1, 2)
-    )
+    periodic.loc[:, [2, 3]] = np.permute_dims(periodic[[2, 3]].values.reshape(-1, 2, 25, 2), (0, 3, 1, 2)).reshape(-1, 2)
 
     # Merge group header (cols 0–5) with sensor data (cols shifted to 6–6+pw-1).
-    raw['raw_periodic'] = periodic = (
-        periodic.rename(columns=lambda x: x + 6)
-        .join(groups, on='group')
-        .reset_index('group', drop=True)
+    raw["raw_periodic"] = periodic = (
+        periodic.rename(columns=lambda x: x + 6).join(groups, on="group").reset_index("group", drop=True)
     )
 
     # Column 3 is the group base time (ms); add per-sample offset (20 ms each).
-    periodic['Time'] = periodic[3] = (
-        periodic[3] + (np.arange(len(periodic)) % 50) * 20)
-    periodic['Distance'] = (
-        periodic[[8, 9]] @ _C14 / 256 - 16385 / 256
-    ).where(periodic[[8, 9]].sum(axis=1) > 0)
-    periodic = periodic[periodic[4] == 1000].set_index('Time')
+    periodic["Time"] = periodic[3] = periodic[3] + (np.arange(len(periodic)) % 50) * 20
+    periodic["Distance"] = (periodic[[8, 9]] @ _C14 / 256 - 16385 / 256).where(periodic[[8, 9]].sum(axis=1) > 0)
+    periodic = periodic[periodic[4] == 1000].set_index("Time")
 
-    periodic['StrokeNumber'] = 0
-    periodic.loc[
-        stroke.index.intersection(periodic.index), 'StrokeNumber'
-    ] = 1
+    periodic["StrokeNumber"] = 0
+    periodic.loc[stroke.index.intersection(periodic.index), "StrokeNumber"] = 1
     strokenum = periodic.StrokeNumber = periodic.StrokeNumber.cumsum().squeeze()
     timestamp = periodic.index.to_series().astype(int)
 
@@ -548,14 +603,11 @@ def _parse_raw(
     stroke_start = stroke_end.shift().fillna(0)
     stroke_length = stroke_end.diff(1)
     stroke_length.iloc[0] = stroke_end.iloc[0]
-    norm = (
-        (timestamp * 1. - strokenum.map(stroke_start))
-        / strokenum.map(stroke_length)
-    )
-    periodic['Normalized Time'] = (norm - 0.5) * 100
+    norm = (timestamp * 1.0 - strokenum.map(stroke_start)) / strokenum.map(stroke_length)
+    periodic["Normalized Time"] = (norm - 0.5) * 100
 
     # Keep only groups where the validity flag is 1000.
-    raw['periodic'] = periodic  # [periodic[4] == 1000].set_index('Time')
+    raw["periodic"] = periodic  # [periodic[4] == 1000].set_index('Time')
     return raw
 
 
@@ -578,33 +630,39 @@ def _infer_sensor_table(sensors_raw: pd.DataFrame) -> pd.DataFrame:
     """
     rows = []
     for i, row in sensors_raw.reset_index(drop=True).iterrows():
-        code = int(row['channel'])
-        sn = int(row['S/N'])
-        seat = int(row['seat'])
+        code = int(row["channel"])
+        sn = int(row["S/N"])
+        seat = int(row["seat"])
         is_boat = seat == 0
         # is_boat = code in _BOAT_CHANNEL_CODES
         if is_boat:
             side_prefix = None
-            channel_name = _BOAT_CHANNEL_CODES.get(code, f'Chan {code:04X}')
+            channel_name = _BOAT_CHANNEL_CODES.get(code, f"Chan {code:04X}")
         else:
-            side_prefix, channel_name = _ROWER_CHANNEL_CODES.get(
-                code, (None, f'Chan {code:04X}'))
+            side_prefix, channel_name = _ROWER_CHANNEL_CODES.get(code, (None, f"Chan {code:04X}"))
 
-        rows.append(dict(
-            sensor_index=i, seat=seat, channel=code,
-            name=channel_name, side_prefix=side_prefix, sn=sn,
-            is_boat=is_boat, is_scull=bool(side_prefix),
-            version=row.version,
-            n_stroke_cols=0 if is_boat else (12 if side_prefix else 7),
-        ))
+        rows.append(
+            dict(
+                sensor_index=i,
+                seat=seat,
+                channel=code,
+                name=channel_name,
+                side_prefix=side_prefix,
+                sn=sn,
+                is_boat=is_boat,
+                is_scull=bool(side_prefix),
+                version=row.version,
+                n_stroke_cols=0 if is_boat else (12 if side_prefix else 7),
+            )
+        )
 
     df = pd.DataFrame(rows)
-    gate = df[~df['is_boat']].sort_values('seat').reset_index(drop=True)
-    boat = df[df['is_boat']].reset_index(drop=True)
+    gate = df[~df["is_boat"]].sort_values("seat").reset_index(drop=True)
+    boat = df[df["is_boat"]].reset_index(drop=True)
 
-    logger_id, = boat.sn.unique()
-    gate['invalid'] = gate.sn == logger_id
-    boat['invalid'] = boat.name.str.startswith("Chan ")
+    (logger_id,) = boat.sn.unique()
+    gate["invalid"] = gate.sn == logger_id
+    boat["invalid"] = boat.name.str.startswith("Chan ")
 
     return pd.concat([gate, boat], ignore_index=True)
 
@@ -615,23 +673,27 @@ def _infer_periodic_table(st: pd.DataFrame) -> pd.DataFrame:
     Column indices start at 6; the first six columns come from the group
     header and are handled separately in _parse_raw.
     """
-    gate = st[~st['is_boat']].set_index('seat').rename(index=int)
-    gate['order'] = gate['channel'].replace({
-        5: -1,  # GateForceY comes last
-        6: -2
-    })
-    boat = st[st['is_boat']].set_index('name')
-    boat['order'] = boat['channel'].replace({
-        4: 7.5  # Rudder comes after distance
-    })
+    gate = st[~st["is_boat"]].set_index("seat").rename(index=int)
+    gate["order"] = gate["channel"].replace(
+        {
+            5: -1,  # GateForceY comes last
+            6: -2,
+        }
+    )
+    boat = st[st["is_boat"]].set_index("name")
+    boat["order"] = boat["channel"].replace(
+        {
+            4: 7.5  # Rudder comes after distance
+        }
+    )
 
     rows = {}
     col = 6
-    for name, sensor in boat.sort_values('order').iterrows():
+    for name, sensor in boat.sort_values("order").iterrows():
         if not sensor.invalid:
             rows[col] = dict(
                 channel=name,
-                position='Boat',
+                position="Boat",
                 name=name,
                 side=None,
                 sn=sensor.sn,
@@ -642,14 +704,16 @@ def _infer_periodic_table(st: pd.DataFrame) -> pd.DataFrame:
 
     # Gate channels interleaved per seat ascending
     for seat in sorted(gate.index.dropna().unique()):
-        seat_sensors = gate.loc[[seat]].sort_values('order', ascending=False)
+        seat_sensors = gate.loc[[seat]].sort_values("order", ascending=False)
         for _, r in seat_sensors.iterrows():
-            side = r['side_prefix']
-            ch = r['name']
+            side = r["side_prefix"]
+            ch = r["name"]
             if not r.invalid:
                 rows[col] = dict(
-                    channel=f'{side} {ch}' if side else ch,
-                    position=str(seat), name=ch, side=side,
+                    channel=f"{side} {ch}" if side else ch,
+                    position=str(seat),
+                    name=ch,
+                    side=side,
                     sn=r.sn,
                     code=r.channel,
                     invalid=r.invalid,
@@ -657,46 +721,43 @@ def _infer_periodic_table(st: pd.DataFrame) -> pd.DataFrame:
 
             col += 1
 
-    df = pd.DataFrame.from_dict(rows, orient='index')
-    df['scale'] = df['name'].map(_PERIODIC_SCALES)
-    df['shift'] = df['name'].map(_PERIODIC_SHIFT)
+    df = pd.DataFrame.from_dict(rows, orient="index")
+    df["scale"] = df["name"].map(_PERIODIC_SCALES)
+    df["shift"] = df["name"].map(_PERIODIC_SHIFT)
     return df
 
 
 def _infer_stroke_table(st: pd.DataFrame) -> pd.DataFrame:
     """Build a column-index → (channel, position, scale, shift) table for stroke."""
-    rows = {i: dict(channel=n, position='Boat', name=n, side=None)
-            for i, n in _STROKE_HEADER_COLS.items()}
+    rows = {i: dict(channel=n, position="Boat", name=n, side=None) for i, n in _STROKE_HEADER_COLS.items()}
 
     block_start = 12
-    seats = st[~st['is_boat']].groupby('seat').first().sort_index()
+    seats = st[~st["is_boat"]].groupby("seat").first().sort_index()
     for seat_idx, seat_row in seats.iterrows():
-        seat_map = _STROKE_SEAT_SCULL if seat_row['is_scull'] else _STROKE_SEAT_SWEEP
+        seat_map = _STROKE_SEAT_SCULL if seat_row["is_scull"] else _STROKE_SEAT_SWEEP
         for offset, label in seat_map.items():
-            if seat_row['is_scull']:
+            if seat_row["is_scull"]:
                 side, ch_name = label
-                col_name = f'{side} {ch_name}'
+                col_name = f"{side} {ch_name}"
             else:
                 side, ch_name = None, label
                 col_name = ch_name
 
-            rows[block_start + offset] = dict(
-                channel=col_name, position=str(seat_idx), name=ch_name, side=side)
-        block_start += seat_row['n_stroke_cols']
+            rows[block_start + offset] = dict(channel=col_name, position=str(seat_idx), name=ch_name, side=side)
+        block_start += seat_row["n_stroke_cols"]
 
-    df = pd.DataFrame.from_dict(rows, orient='index')
-    df['scale'] = df['name'].map(_STROKE_SCALES)
-    df['shift'] = df['name'].map(_STROKE_SHIFT)
+    df = pd.DataFrame.from_dict(rows, orient="index")
+    df["scale"] = df["name"].map(_STROKE_SCALES)
+    df["shift"] = df["name"].map(_STROKE_SHIFT)
     return df
 
 
 def _infer_gps_table() -> pd.DataFrame:
     """Build the GPS column-index → (channel, position, scale, shift) table."""
-    rows = {k: dict(channel=v, position='Boat', name=v, side=None)
-            for k, v in _GPS_NAMED_COLS.items()}
-    df = pd.DataFrame.from_dict(rows, orient='index')
-    df['scale'] = df['name'].map(_GPS_SCALES)
-    df['shift'] = df['name'].map(_GPS_SHIFT)
+    rows = {k: dict(channel=v, position="Boat", name=v, side=None) for k, v in _GPS_NAMED_COLS.items()}
+    df = pd.DataFrame.from_dict(rows, orient="index")
+    df["scale"] = df["name"].map(_GPS_SCALES)
+    df["shift"] = df["name"].map(_GPS_SHIFT)
     return df
 
 
@@ -706,45 +767,38 @@ def _map_channels(raw_data, metadata) -> tuple[pd.DataFrame, pd.DataFrame, pd.Da
     r = raw_data
 
     gps = _map_data(
-        r['GPS'], m['gps info'], keep_cols=['Distance', 'latitude', 'longitude'],)
-    stroke = _map_data(
-        r['stroke'], m['stroke info'], keep_cols=['Distance'])
-
-    periodic = _map_data(
-        r['periodic'], m['periodic info'],
-        keep_cols=['Distance', 'Normalized Time', 'StrokeNumber']
+        r["GPS"],
+        m["gps info"],
+        keep_cols=["Distance", "latitude", "longitude"],
     )
+    stroke = _map_data(r["stroke"], m["stroke info"], keep_cols=["Distance"])
 
-    lat0, lon0 = metadata['gps_coords']
+    periodic = _map_data(r["periodic"], m["periodic info"], keep_cols=["Distance", "Normalized Time", "StrokeNumber"])
+
+    lat0, lon0 = metadata["gps_coords"]
     long_scale = _GPS_SCALE * np.cos(np.deg2rad(lat0))
-    gps[('latitude', 'Boat')] = (
-        gps['lat'] / _GPS_SCALE + lat0).where(gps['lat'] != 0)
-    gps[('longitude', 'Boat')] = (
-        gps['long'] / long_scale + lon0).where(gps['long'] != 0)
+    gps[("latitude", "Boat")] = (gps["lat"] / _GPS_SCALE + lat0).where(gps["lat"] != 0)
+    gps[("longitude", "Boat")] = (gps["long"] / long_scale + lon0).where(gps["long"] != 0)
 
-    for side in ['', 'P ', 'S ']:
-        if f'{side}MaxAngle' in stroke:
-            length = \
-                stroke[f'{side}MaxAngle'] - stroke[f'{side}MinAngle']
-            effect = length - \
-                stroke[side + 'CatchSlip'] - stroke[side + 'FinishSlip']
-            new_stroke_data = pd.concat({
-                side + "Length": length, side + "Effective": effect}, axis=1
-            ).rename_axis(columns=stroke.columns.names)
+    for side in ["", "P ", "S "]:
+        if f"{side}MaxAngle" in stroke:
+            length = stroke[f"{side}MaxAngle"] - stroke[f"{side}MinAngle"]
+            effect = length - stroke[side + "CatchSlip"] - stroke[side + "FinishSlip"]
+            new_stroke_data = pd.concat({side + "Length": length, side + "Effective": effect}, axis=1).rename_axis(
+                columns=stroke.columns.names
+            )
 
-            stroke = pd.concat([
-                stroke, new_stroke_data
-            ], axis=1)
+            stroke = pd.concat([stroke, new_stroke_data], axis=1)
 
-        if (ga := side + 'GateAngle') in periodic:
-            gateangelvel = np.gradient(
-                periodic[ga], periodic.index / 1000, axis=0
-            ) + periodic[ga] * 0
-            periodic = pd.concat([
-                periodic,
-                pd.concat({side + 'GateAngleVel': gateangelvel}, axis=1)
-                .rename_axis(columns=periodic.columns.names)
-            ], axis=1)
+        if (ga := side + "GateAngle") in periodic:
+            gateangelvel = np.gradient(periodic[ga], periodic.index / 1000, axis=0) + periodic[ga] * 0
+            periodic = pd.concat(
+                [
+                    periodic,
+                    pd.concat({side + "GateAngleVel": gateangelvel}, axis=1).rename_axis(columns=periodic.columns.names),
+                ],
+                axis=1,
+            )
 
     return gps, stroke, periodic
 
@@ -764,21 +818,21 @@ def _map_data(raw: pd.DataFrame, meta: pd.DataFrame, keep_cols=()) -> pd.DataFra
     -------
     pd.DataFrame with a (channel, position) MultiIndex column.
     """
-    results = {(c, 'Boat'): raw[c] for c in keep_cols if c in raw}
+    results = {(c, "Boat"): raw[c] for c in keep_cols if c in raw}
 
     if meta is not None:
         for i, ch in meta.iterrows():
             if i not in raw.columns:
                 continue
-            k = (ch['channel'], ch['position'])
-            scale = ch['scale']
-            shift = ch['shift']
+            k = (ch["channel"], ch["position"])
+            scale = ch["scale"]
+            shift = ch["shift"]
             if pd.isna(scale):
                 results[k] = raw[i].where(raw[i] > 0)
             else:
                 results[k] = ((raw[i] + 1) * scale - shift).where(raw[i] > 0)
 
-    return pd.concat(results, axis=1, names=['channel', 'position'])
+    return pd.concat(results, axis=1, names=["channel", "position"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -786,16 +840,16 @@ def _map_data(raw: pd.DataFrame, meta: pd.DataFrame, keep_cols=()) -> pd.DataFra
 # ─────────────────────────────────────────────────────────────────────────────
 
 # position byte 1-9 only
-_CREW_RECORD_RE = re.compile(b'\x05\x00\x00\x00\xe0([\x01-\x09])\x00')
-_NAME_RE = re.compile(b'\x80([\x01-\x30])\x80([\x20-\x7E]+)')
+_CREW_RECORD_RE = re.compile(b"\x05\x00\x00\x00\xe0([\x01-\x09])\x00")
+_NAME_RE = re.compile(b"\x80([\x01-\x30])\x80([\x20-\x7e]+)")
 # position byte 1-9 only
-_CREW_RECORD_RE = re.compile(b'\x05\x00\x00\x00\xe0([\x01-\x09])\x00')
-_NAME_RE = re.compile(b'\x80([\x01-\x30])\x80([\x20-\x7E]+)')
+_CREW_RECORD_RE = re.compile(b"\x05\x00\x00\x00\xe0([\x01-\x09])\x00")
+_NAME_RE = re.compile(b"\x80([\x01-\x30])\x80([\x20-\x7e]+)")
 
 _CREW_FIELD_GUIDS = {
-    '96544694-0526-46AF-A944-023B066D721B': 'last_name',
-    '1964EFCE-7A57-42DF-9B8A-295CAE1105F1': 'squad',
-    '1BF3342E-F300-4FFA-85BF-D1439C4DD3CA': 'first_name',
+    "96544694-0526-46AF-A944-023B066D721B": "last_name",
+    "1964EFCE-7A57-42DF-9B8A-295CAE1105F1": "squad",
+    "1BF3342E-F300-4FFA-85BF-D1439C4DD3CA": "first_name",
 }
 
 
@@ -809,27 +863,25 @@ def _parse_crew_fields(index_data: bytes) -> dict:
     fields: dict = {}
     pos = 0
     while True:
-        idx = index_data.find(b'\x07\x00\x00\x00\x80', pos)
+        idx = index_data.find(b"\x07\x00\x00\x00\x80", pos)
         if idx < 0:
             break
         # Structure: 07 00 00 00  80 <seq_id>  00×15  <GUID 16b>  <seat>  00 00  80  <text \x00>
-        padding = index_data[idx + 6: idx + 21]
+        padding = index_data[idx + 6 : idx + 21]
         if len(padding) == 15 and all(b == 0 for b in padding):
-            guid_bytes = index_data[idx + 21: idx + 37]
+            guid_bytes = index_data[idx + 21 : idx + 37]
 
             if idx + 40 < len(index_data):
                 seat = index_data[idx + 37]
-                two_zeros = index_data[idx + 38: idx + 40]
+                two_zeros = index_data[idx + 38 : idx + 40]
                 marker = index_data[idx + 40]
 
-                if seat in range(1, 10) and two_zeros == b'\x00\x00' and marker == 0x80:
+                if seat in range(1, 10) and two_zeros == b"\x00\x00" and marker == 0x80:
                     text_start = idx + 41
-                    text_end = index_data.find(
-                        b'\x00', text_start, text_start + 64)
+                    text_end = index_data.find(b"\x00", text_start, text_start + 64)
 
                     if text_end > text_start:
-                        text = index_data[text_start:text_end].decode(
-                            'ascii', errors='replace').strip()
+                        text = index_data[text_start:text_end].decode("ascii", errors="replace").strip()
                         try:
                             guid = str(uuid.UUID(bytes_le=guid_bytes)).upper()
                             field = _CREW_FIELD_GUIDS.get(guid)
@@ -871,7 +923,7 @@ def _parse_crew_from_index(index_data: bytes) -> pd.DataFrame:
     records = {}  # keyed by pos_byte, value = dict
     for m in _CREW_RECORD_RE.finditer(index_data):
         pos_byte = m.group(1)[0]
-        after = index_data[m.end(): m.end() + 40]
+        after = index_data[m.end() : m.end() + 40]
 
         # Detect format from the 15 bytes following the mandatory 0x00 separator.
         # Old format: those 15 bytes are all 0x00 (zero-padded), side byte at [15].
@@ -882,21 +934,21 @@ def _parse_crew_from_index(index_data: bytes) -> pd.DataFrame:
 
         nm = _NAME_RE.search(after[side_offset:])
         if nm is not None:
-            name = nm.group(2).decode('ascii', errors='replace').strip()
+            name = nm.group(2).decode("ascii", errors="replace").strip()
         else:
             name = None  # unnamed — will use position label as fallback
 
         # Extract GUID (new format only — stored as Windows mixed-endian bytes_le).
         if is_old_format:
-            guid = ''
+            guid = ""
         else:
             guid_bytes = after[:16]
             guid = str(uuid.UUID(bytes_le=guid_bytes)).upper()
 
         if pos_byte <= 8:
-            side = 'Port' if side_byte == 1 else 'Stbd'
+            side = "Port" if side_byte == 1 else "Stbd"
         else:
-            side = 'Cox'
+            side = "Cox"
 
         # Prefer named records: only overwrite an existing entry if this
         # one has a name (or there is no entry yet).
@@ -905,44 +957,39 @@ def _parse_crew_from_index(index_data: bytes) -> pd.DataFrame:
                 position=int(pos_byte),
                 side=side,
                 guid=guid,
-                name=name if name is not None else f'Seat {int(pos_byte)}',
+                name=name if name is not None else f"Seat {int(pos_byte)}",
             )
 
     if not records:
-        return pd.DataFrame(
-            columns=['position', 'side', 'guid', 'name',
-                     'first_name', 'last_name', 'squad']
-        ).set_index('position')
+        return pd.DataFrame(columns=["position", "side", "guid", "name", "first_name", "last_name", "squad"]).set_index(
+            "position"
+        )
 
     # Merge extended per-seat attributes (first_name, last_name, squad).
     ext = _parse_crew_fields(index_data)
     for pos_byte, rec in records.items():
         seat_fields = ext.get(pos_byte, {})
-        rec['first_name'] = seat_fields.get('first_name', '')
-        rec['last_name'] = seat_fields.get('last_name', '')
-        rec['squad'] = seat_fields.get('squad', '')
+        rec["first_name"] = seat_fields.get("first_name", "")
+        rec["last_name"] = seat_fields.get("last_name", "")
+        rec["squad"] = seat_fields.get("squad", "")
 
-    return (
-        pd.DataFrame(records.values())
-        .sort_values('position')
-        .reset_index(drop=True)
-    ).set_index('position')
+    return (pd.DataFrame(records.values()).sort_values("position").reset_index(drop=True)).set_index("position")
 
 
 def _load_crew(peach_path: str) -> pd.DataFrame:
     """Try to load the crew index file alongside *peach_path*."""
-    idx = re.sub(r'\.peach-data$', '.peach-data-index', str(peach_path))
+    idx = re.sub(r"\.peach-data$", ".peach-data-index", str(peach_path))
     try:
-        with open(idx, 'rb') as f:
+        with open(idx, "rb") as f:
             return _parse_crew_from_index(f.read())
     except FileNotFoundError:
-        return pd.DataFrame(
-            columns=['position', 'side', 'name']).set_index('position')
+        return pd.DataFrame(columns=["position", "side", "name"]).set_index("position")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Alignment / validation
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def check_alignment(parsed: pd.DataFrame, ref: pd.DataFrame):
     """Compute regression statistics between *parsed* and *ref* DataFrames.
@@ -950,17 +997,17 @@ def check_alignment(parsed: pd.DataFrame, ref: pd.DataFrame):
     Returns (calibration_df, missing_columns_index).
     Perfect alignment: slope=1, intercept=0, rvalue=1, rmse=0.
     """
-    ref = ref.drop(_EXPORT_EXTRA_COLS, axis=1, level=0, errors='ignore')
+    ref = ref.drop(_EXPORT_EXTRA_COLS, axis=1, level=0, errors="ignore")
     missing = ref.columns.difference(parsed.columns)
-    p, r = parsed.align(ref, join='inner')
+    p, r = parsed.align(ref, join="inner")
     regs = {}
     for c, v in r.items():
         if v.std() > 0:
-            x, y = v.dropna().align(p[c].dropna(), join='inner')
+            x, y = v.dropna().align(p[c].dropna(), join="inner")
             if len(x):
                 regs[c] = pd.Series(stats.linregress(x, y)._asdict())
-    cal = pd.concat(regs, names=['reference', 'parsed']).unstack()
-    cal['rmse'] = np.square(p - r).mean() ** 0.5
+    cal = pd.concat(regs, names=["reference", "parsed"]).unstack()
+    cal["rmse"] = np.square(p - r).mean() ** 0.5
     return cal, missing
 
 
@@ -996,24 +1043,24 @@ class PeachData:
     """
 
     def __init__(self, path=None):
-        self.path:        str | None = None if path is None else str(path)
-        self.metadata:    dict | None = None
+        self.path: str | None = None if path is None else str(path)
+        self.metadata: dict | None = None
         self.record_locs: dict | None = None
-        self.raw_data:    dict | None = None
-        self.gps:         pd.DataFrame | None = None
-        self.stroke:      pd.DataFrame | None = None
-        self.periodic:    pd.DataFrame | None = None
-        self.crew:        pd.DataFrame | None = None
+        self.raw_data: dict | None = None
+        self.gps: pd.DataFrame | None = None
+        self.stroke: pd.DataFrame | None = None
+        self.periodic: pd.DataFrame | None = None
+        self.crew: pd.DataFrame | None = None
 
     # ── Public factory method ─────────────────────────────────────────────────
 
     @classmethod
-    def from_path(cls, peach_path: str) -> 'PeachData':
+    def from_path(cls, peach_path: str) -> "PeachData":
         """Load a ``.peach-data`` file.  The matching ``.peach-data-index``
         (crew list) is discovered automatically if present.
         """
 
-        with open(peach_path, 'rb') as f:
+        with open(peach_path, "rb") as f:
             raw_bytes = f.read()
 
         bin_u16 = np.frombuffer(raw_bytes, dtype=np.uint16)
@@ -1035,56 +1082,47 @@ class PeachData:
     def _load_from_bin(self, bin_u16):
         self.metadata = _load_header(bin_u16)
         if self.metadata:
-            n_sensors = len(self.metadata['sensors info'])
+            n_sensors = len(self.metadata["sensors info"])
             self.record_locs = _locate_records(bin_u16, n_sensors)
 
         if self.record_locs:
-            self.raw_data = _parse_raw(
-                bin_u16, self.record_locs, self.gps_coords)
-            self.gps, self.stroke, self.periodic = _map_channels(
-                self.raw_data, self.metadata)
+            self.raw_data = _parse_raw(bin_u16, self.record_locs, self.gps_coords)
+            self.gps, self.stroke, self.periodic = _map_channels(self.raw_data, self.metadata)
 
         return self
 
     def add_details(self, names=True, side=True):
         if self.crew is not None:
             crew_list = self.crew.astype(str).rename(index=str)
-            crew_list.loc['Boat'] = pd.Series({
-                'side': 'Boat', 'name': 'Boat'})
+            crew_list.loc["Boat"] = pd.Series({"side": "Boat", "name": "Boat"})
 
-            cols = ['channel', 'name' if names else 'position']
+            cols = ["channel", "name" if names else "position"]
             if side:
-                cols.append('side')
+                cols.append("side")
 
             if self.is_sculling:
+
                 def _add_details(df):
-                    merged = (
-                        df.columns.to_frame(index=False).astype(str)
-                        .join(crew_list, on='position', how='left')
+                    merged = df.columns.to_frame(index=False).astype(str).join(crew_list, on="position", how="left")
+                    merged["side"] = (
+                        merged.channel.str.extract(r"^(P|S)\s")[0].replace({"P": "Port", "S": "Stbd"}).fillna("Boat")
                     )
-                    merged['side'] = (
-                        merged.channel.str.extract(r"^(P|S)\s")[0]
-                        .replace({'P': 'Port', 'S': 'Stbd'})
-                        .fillna('Boat')
-                    )
-                    merged['channel'] = merged.channel.str.replace(
-                        "^(P |S )", "", regex=True)
+                    merged["channel"] = merged.channel.str.replace("^(P |S )", "", regex=True)
 
                     new_df = df.copy(False)
                     new_df.columns = pd.MultiIndex.from_frame(merged[cols])
                     return new_df
 
             else:
+
                 def _add_details(df):
-                    merged = (
-                        df.columns.to_frame(index=False).astype(str)
-                        .join(crew_list, on='position', how='left')
-                    )
+                    merged = df.columns.to_frame(index=False).astype(str).join(crew_list, on="position", how="left")
 
                     new_df = df.copy(False)
                     new_df.columns = pd.MultiIndex.from_frame(merged[cols])
                     return new_df
         else:
+
             def _add_details(x):
                 return x
 
@@ -1105,12 +1143,12 @@ class PeachData:
     # ── Repr ─────────────────────────────────────────────────────────────────
     def __repr__(self):
         if self.metadata is None:
-            return 'PeachData(unloaded)'
+            return "PeachData(unloaded)"
 
         try:
             from rowing import utils
-            duration = utils.format_timedelta_hours(
-                self.duration, hundreths=False)
+
+            duration = utils.format_timedelta_hours(self.duration, hundreths=False)
         except (ImportError, AttributeError):
             duration = self.duration
 
@@ -1125,16 +1163,14 @@ class PeachData:
     @property
     def crew(self):
         if self.metadata:
-
             rig = self.rig
             if self._crew is None:
-                rig['name'] = rig.index
+                rig["name"] = rig.index
                 return rig
 
             crew = self._crew.combine_first(rig)
-            crew['side'] = crew['side'].fillna('Stbd')
-            crew['name'] = crew['name'].combine_first(
-                crew.index.to_series().astype(str))
+            crew["side"] = crew["side"].fillna("Stbd")
+            crew["name"] = crew["name"].combine_first(crew.index.to_series().astype(str))
 
             return crew
 
@@ -1145,21 +1181,18 @@ class PeachData:
     @property
     def rig(self):
         if self.metadata:
-            if 'rig' in self.metadata:
-                return self.metadata['rig'].set_index('position').copy()
+            if "rig" in self.metadata:
+                return self.metadata["rig"].set_index("position").copy()
 
             # fall back
             all_seats = self.all_seats
-            return pd.DataFrame(dict(
-                position=all_seats,
-                side=['Stbd'] * len(all_seats)
-            )).set_index('position')
+            return pd.DataFrame(dict(position=all_seats, side=["Stbd"] * len(all_seats))).set_index("position")
 
     @property
     def oar_type(self):
         if self.metadata:
-            return 'sculling' if self.is_sculling else 'sweep'
-        return ''
+            return "sculling" if self.is_sculling else "sweep"
+        return ""
 
     @property
     def coxed(self):
@@ -1170,17 +1203,17 @@ class PeachData:
     def boat_type(self) -> str:
         if self.metadata:
             nrower = self.seats[-1]
-            mod = '-'
+            mod = "-"
             if self.is_sculling:
-                mod = 'x'
+                mod = "x"
             elif nrower == 8:
-                mod = '+'
+                mod = "+"
             elif len(self.crew) and self.coxed:
-                mod = '+'
+                mod = "+"
 
             return f"{nrower}{mod}"
 
-        return ''
+        return ""
 
     @property
     def id(self):
@@ -1208,14 +1241,14 @@ class PeachData:
     @property
     def duration(self) -> pd.Timedelta:
         if self.gps is not None:
-            return pd.Timedelta(self.gps.index[-1], unit='ms')
+            return pd.Timedelta(self.gps.index[-1], unit="ms")
         return pd.Timedelta(0)
 
     @property
     def date(self) -> pd.Timestamp | None:
         """Session timestamp."""
         if self.metadata:
-            return self.metadata['date']
+            return self.metadata["date"]
 
         return pd.Timestamp(0)
 
@@ -1223,114 +1256,81 @@ class PeachData:
     def gps_coords(self) -> tuple[float, float] | None:
         """GPS initialisation point as ``(latitude_deg, longitude_deg)``."""
         if self.metadata:
-            return tuple(self.metadata['gps_coords'])
+            return tuple(self.metadata["gps_coords"])
 
     @property
     def serial(self) -> int | None:
         if self.metadata:
-            return self.metadata['serial']
+            return self.metadata["serial"]
 
     @property
     def session(self) -> int | None:
         if self.metadata:
-            return self.metadata['session']
+            return self.metadata["session"]
 
     @property
     def details(self) -> pd.DataFrame | None:
         if self.metadata:
-            ks = [
-                'serial', 'session', 'date', 'latitude', 'longitude'
-            ]
-            details = {
-                k: self.metadata[k]
-                for k in ks
-            }
-            details['type'] = self.boat_type
-            details['distance'] = self.distance
-            details['strokes'] = self.n_strokes
-            details['duration'] = self.duration
+            ks = ["serial", "session", "date", "latitude", "longitude"]
+            details = {k: self.metadata[k] for k in ks}
+            details["type"] = self.boat_type
+            details["distance"] = self.distance
+            details["strokes"] = self.n_strokes
+            details["duration"] = self.duration
             crew = (
                 self.crew
                 # .set_index('position')
-                .stack().swaplevel().sort_index()
-                .to_frame().T
+                .stack()
+                .swaplevel()
+                .sort_index()
+                .to_frame()
+                .T
             )
             crew.index = [self.id]
-            return pd.concat([
-                pd.DataFrame.from_dict(
-                    {('Boat', self.id): details}, orient='index'
-                ).unstack(0),
-                crew
-            ], axis=1)
+            return pd.concat([pd.DataFrame.from_dict({("Boat", self.id): details}, orient="index").unstack(0), crew], axis=1)
 
     @property
     def data(self) -> dict[str, pd.DataFrame | None] | None:
         if self.metadata:
-            return dict(
-                details=self.details,
-                params=self.params,
-                gps=self.gps,
-                stroke=self.stroke,
-                periodic=self.periodic
-            )
+            return dict(details=self.details, params=self.params, gps=self.gps, stroke=self.stroke, periodic=self.periodic)
 
     def app_data(self, names=True, with_timings=True):
         from rowing.analysis import files, telemetry
+
         if not self.metadata:
             return {}
 
         detailed = self.add_details(names=names, side=True)
         app_data = {
             # 'power':
-            'details': detailed.details,
-            'Crew Info': detailed.crew,
-            'Rig Info': self.rig
-            .reset_index()
-            .rename(columns=str.title),
-            'Parameter Info': detailed.params
-            .rename_axis('Parameter')
-            .rename(columns={'value': 'Value'})
-            .reset_index(),
-            'Sensor Info': detailed.sensor_table,
+            "details": detailed.details,
+            "Crew Info": detailed.crew,
+            "Rig Info": self.rig.reset_index().rename(columns=str.title),
+            "Parameter Info": detailed.params.rename_axis("Parameter").rename(columns={"value": "Value"}).reset_index(),
+            "Sensor Info": detailed.sensor_table,
         }
-        positions = (
-            detailed.gps.reset_index()
-            .droplevel(1, axis=1)
-            .dropna(subset=['latitude', 'longitude'])
-        )
-        positions['time'] = detailed.date + \
-            pd.to_timedelta(positions.Time, unit='ms')
-        app_data['positions'] = files.process_latlontime(positions)
+        positions = detailed.gps.reset_index().droplevel(1, axis=1).dropna(subset=["latitude", "longitude"])
+        positions["time"] = detailed.date + pd.to_timedelta(positions.Time, unit="ms")
+        app_data["positions"] = files.process_latlontime(positions)
 
-        app_data['Periodic'] = periodic = (
-            detailed.periodic.reset_index()
-            .rename_axis(columns=['channel', 'rower', 'side'])
-        )
-        periodic['timestamp', 'Boat', 'Boat'] = periodic.Time
-        periodic['Time'] = detailed.date + \
-            pd.to_timedelta(periodic.Time, unit='ms')
+        app_data["Periodic"] = periodic = detailed.periodic.reset_index().rename_axis(columns=["channel", "rower", "side"])
+        periodic["timestamp", "Boat", "Boat"] = periodic.Time
+        periodic["Time"] = detailed.date + pd.to_timedelta(periodic.Time, unit="ms")
 
-        power = detailed.stroke.reset_index().rename_axis(
-            columns=['channel', 'rower', 'side'])
-        power['timestamp', 'Boat', 'Boat'] = power.Time
-        power['Time'] = detailed.date + \
-            pd.to_timedelta(power.Time, unit='ms')
+        power = detailed.stroke.reset_index().rename_axis(columns=["channel", "rower", "side"])
+        power["timestamp", "Boat", "Boat"] = power.Time
+        power["Time"] = detailed.date + pd.to_timedelta(power.Time, unit="ms")
 
         if self.is_sculling:
-            rower_power = (
-                power.SwivelPower
-                .xs('Stbd', level=1, axis=1, drop_level=False)
-                + power.SwivelPower
-                .xs('Port', level=1, axis=1, drop_level=True)
+            rower_power = power.SwivelPower.xs("Stbd", level=1, axis=1, drop_level=False) + power.SwivelPower.xs(
+                "Port", level=1, axis=1, drop_level=True
             )
         else:
             rower_power = power.SwivelPower
 
-        app_data['power'] = pd.concat([
-            power, pd.concat({'Rower Swivel Power': rower_power}, axis=1)
-        ], axis=1)
+        app_data["power"] = pd.concat([power, pd.concat({"Rower Swivel Power": rower_power}, axis=1)], axis=1)
         if with_timings:
-            app_data['power'] = telemetry.add_timings(app_data)
+            app_data["power"] = telemetry.add_timings(app_data)
 
         return app_data
 
@@ -1347,10 +1347,7 @@ class PeachData:
                 folder = base / folder
                 folder.mkdir(exist_ok=True, parents=True)
                 if df is not None:
-                    (
-                        df.rename(columns=str)
-                        .to_parquet(folder / f"{self.id}.parquet")
-                    )
+                    (df.rename(columns=str).to_parquet(folder / f"{self.id}.parquet"))
 
         return self
 
@@ -1358,14 +1355,14 @@ class PeachData:
     def sensor_table(self) -> pd.DataFrame | None:
         """Human-readable sensor table (gate sensors first, seat-ascending)."""
         if self.metadata:
-            return self.metadata['sensors info']
+            return self.metadata["sensors info"]
 
     @property
     def seats(self) -> list[int] | None:
         """Sorted list of gate-sensor seat numbers present in this file."""
         if self.metadata:
             st = self.sensor_table
-            return sorted(int(s) for s in st.loc[~st['is_boat'], 'seat'].dropna().unique())
+            return sorted(int(s) for s in st.loc[~st["is_boat"], "seat"].dropna().unique())
 
     @property
     def all_seats(self):
@@ -1376,13 +1373,13 @@ class PeachData:
     def is_sculling(self) -> bool | None:
         """True if this file contains sculling (P/S) gate sensors."""
         if self.metadata:
-            return bool(self.sensor_table['is_scull'].any())
+            return bool(self.sensor_table["is_scull"].any())
 
     @property
     def params(self) -> pd.DataFrame | None:
         """Boat configuration parameters (oar lengths, drive thresholds, …)."""
         if self.metadata:
-            return self.metadata['params'][['value', 'unit']]
+            return self.metadata["params"][["value", "unit"]]
 
     # ── Validation ────────────────────────────────────────────────────────────
 
@@ -1405,17 +1402,16 @@ class PeachData:
         """
         cals, missing_parts = {}, {}
         for key, ref_key in [
-            ('periodic', 'Periodic'),
-            ('gps',      'Aperiodic 0x8013'),
-            ('stroke',   'Aperiodic 0x800A'),
+            ("periodic", "Periodic"),
+            ("gps", "Aperiodic 0x8013"),
+            ("stroke", "Aperiodic 0x800A"),
         ]:
             parsed_df = getattr(self, key)
-            cals[key], missing_parts[key] = check_alignment(
-                parsed_df, ref_data[ref_key])
+            cals[key], missing_parts[key] = check_alignment(parsed_df, ref_data[ref_key])
 
         missing = pd.concat(
             {k: v.to_frame(index=False) for k, v in missing_parts.items()},
-            names=['data'],
+            names=["data"],
         ).reset_index(0)
         return cals, missing
 
@@ -1432,40 +1428,36 @@ def parse_reference_lines(lines, **kws):
     for i, line in enumerate(lines):
         if line.startswith("====="):
             if k:
-                groups[k] = lines[last + 1:i]
+                groups[k] = lines[last + 1 : i]
             k = " ".join(line.strip().split("\t")[1:])
             last = i
-    groups[k] = lines[last + 1:]
+    groups[k] = lines[last + 1 :]
 
     data = {}
     for k, ls in groups.items():
         kwargs = {**kws}
-        if k == 'Rig Info':
-            ls = ['Position\tSide\n'] + ls[2:]
-        elif 'eriodic' in k:
-            kwargs['header'] = list(range(2))
+        if k == "Rig Info":
+            ls = ["Position\tSide\n"] + ls[2:]
+        elif "eriodic" in k:
+            kwargs["header"] = list(range(2))
         if ls:
             data[k] = df = pd.read_table(io.StringIO("".join(ls)), **kwargs)
-        if 'eriodic' in k:
-            unnamed_cols = df.droplevel(
-                axis=1, level=1).filter(regex='Unnamed').columns
+        if "eriodic" in k:
+            unnamed_cols = df.droplevel(axis=1, level=1).filter(regex="Unnamed").columns
             data[k] = (
-                df
-                .drop(unnamed_cols, axis=1, level=0)
-                .rename(
-                    lambda x: x if x in _ALLOWED_POSITIONS else 'Boat', axis=1, level=1
-                )
-                .rename_axis(columns=['channel', 'position'])
-                .set_index(('Time', 'Boat'))
-                .rename_axis(index='Time')
+                df.drop(unnamed_cols, axis=1, level=0)
+                .rename(lambda x: x if x in _ALLOWED_POSITIONS else "Boat", axis=1, level=1)
+                .rename_axis(columns=["channel", "position"])
+                .set_index(("Time", "Boat"))
+                .rename_axis(index="Time")
             )
     return data
 
 
 def parse_reference_file(filepath, **kws):
     if filepath.endswith("peach-data"):
-        filepath = filepath.replace("peach-data", 'txt')
-    with open(filepath, 'r') as f:
+        filepath = filepath.replace("peach-data", "txt")
+    with open(filepath) as f:
         return parse_reference_lines(f.readlines(), **kws)
 
 
@@ -1473,13 +1465,15 @@ def parse_reference_file(filepath, **kws):
 # Quick smoke-test
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def main():
     import sys
-    path = sys.argv[1] if len(sys.argv) > 1 else 'row005235-000119D.peach-data'
+
+    path = sys.argv[1] if len(sys.argv) > 1 else "row005235-000119D.peach-data"
     data = PeachData.from_path(path)
     print(data)
     print(data.details)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

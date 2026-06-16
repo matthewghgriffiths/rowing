@@ -1,52 +1,43 @@
-
-import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import streamlit as st
+
 try:
     from plotly.validators.scatter.marker import SymbolValidator
 except ModuleNotFoundError:
     from plotly.validator_cache import ValidatorCache
-    def SymbolValidator(): return ValidatorCache.get_validator("scatter.marker", "symbol")
 
-from rowing.world_rowing import fields
+    def SymbolValidator():
+        return ValidatorCache.get_validator("scatter.marker", "symbol")
+
+
 from rowing import utils
+from rowing.world_rowing import fields
 
 FORMATS = {
-    "default": {
-        "format": ':.1%'
-    },
+    "default": {"format": ":.1%"},
     "percentage": {
-        "format": ':.1%',
-        "tickformat": ',.1%',
+        "format": ":.1%",
+        "tickformat": ",.1%",
     },
     "time": {
         "format": "|%-M:%S.%L",
         "tickformat": "%-M:%S",
-    }
+    },
 }
 
-SYMBOLS = [
-    s for s in SymbolValidator().values[2::3]
-    if not s.endswith("open") or s.endswith("dot")
-]
+SYMBOLS = [s for s in SymbolValidator().values[2::3] if not s.endswith("open") or s.endswith("dot")]
 
 
 def live_race_plot_data(live_race, *args, **kwargs):
     if live_race.livetracker is None:
         return None
 
-    return melt_livetracker(
-        live_race.livetracker,
-        live_race.lanes.index,
-        live_race.race_distance,
-        **kwargs
-    )
+    return melt_livetracker(live_race.livetracker, live_race.lanes.index, live_race.race_distance, **kwargs)
 
 
-def melt_livetracker(
-        livetracker, lanes=None, race_distance=2000, filter_distance=100
-):
+def melt_livetracker(livetracker, lanes=None, race_distance=2000, filter_distance=100):
     facets = [
         fields.live_raceBoatTracker_distanceFromLeader,
         fields.split,
@@ -54,33 +45,34 @@ def melt_livetracker(
         fields.live_raceBoatTracker_strokeRate,
     ]
     facet_rows = {facet: len(facets) - i for i, facet in enumerate(facets)}
-    index_names = [
-        fields.live_raceBoatTracker_id,
-        fields.raceBoats,
-        fields.live_raceBoatTracker_distanceTravelled
-    ]
+    index_names = [fields.live_raceBoatTracker_id, fields.raceBoats, fields.live_raceBoatTracker_distanceTravelled]
     lanes = livetracker.columns.levels[1] if lanes is None else lanes
 
-    stacked = livetracker.stack(
-        1, future_stack=True
-    ).reindex(
-        pd.MultiIndex.from_product([livetracker.index, lanes])
-    ).droplevel(0).reset_index().dropna(
-        subset=index_names
-    ).set_index(
-        index_names
+    stacked = (
+        livetracker.stack(1, future_stack=True)
+        .reindex(pd.MultiIndex.from_product([livetracker.index, lanes]))
+        .droplevel(0)
+        .reset_index()
+        .dropna(subset=index_names)
+        .set_index(index_names)
     )
 
-    plot_data = stacked[
-        facets
-    ].reset_index().melt(
-        index_names, var_name='facet',
-    ).join(stacked[facets], on=index_names)
+    plot_data = (
+        stacked[facets]
+        .reset_index()
+        .melt(
+            index_names,
+            var_name="facet",
+        )
+        .join(stacked[facets], on=index_names)
+    )
 
     plot_data = fields.to_plotly_dataframe(plot_data.dropna(subset=["value"]))
 
     facet_format, facet_axes, facet_data = facet_properties(
-        plot_data, race_distance=race_distance, filter_distance=filter_distance,
+        plot_data,
+        race_distance=race_distance,
+        filter_distance=filter_distance,
         format={fields.split: "|%-M:%S.%L"},
     )
 
@@ -88,21 +80,13 @@ def melt_livetracker(
 
 
 def select_figure_params():
-    fig_height = st.number_input(
-        "plot size", 10, 2_000, 1000
-    )
+    fig_height = st.number_input("plot size", 10, 2_000, 1000)
     fig_autosize = st.checkbox("autosize plot")
 
     params = {}
-    params['layout'] = layout = {}
+    params["layout"] = layout = {}
 
-    layout['legend'] = dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="right",
-        x=1
-    )
+    layout["legend"] = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     if fig_autosize:
         layout["autosize"] = True
     else:
@@ -112,7 +96,11 @@ def select_figure_params():
 
 
 def update_figure(
-    fig, layout=None, xaxes=None, yaxes=None, annotations=None,
+    fig,
+    layout=None,
+    xaxes=None,
+    yaxes=None,
+    annotations=None,
 ):
     if fig is None:
         return None
@@ -129,9 +117,7 @@ def update_figure(
     return fig
 
 
-def make_plots(
-    fig_data, *args, **kwargs
-):
+def make_plots(fig_data, *args, **kwargs):
     if fig_data is None:
         return None
 
@@ -139,7 +125,7 @@ def make_plots(
     fig = px.line(
         plot_data,
         x=fields.live_raceBoatTracker_distanceTravelled,
-        y='value',
+        y="value",
         color=fields.raceBoats,
         facet_row="facet",
         category_orders={
@@ -162,24 +148,27 @@ def melt_livetracker_times(live_data, filter_distance=100):
             fields.split,
             fields.avg_split,
         ]
-    ).melt([
-        fields.live_time,
-        fields.live_raceBoatTracker_distanceTravelled,
-        fields.raceBoats,
-        fields.boatClass,
-        fields.live_raceId,
-        fields.race_distance,
-    ], var_name='facet')
-    plot_data[fields.crew] = (
-        plot_data[fields.raceBoats] + " " + plot_data[fields.boatClass])
+    ).melt(
+        [
+            fields.live_time,
+            fields.live_raceBoatTracker_distanceTravelled,
+            fields.raceBoats,
+            fields.boatClass,
+            fields.live_raceId,
+            fields.race_distance,
+        ],
+        var_name="facet",
+    )
+    plot_data[fields.crew] = plot_data[fields.raceBoats] + " " + plot_data[fields.boatClass]
     plot_data = plot_data.merge(
-        live_data, on=[
+        live_data,
+        on=[
             fields.live_time,
             fields.live_raceBoatTracker_distanceTravelled,
             fields.raceBoats,
             fields.live_raceId,
         ],
-        suffixes=("", "_1")
+        suffixes=("", "_1"),
     )
 
     facet_format, facet_axes, facet_data = facet_properties(
@@ -188,10 +177,10 @@ def melt_livetracker_times(live_data, filter_distance=100):
         filter_distance=filter_distance,
         format={
             fields.avg_speed: ":0.2f",
-            'Speed': ":0.2f",
+            "Speed": ":0.2f",
             fields.distance_from_paceboat: ":0.1f",
-            fields.PGMT: ':.1%',
-            fields.PGMT_paceboat: ':.1%',
+            fields.PGMT: ":.1%",
+            fields.PGMT_paceboat: ":.1%",
             fields.GMT: "|%-M:%S.%L",
             fields.split: "|%-M:%S.%L",
             fields.avg_split: "|%-M:%S.%L",
@@ -202,19 +191,11 @@ def melt_livetracker_times(live_data, filter_distance=100):
     return plot_data, facet_axes, facet_format
 
 
-def facet_properties(
-    plot_data, filter_distance=100, race_distance=2000, quantile=0.2,
-    format=None, axes=None
-):
+def facet_properties(plot_data, filter_distance=100, race_distance=2000, quantile=0.2, format=None, axes=None):
 
     distance_travelled = plot_data[fields.live_raceBoatTracker_distanceTravelled]
-    filter_distance = min(
-        distance_travelled.quantile(quantile), filter_distance)
-    filter = (
-        (distance_travelled > filter_distance)
-        & (distance_travelled < race_distance)
-        & plot_data.facet.notnull()
-    )
+    filter_distance = min(distance_travelled.quantile(quantile), filter_distance)
+    filter = (distance_travelled > filter_distance) & (distance_travelled < race_distance) & plot_data.facet.notnull()
     if not filter.any():
         facet_groups = plot_data.groupby("facet")
     else:
@@ -226,11 +207,20 @@ def facet_properties(
     facet_max = facet_groups.value.max()[facets]
     facet_min = facet_groups.value.min()[facets]
     facet_ptp = facet_max - facet_min
-    facet_data = pd.concat(
-        [facet_min - facet_ptp*0.1, facet_max + facet_ptp*0.1, ],
-        axis=1).apply(tuple, axis=1).rename("range").to_frame()
-    facet_data['matches'] = None
-    facet_data['title_text'] = facet_data.index
+    facet_data = (
+        pd.concat(
+            [
+                facet_min - facet_ptp * 0.1,
+                facet_max + facet_ptp * 0.1,
+            ],
+            axis=1,
+        )
+        .apply(tuple, axis=1)
+        .rename("range")
+        .to_frame()
+    )
+    facet_data["matches"] = None
+    facet_data["title_text"] = facet_data.index
 
     facet_format = {f: True for f in facets}
 
@@ -241,13 +231,13 @@ def facet_properties(
     for facet in facet_axes:
         fmt = facet_format[facet]
         if fmt is not True:
-            facet_axes[facet]['tickformat'] = fmt
+            facet_axes[facet]["tickformat"] = fmt
 
-    facet_axes.setdefault(fields.PGMT, {})['tickformat'] = ',.1%'
-    facet_axes.setdefault(fields.PGMT_paceboat, {})['tickformat'] = ',.1%'
-    facet_axes.setdefault(fields.split, {})['tickformat'] = "%-M:%S"
-    facet_axes.setdefault(fields.avg_split, {})['tickformat'] = "%-M:%S"
-    facet_axes.setdefault(fields.lane_ResultTime, {})['tickformat'] = "%-M:%S"
+    facet_axes.setdefault(fields.PGMT, {})["tickformat"] = ",.1%"
+    facet_axes.setdefault(fields.PGMT_paceboat, {})["tickformat"] = ",.1%"
+    facet_axes.setdefault(fields.split, {})["tickformat"] = "%-M:%S"
+    facet_axes.setdefault(fields.avg_split, {})["tickformat"] = "%-M:%S"
+    facet_axes.setdefault(fields.lane_ResultTime, {})["tickformat"] = "%-M:%S"
 
     for col in [
         fields.distance_from_paceboat,
@@ -256,8 +246,8 @@ def facet_properties(
         fields.split,
         fields.avg_split,
     ]:
-        if col in facet_axes and 'range' in facet_axes[col]:
-            facet_axes[col]['range'] = facet_axes[col]['range'][::-1]
+        if col in facet_axes and "range" in facet_axes[col]:
+            facet_axes[col]["range"] = facet_axes[col]["range"][::-1]
 
     if axes:
         facet_axes.update(axes)
@@ -266,8 +256,7 @@ def facet_properties(
 
 
 def make_livetracker_plot(
-    facets, plot_data, facet_axes, facet_format,
-    facet_row_spacing=0.01, height=1000, width=800, **kwargs
+    facets, plot_data, facet_axes, facet_format, facet_row_spacing=0.01, height=1000, width=800, **kwargs
 ):
     facet_rows = {facet: len(facets) - i for i, facet in enumerate(facets)}
     fig = px.line(
@@ -283,16 +272,10 @@ def make_livetracker_plot(
         facet_row_spacing=facet_row_spacing,
         height=height,
         width=width,
-        **kwargs
+        **kwargs,
     )
 
-    fig.update_layout(legend=dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="right",
-        x=1
-    ))
+    fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
 
     fig.update_annotations(text="")
     for facet, row in facet_rows.items():
@@ -308,14 +291,10 @@ def show_intermediates(intermediates):
         index=[fields.Time],
         columns=inter_pos.columns,
     )
-    inter_time = fields.to_streamlit_dataframe(
-        intermediates[fields.intermediates_ResultTime]
-    )
+    inter_time = fields.to_streamlit_dataframe(intermediates[fields.intermediates_ResultTime])
     inters = pd.concat([inter_pos, row, inter_time], axis=0)
-    inters.index.name = 'Rank'
-    st.dataframe(
-        inters, use_container_width=True
-    )
+    inters.index.name = "Rank"
+    st.dataframe(inters, use_container_width=True)
 
 
 def show_lane_info(lane_info):
@@ -323,15 +302,22 @@ def show_lane_info(lane_info):
     dist_col = fields.lane_currentPoint_raceBoatTracker_distanceTravelled
     pos_col = fields.lane_currentPoint_raceBoatTracker_currentPosition
     rate_col = fields.lane_currentPoint_raceBoatTracker_strokeRate
-    lane_info = lane_info[[
-        fields.lane_Lane,
-        # pos_col,
-        dist_col,
-        fields.lane_currentPoint_raceBoatTracker_strokeRate,
-        speed_col,
-    ]].sort_values(fields.lane_Lane).copy()
+    lane_info = (
+        lane_info[
+            [
+                fields.lane_Lane,
+                # pos_col,
+                dist_col,
+                fields.lane_currentPoint_raceBoatTracker_strokeRate,
+                speed_col,
+            ]
+        ]
+        .sort_values(fields.lane_Lane)
+        .copy()
+    )
     lane_info[fields.split] = pd.to_timedelta(
-        500 / lane_info[speed_col].replace(0, np.nan), unit='s',
+        500 / lane_info[speed_col].replace(0, np.nan),
+        unit="s",
     ) + pd.Timestamp(0)
     st.dataframe(
         lane_info,
@@ -342,37 +328,23 @@ def show_lane_info(lane_info):
             "Lane": st.column_config.TextColumn(
                 width="small",
             ),
-            pos_col: st.column_config.ProgressColumn(
-                pos_col,
-                min_value=0,
-                max_value=len(lane_info),
-                format="%d"
-            ),
+            pos_col: st.column_config.ProgressColumn(pos_col, min_value=0, max_value=len(lane_info), format="%d"),
             speed_col: st.column_config.ProgressColumn(
                 speed_col,
-                help='Metre Per Second',
+                help="Metre Per Second",
                 min_value=float(lane_info[speed_col].min()) - 0.1,
                 max_value=float(lane_info[speed_col].max()),
-                format="%.1f"
+                format="%.1f",
             ),
             dist_col: st.column_config.ProgressColumn(
-                dist_col,
-                min_value=int(lane_info[dist_col].min()) - 1,
-                max_value=int(lane_info[dist_col].max()),
-                format="%d"
+                dist_col, min_value=int(lane_info[dist_col].min()) - 1, max_value=int(lane_info[dist_col].max()), format="%d"
             ),
             rate_col: st.column_config.ProgressColumn(
-                rate_col,
-                min_value=int(lane_info[rate_col].min()) - 1,
-                max_value=int(lane_info[rate_col].max()),
-                format="%d"
+                rate_col, min_value=int(lane_info[rate_col].min()) - 1, max_value=int(lane_info[rate_col].max()), format="%d"
             ),
-            fields.split: st.column_config.TimeColumn(
-                fields.split,
-                format="m:ss"
-            ),
+            fields.split: st.column_config.TimeColumn(fields.split, format="m:ss"),
         },
-        use_container_width=True
+        use_container_width=True,
     )
 
 
@@ -388,18 +360,11 @@ def show_lane_intermediates(lane_info, intermediates):
                     except:
                         return ""
 
-                st.dataframe(
-                    intermediates[fields.intermediates_Rank].map(
-                        to_int_str),
-                    use_container_width=True
-                )
+                st.dataframe(intermediates[fields.intermediates_Rank].map(to_int_str), use_container_width=True)
 
             if fields.intermediates_ResultTime in intermediates:
                 st.markdown("#### Intermediate time")
-                show_intermediates(
-                    intermediates[fields.intermediates_ResultTime],
-                    use_container_width=True
-                )
+                show_intermediates(intermediates[fields.intermediates_ResultTime], use_container_width=True)
                 # st.dataframe(
                 #     fields.to_streamlit_dataframe(
                 #         intermediates[fields.intermediates_ResultTime]
@@ -407,7 +372,7 @@ def show_lane_intermediates(lane_info, intermediates):
                 #     use_container_width=True
                 # )
 
-        if lane_info is not None and lane_info.size and 'Speed' in lane_info.columns:
+        if lane_info is not None and lane_info.size and "Speed" in lane_info.columns:
             st.markdown("#### Live data")
             show_lane_info(lane_info)
 
@@ -416,18 +381,12 @@ def show_lane_intermediates(lane_info, intermediates):
     #         show_intermediates(intermediates)
 
 
-def highlight_min(s, props=''):
-    return np.where(s == np.nanmin(s.values), props, '')
+def highlight_min(s, props=""):
+    return np.where(s == np.nanmin(s.values), props, "")
 
 
 def show_intermediates(inter_times, **kwargs):
     st.dataframe(
-        inter_times.style.apply(
-            highlight_min,
-            props='background-color:#e6ffe6',
-            axis=1
-        ).format(
-            utils.format_timedelta
-        ),
-        **kwargs
+        inter_times.style.apply(highlight_min, props="background-color:#e6ffe6", axis=1).format(utils.format_timedelta),
+        **kwargs,
     )

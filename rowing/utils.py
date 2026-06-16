@@ -1,30 +1,26 @@
-
-import sys
+import json
 import logging
-from typing import Callable, Dict, TypeVar, Tuple, Any, Optional
+import queue
+import sys
+import threading
+import traceback
+from collections.abc import Callable
+from concurrent.futures import ALL_COMPLETED, FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from contextlib import nullcontext
 from datetime import timedelta
-import json
-from functools import lru_cache, cached_property
-from pathlib import Path
-import threading
-import queue
+from functools import cached_property, lru_cache, wraps
 from multiprocessing import Process, Queue
-from functools import wraps
-import traceback
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple, TypeVar
 
-from concurrent.futures import (
-    ThreadPoolExecutor, as_completed,
-    wait, FIRST_COMPLETED, ALL_COMPLETED
-)
 try:
     from concurrent.futures import ProcessPoolExecutor
 except ModuleNotFoundError:
     ProcessPoolExecutor = None
 
-from tqdm.auto import tqdm
-import pandas as pd
 import numpy as np
+import pandas as pd
+from tqdm.auto import tqdm
 
 _pyodide = "pyodide" in sys.modules
 
@@ -37,14 +33,7 @@ def interpolate_datetime(s, index, **kwargs):
 
 
 def interpolate_timedelta(s, index, **kwargs):
-    return pd.Series(
-        pd.to_timedelta(
-            np.interp(
-                index, s.index, s.dt.total_seconds(), **kwargs
-            ),
-            unit='s'),
-        index
-    )
+    return pd.Series(pd.to_timedelta(np.interp(index, s.index, s.dt.total_seconds(), **kwargs), unit="s"), index)
 
 
 def interpolate_series(s, index, **kwargs):
@@ -57,7 +46,7 @@ def interpolate_series(s, index, **kwargs):
     if pd.api.types.is_datetime64_any_dtype(s.index):
         i0 = s.index[0]
         s0 = s.copy()
-        s0.index = (s.index - i0)
+        s0.index = s.index - i0
         x0 = pd.DatetimeIndex(index) - i0
         si = interpolate_series(s0, x0, **kwargs)
         si.index = index0
@@ -72,7 +61,7 @@ def interpolate_series(s, index, **kwargs):
         elif pd.api.types.is_timedelta64_dtype(s):
             si = interpolate_timedelta(s, index, **kwargs)
         elif pd.api.types.is_object_dtype(s):
-            i = np.clip(s.index.get_indexer_for(index), 0, s.index.size-1)
+            i = np.clip(s.index.get_indexer_for(index), 0, s.index.size - 1)
             si = pd.Series(s[i].values, index, **kwargs)
         else:
             si = pd.Series(np.interp(x, s.index, s, **kwargs))
@@ -93,13 +82,12 @@ def initials(name):
 @lru_cache
 def load_gsheet(sheet):
     from gspread_pandas import Spread
+
     return Spread(sheet)
 
 
 def to_gspread(
-    df, spread, sheet_name="Sheet1",
-    index=True, header=True, merge_cells=True, freeze=True,
-    max_workers=4, **kwargs
+    df, spread, sheet_name="Sheet1", index=True, header=True, merge_cells=True, freeze=True, max_workers=4, **kwargs
 ):
     spread = load_gsheet(spread)
     n_index = int(index)
@@ -116,74 +104,47 @@ def to_gspread(
             flat_df = flat_df.T.reset_index().T
 
         spread.unmerge_cells(sheet=sheet_name)
-        spread.df_to_sheet(
-            flat_df, index=False, headers=False, **kwargs
-        )
+        spread.df_to_sheet(flat_df, index=False, headers=False, **kwargs)
         n_index = n_index and df.index.nlevels
         n_header = n_header and df.columns.nlevels
         merge_groups = []
         if index:
             merge_groups += [
                 (
-                    (merge_group['row'], merge_group['col']),
-                    (merge_group['mergestart'], merge_group['mergeend']),
-                ) for merge_group in _to_merge_index(df.index, rowstart, 1)
-                if merge_group['mergeend'] and merge_group['mergestart']
+                    (merge_group["row"], merge_group["col"]),
+                    (merge_group["mergestart"], merge_group["mergeend"]),
+                )
+                for merge_group in _to_merge_index(df.index, rowstart, 1)
+                if merge_group["mergeend"] and merge_group["mergestart"]
             ]
         if header:
             merge_groups += [
                 (
-                    (merge_group['col'], merge_group['row']),
-                    (merge_group['mergeend'], merge_group['mergestart']),
-                ) for merge_group in _to_merge_index(df.columns, n_index + 1, 1)
-                if merge_group['mergeend'] and merge_group['mergestart']
+                    (merge_group["col"], merge_group["row"]),
+                    (merge_group["mergeend"], merge_group["mergestart"]),
+                )
+                for merge_group in _to_merge_index(df.columns, n_index + 1, 1)
+                if merge_group["mergeend"] and merge_group["mergestart"]
             ]
 
         if merge_groups:
-            map_concurrent(
-                spread.merge_cells, merge_groups, sheet=sheet_name, max_workers=max_workers)
+            map_concurrent(spread.merge_cells, merge_groups, sheet=sheet_name, max_workers=max_workers)
     else:
-        spread.df_to_sheet(
-            df, index=index, headers=header, sheet=sheet_name, **kwargs
-        )
+        spread.df_to_sheet(df, index=index, headers=header, sheet=sheet_name, **kwargs)
 
     if freeze:
-        spread.freeze(
-            cols=n_index,
-            rows=n_header,
-            sheet=sheet_name
-        )
+        spread.freeze(cols=n_index, rows=n_header, sheet=sheet_name)
 
     sheet = spread.find_sheet(sheet_name)
 
     if kwargs.get("replace"):
         sheet.format(
             to_a1_notation(1, 1, *spread.get_sheet_dims(sheet_name)),
-            {
-                "verticalAlignment": "BOTTOM",
-                "horizontalAlignment": "LEFT",
-                "textFormat": {
-                    "bold": False
-                }
-            }
+            {"verticalAlignment": "BOTTOM", "horizontalAlignment": "LEFT", "textFormat": {"bold": False}},
         )
+    sheet.format(to_a1_notation(1, 1, n_header + len(df), n_index), {"verticalAlignment": "TOP", "textFormat": {"bold": True}})
     sheet.format(
-        to_a1_notation(1, 1, n_header + len(df), n_index),
-        {
-            "verticalAlignment": "TOP",
-            "textFormat": {
-                "bold": True
-            }
-        }
-    )
-    sheet.format(
-        to_a1_notation(1, 1, n_header, df.shape[1] + n_index),
-        {
-            "horizontalAlignment": "CENTER",
-            "textFormat": {
-                "bold": True
-            }
-        }
+        to_a1_notation(1, 1, n_header, df.shape[1] + n_index), {"horizontalAlignment": "CENTER", "textFormat": {"bold": True}}
     )
     return spread
 
@@ -195,19 +156,14 @@ def read_gspread(sheet, sheet_name="Sheet1", **kwargs):
 
 def _to_merge_index(index, rowcounter=0, gcolidx=0):
     import pandas as pd
+
     if not isinstance(index, pd.MultiIndex):
         index = pd.MultiIndex.from_product([index])
 
-    level_strs = index.format(
-        sparsify=True, adjoin=False, names=False
-    )
-    level_lengths = pd.io.formats.format.get_level_lengths(
-        level_strs
-    )
+    level_strs = index.format(sparsify=True, adjoin=False, names=False)
+    level_lengths = pd.io.formats.format.get_level_lengths(level_strs)
 
-    for lnum, (spans, levels, level_codes) in enumerate(
-        zip(level_lengths, index.levels, index.codes)
-    ):
+    for lnum, (spans, levels, level_codes) in enumerate(zip(level_lengths, index.levels, index.codes)):
         values = levels.take(
             level_codes,
             allow_fill=levels._can_hold_na,
@@ -264,7 +220,7 @@ def format_timedelta(td, hours=False, hundreths=True):
         # return ("--:" if hours else '') + "--:--" + ('' if hundreths else ".--")
 
     secs = int(secs)
-    end = f".{(td.microseconds // 10_000):02d}" if hundreths else ''
+    end = f".{(td.microseconds // 10_000):02d}" if hundreths else ""
     if hours:
         hs, mins = divmod(mins, 60)
         return f"{hs:02d}:{mins:02d}:{secs:02d}{end}"
@@ -279,15 +235,18 @@ def format_timedelta_hours(td, hundreths=True):
 def format_series_timedelta(s):
     na_vals = s.isna()
     components = s.fillna(pd.Timedelta(0)).dt.components
-    components['hundredths'] = components.milliseconds // 10
+    components["hundredths"] = components.milliseconds // 10
     components = components.astype(str)
     times = (
-        components.hours + ":"
+        components.hours
+        + ":"
         + components.minutes.str.zfill(2)
-        + ":" + components.seconds.str.zfill(2)
-        + "." + components.hundredths.str.zfill(2)
+        + ":"
+        + components.seconds.str.zfill(2)
+        + "."
+        + components.hundredths.str.zfill(2)
     )
-    times[na_vals] = ''
+    times[na_vals] = ""
     return times
 
 
@@ -299,14 +258,10 @@ def format_gsheet(df, index=True, columns=True):
             gsheet[c] = format_series_timedelta(col)
 
     if index:
-        gsheet.index = pd.MultiIndex.from_frame(format_gsheet(
-            df.index.to_frame(), index=False, columns=False
-        ))
+        gsheet.index = pd.MultiIndex.from_frame(format_gsheet(df.index.to_frame(), index=False, columns=False))
 
     if columns:
-        gsheet.columns = pd.MultiIndex.from_frame(format_gsheet(
-            df.columns.to_frame(), index=False, columns=False
-        ))
+        gsheet.columns = pd.MultiIndex.from_frame(format_gsheet(df.columns.to_frame(), index=False, columns=False))
 
     return gsheet
 
@@ -321,90 +276,87 @@ def format_xaxis_splits(ax=None, ticks=True, hundreths=False):
 
 def format_axis_splits(ax=None, yticks=True, xticks=False, hundreths=False):
     import matplotlib.pyplot as plt
+
     ax = ax or plt.gca()
     if yticks:
         if yticks is True:
             yticks = ax.get_yticks()
         ax.set_yticks(yticks)
-        ax.set_yticklabels(
-            [format_totalseconds(s, hundreths) for s in yticks]
-        )
+        ax.set_yticklabels([format_totalseconds(s, hundreths) for s in yticks])
     if xticks:
         if xticks is True:
             xticks = ax.get_xticks()
         ax.set_xticks(xticks)
-        ax.set_xticklabels(
-            [format_totalseconds(s, hundreths) for s in xticks]
-        )
+        ax.set_xticklabels([format_totalseconds(s, hundreths) for s in xticks])
 
 
 K = TypeVar("K")
-A = TypeVar('A')
-V = TypeVar('V')
+A = TypeVar("A")
+V = TypeVar("V")
 
 
 def map_concurrent(
     func: Callable[..., V],
-    inputs: Dict[K, Tuple],
+    inputs: dict[K, tuple],
     threaded: bool = True,
     max_workers: int = 10,
     progress_bar=tqdm,
     singleton: bool = False,
-    total: Optional[int] = None,
+    total: int | None = None,
     raise_on_err: bool = False,
-    executor_kws: Optional[dict] = None,
+    executor_kws: dict | None = None,
     **kwargs,
-) -> Tuple[Dict[K, V], Dict[K, Exception]]:
+) -> tuple[dict[K, V], dict[K, Exception]]:
     """
-    This function is equalivant to calling,
+        This function is equalivant to calling,
 
-    >>> output = {k: func(*args, **kwargs) for k, args in inputs.items()}
+        >>> output = {k: func(*args, **kwargs) for k, args in inputs.items()}
 
-    except that the function is called using either `ThreadPoolExecutor`
-    if `threaded=True` or a `ProcessPoolExecutor` otherwise.
+        except that the function is called using either `ThreadPoolExecutor`
+        if `threaded=True` or a `ProcessPoolExecutor` otherwise.
 
-    The function returns a tuple of `(output, errors)` where errors returns
-    the errors that happened during the calling of any of the functions. So
-    the function will run all the other work before
+        The function returns a tuple of `(output, errors)` where errors returns
+        the errors that happened during the calling of any of the functions. So
+        the function will run all the other work before
 
-    The function also generates a status bar indicating the progress of the
-    computation.
+        The function also generates a status bar indicating the progress of the
+        computation.
 
-    Alternatively if `raise_on_err=True` then the function will reraise the
-    same error.
+        Alternatively if `raise_on_err=True` then the function will reraise the
+        same error.
 
-    Examples
-    --------
-    >>> import time
-    >>> def do_work(arg):
-    ...     time.sleep(0.5)
-    ...     return arg
-    >>> inputs = {i: (i,) for i in range(20)}
-    >>> output, errors = map_concurrent(do_work, inputs)
-    100%|███████████████████| 20/20 [00:01<00:00, 19.85it/s, completed=18]
-    >>> len(output), len(errors)
-    (20, 0)
+        Examples
+        --------
+        >>> import time
+        >>> def do_work(arg):
+        ...     time.sleep(0.5)
+        ...     return arg
+        >>> inputs = {i: (i,) for i in range(20)}
+        >>> output, errors = map_concurrent(do_work, inputs)
+        100%|███████████████████| 20/20 [00:01<00:00, 19.85it/s, completed=18]
+        >>> len(output), len(errors)
+        (20, 0)
 
-    >>> def do_work2(arg):
-    ...     time.sleep(0.5)
-    ...     if arg == 5:
-    ...         raise(ValueError('something went wrong'))
-    ...     return arg
-    >>> output, errors = map_concurrent(do_work2, inputs)
-    100%|████████| 20/20 [00:01<00:00, 19.86it/s, completed=18, nerrors=1]
-    >>> len(output), len(errors)
-    (19, 1)
-    >>> errors
-{5: ValueError('something went wrong')}
+        >>> def do_work2(arg):
+        ...     time.sleep(0.5)
+        ...     if arg == 5:
+        ...         raise(ValueError('something went wrong'))
+        ...     return arg
+        >>> output, errors = map_concurrent(do_work2, inputs)
+        100%|████████| 20/20 [00:01<00:00, 19.86it/s, completed=18, nerrors=1]
+        >>> len(output), len(errors)
+        (19, 1)
+        >>> errors
+    {5: ValueError('something went wrong')}
 
-    >>> try:
-    ...     output, errors = map_concurrent(
-    ...         do_work2, inputs, raise_on_err=True)
-    ... except ValueError:
-    ...     print("task failed successfully!")
-    ...
-    45%|█████████▍           | 9/20 [00:00<00:00, 17.71it/s, completed=5]
-    task failed!
+        >>> try:
+        ...     output, errors = map_concurrent(
+        ...         do_work2, inputs, raise_on_err=True)
+        ... except ValueError:
+        ...     print("task failed successfully!")
+        ...
+        45%|█████████▍           | 9/20 [00:00<00:00, 17.71it/s, completed=5]
+        task failed!
     """
     output = {}
     errors = {}
@@ -422,22 +374,19 @@ def map_concurrent(
         items = inputs
 
     if singleton:
+
         def get(args):
-            return args,
+            return (args,)
     else:
+
         def get(args):
             return args
 
-    pbar = progress_bar(
-        total=total or len(items)
-    ) if progress_bar else nullcontext()
+    pbar = progress_bar(total=total or len(items)) if progress_bar else nullcontext()
     with pbar, Executor(max_workers=max_workers, **(executor_kws or {})) as executor:
-        work = {
-            executor.submit(func, *get(args), **kwargs): k
-            for k, args in items
-        }
+        work = {executor.submit(func, *get(args), **kwargs): k for k, args in items}
 
-        status: Dict[str, Any] = {}
+        status: dict[str, Any] = {}
         for future in as_completed(work):
             status["completed"] = key = work[future]
             if progress_bar:
@@ -462,16 +411,16 @@ def map_concurrent(
 
 class WorkQueue:
     """
-    A Work Queue to allow straightforward multithreading. calling 
+    A Work Queue to allow straightforward multithreading. calling
 
     `WorkQueue(executor, queue_size=5).run(func, work)`
 
-    is broadly equivalent to generating an iterator, 
+    is broadly equivalent to generating an iterator,
 
     `((func(*args), *args) for args in work)`
 
-    except the iterator of the WorkQueue returns the work out of order. 
-    multiple work queues can be created which pass their results together. 
+    except the iterator of the WorkQueue returns the work out of order.
+    multiple work queues can be created which pass their results together.
 
     passing queue_size > 0 caps the maximum number of jobs the work queue
     will allow to be simultaneously running
@@ -495,7 +444,7 @@ class WorkQueue:
     queue_size = 10
     work = [(i,) for i in range(5)]
     start = time.time()
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         queue1 = WorkQueue(executor, queue_size=queue_size).run(func1, work)
         queue2 = WorkQueue(executor, queue_size=queue_size).run(func2, queue1)
         queue3 = WorkQueue(executor, queue_size=queue_size).run(func3, queue2)
@@ -556,22 +505,21 @@ class WorkQueue:
 
     def run(self, func, work, **kwargs):
         """
-        equivalent to creating a generator, 
+        equivalent to creating a generator,
 
         `((func(*args, **kwargs), *args) for args in work)`
 
         Except that the generator returns values as they are calculated
         """
         self.running = True
-        self.work_thread = threading.Thread(
-            target=self._consume, args=(func, work), kwargs=kwargs)
+        self.work_thread = threading.Thread(target=self._consume, args=(func, work), kwargs=kwargs)
         self.work_thread.start()
         return self
 
     def join(self, timeout=None):
         """
         Calling WorkQueue(executor).run(func, work).join() will block until
-        all the jobs sent to executor to complete 
+        all the jobs sent to executor to complete
         """
         self.work_thread.join(timeout)
         wait(self.queue, return_when=ALL_COMPLETED)
@@ -596,17 +544,17 @@ class WorkQueue:
 
 def _map_singlethreaded(
     func: Callable[..., V],
-    inputs: Dict[K, Tuple],
+    inputs: dict[K, tuple],
     threaded: bool = True,
     max_workers: int = 10,
     progress_bar=tqdm,
     raise_on_err: bool = False,
     **kwargs,
-) -> Tuple[Dict[K, V], Dict[K, Exception]]:
+) -> tuple[dict[K, V], dict[K, Exception]]:
     output = {}
     errors = {}
 
-    status: Dict[str, Any] = {}
+    status: dict[str, Any] = {}
     pbar = progress_bar(total=len(inputs)) if progress_bar else nullcontext()
     with pbar:
         for key, args in inputs.items():
@@ -618,7 +566,7 @@ def _map_singlethreaded(
                 else:
                     logging.warning(f"{key} experienced error {exc}")
                     errors[key] = exc
-                    status['nerrors'] = len(errors)
+                    status["nerrors"] = len(errors)
 
             if pbar:
                 pbar.update(1)
@@ -633,7 +581,7 @@ if _pyodide:
 
 def cached_map_concurrent(
     func: Callable[..., V],
-    inputs: Dict[K, Tuple],
+    inputs: dict[K, tuple],
     singleton: bool = False,
     local_cache: Optional["LocalCache"] = None,
     path=".",
@@ -642,9 +590,7 @@ def cached_map_concurrent(
 ):
     if local_cache is None:
         logger.debug("no cache for %r", func)
-        return map_concurrent(
-            func, inputs, **kwargs
-        )
+        return map_concurrent(func, inputs, **kwargs)
 
     if isinstance(inputs, dict):
         items = inputs.items()
@@ -656,9 +602,11 @@ def cached_map_concurrent(
     total = total or len(items)
 
     if singleton:
+
         def get(args):
-            return args,
+            return (args,)
     else:
+
         def get(args):
             return args
 
@@ -669,9 +617,7 @@ def cached_map_concurrent(
 
     cached_inputs = ((k, (k, *get(args))) for k, args in items)
 
-    output, errors = map_concurrent(
-        cached_func, cached_inputs, total=total, **kwargs
-    )
+    output, errors = map_concurrent(cached_func, cached_inputs, total=total, **kwargs)
 
     if isinstance(inputs, list):
         output = [output.get(i, None) for i in range(len(inputs))]
@@ -680,10 +626,7 @@ def cached_map_concurrent(
 
 
 class LocalCache:
-    def __init__(
-        self, serialise, deserialise, file_ending,
-        read_mode=None, write_mode=None
-    ):
+    def __init__(self, serialise, deserialise, file_ending, read_mode=None, write_mode=None):
         self._serialise = serialise
         self._deserialise = deserialise
         self.file_ending = file_ending
@@ -733,22 +676,13 @@ class LocalCache:
             return self._deserialise(obj_path, **kwargs)
 
 
-parquet_cache = LocalCache(
-    pd.DataFrame.to_parquet,
-    pd.read_parquet,
-    "parquet"
-)
+parquet_cache = LocalCache(pd.DataFrame.to_parquet, pd.read_parquet, "parquet")
 
-json_cache = LocalCache(
-    json.dump, json.load, "json", "r", "w"
-)
+json_cache = LocalCache(json.dump, json.load, "json", "r", "w")
 
 
 class CachedClient:
-    def __init__(
-        self, username=None, password=None, path=None,
-        local_cache: Optional[LocalCache] = None, map_kws=None
-    ):
+    def __init__(self, username=None, password=None, path=None, local_cache: LocalCache | None = None, map_kws=None):
         self.username = username
         self.password = password
         self.path = Path(path).resolve()
@@ -758,7 +692,7 @@ class CachedClient:
     @classmethod
     def from_credentials(cls, credentials, **kwargs):
         if not isinstance(credentials, dict):
-            with open(credentials, 'r') as f:
+            with open(credentials) as f:
                 credentials = json.load(f)
 
         return cls(**credentials, **kwargs)
@@ -771,22 +705,19 @@ class CachedClient:
         path = path or self.path
         if local_cache:
             if reload:
-                return local_cache.update(
-                    key, path, func, *args, **kwargs
-                )
+                return local_cache.update(key, path, func, *args, **kwargs)
             else:
-                return local_cache.get(
-                    key, path, func, *args, **kwargs
-                )
+                return local_cache.get(key, path, func, *args, **kwargs)
         else:
             func(*args, **kwargs)
 
 
 def timeout(seconds):
     """Calls any function with timeout after 'seconds'.
-       If a timeout occurs, 'action' will be returned or called if
-       it is a function-like object.
+    If a timeout occurs, 'action' will be returned or called if
+    it is a function-like object.
     """
+
     def handler(queue, errorq, func, args, kwargs):
         try:
             queue.put(func(*args, **kwargs))
@@ -806,8 +737,7 @@ def timeout(seconds):
             if p.is_alive():
                 p.terminate()
                 p.join()
-                raise TimeoutError(
-                    "Timed out after {} seconds".format(seconds))
+                raise TimeoutError(f"Timed out after {seconds} seconds")
             else:
                 try:
                     exc = errorq.get(block=False)

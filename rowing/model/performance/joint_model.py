@@ -1,43 +1,36 @@
-
 import datetime
-from functools import partial, cached_property
 import json
-from typing import NamedTuple, List, Optional, Dict, Tuple
-# from dataclasses import dataclass
-
-
-import numpy as np
-import pandas as pd
-# from scipy import sparse
-from scipy import stats, sparse
-
-from sklearn import metrics
+from functools import cached_property, partial
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import jax
-from jax import numpy as jnp, scipy as jsp, tree_map
-from jax.scipy.linalg import solve_triangular
-from jax.scipy import linalg
-
-from flax.struct import dataclass
-
-import plotly.express as px
 import matplotlib.pyplot as plt
-import seaborn as sns
 
+# from dataclasses import dataclass
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import seaborn as sns
+from flax.struct import dataclass
+from jax import numpy as jnp
+from jax import scipy as jsp
+from jax import tree_map
+from jax.scipy import linalg
+from jax.scipy.linalg import solve_triangular
+
+# from scipy import sparse
+from scipy import sparse, stats
+from sklearn import metrics
 from tqdm.autonotebook import tqdm
 
-from rowing.world_rowing import api, utils, fields
-from rowing.model.gp import kernels, utils as gp_utils
+from rowing.model.gp import kernels
+from rowing.model.gp import utils as gp_utils
+from rowing.model.performance.competition_model import GetKernel, RaceModel, get_athlete_kernel, get_race_kernel, year_to_date
+from rowing.world_rowing import api, fields, utils
 
-from rowing.model.performance.competition_model import (
-    GetKernel, get_race_kernel, get_athlete_kernel, RaceModel,
-    year_to_date
-)
-
-
-Message = Tuple[jax.Array, jax.Array]
-Messages = List[Dict[str, Message]]
-MessageList = Tuple[List[jax.Array], List[jax.Array]]
+Message = tuple[jax.Array, jax.Array]
+Messages = list[dict[str, Message]]
+MessageList = tuple[list[jax.Array], list[jax.Array]]
 
 
 @jax.jit
@@ -92,7 +85,7 @@ treemapcat = partial(treestarmap, np.concatenate)
 
 def make_race_model(comp_results):
     boat_order = comp_results.index
-    start_times = comp_results['Race Start']
+    start_times = comp_results["Race Start"]
     times = (start_times - start_times.min()).dt.total_seconds().values
     hours = times / 60 * 60
 
@@ -103,29 +96,26 @@ def make_race_model(comp_results):
         fields.race_boatClass,
         fields.BoatType,
     ]:
-        weights[f] = comp_results.reset_index().groupby([
-            "raceBoats_id", f
-        ]).size().unstack(level=1, fill_value=0).loc[boat_order]
+        weights[f] = (
+            comp_results.reset_index().groupby(["raceBoats_id", f]).size().unstack(level=1, fill_value=0).loc[boat_order]
+        )
 
-    weights['lane'] = (
-        comp_results.Lane
-        - comp_results.Lane.mean()
-    ).to_frame().loc[boat_order]
+    weights["lane"] = (comp_results.Lane - comp_results.Lane.mean()).to_frame().loc[boat_order]
     Ws = {k: jnp.array(df.values) for k, df in weights.items()}
     grams = {k: W @ W.T for k, W in Ws.items()}
 
     race_model = RaceModel(
         hours=hours,
         W_boatclass=Ws["Boat Class"],
-        W_venue=Ws['race_event_competition_venueId'],
-        W_lane=Ws['lane'],
-        gram_venue=grams['race_event_competition_venueId'],
-        gram_boatclass=grams['Boat Class'],
-        gram_lane=grams['lane'],
+        W_venue=Ws["race_event_competition_venueId"],
+        W_lane=Ws["lane"],
+        gram_venue=grams["race_event_competition_venueId"],
+        gram_boatclass=grams["Boat Class"],
+        gram_lane=grams["lane"],
         metadata={
             "results": comp_results,
             "weights": weights,
-        }
+        },
     )
     return race_model
 
@@ -173,15 +163,14 @@ class ModelData:
     def boat_competition_csc(self):
         w = np.ones(len(self.boats))
         i = self.boat_index.get_indexer(self.boats.index)
-        j = self.competition_index.get_indexer(
-            self.boats.race_event_competition_id)
+        j = self.competition_index.get_indexer(self.boats.race_event_competition_id)
         return sparse.csc_array((w, (i, j))).sorted_indices()
 
     @cached_property
     def event_boat_csc(self):
         w = np.ones(len(self.boats))
         j = self.boat_index.get_indexer(self.boats.index)
-        i = self.events_index.get_indexer(self.boats['Boat Type'])
+        i = self.events_index.get_indexer(self.boats["Boat Type"])
         return sparse.csc_array((w, (i, j))).sorted_indices()
 
     @cached_property
@@ -194,11 +183,11 @@ class ModelData:
 
     @cached_property
     def athlete_performance_order(self):
-        return self.athlete_competition_csc.indices.argsort(kind='stable')
+        return self.athlete_competition_csc.indices.argsort(kind="stable")
 
     @cached_property
     def competition_performance_order(self):
-        return self.competition_athlete_csc.indices.argsort(kind='stable')
+        return self.competition_athlete_csc.indices.argsort(kind="stable")
 
     @cached_property
     def athletecompetition_performance_csc(self):
@@ -210,10 +199,13 @@ class ModelData:
     @cached_property
     def athletecompetition_boat_csc(self):
         seats = self.seats
-        i = np.ravel_multi_index((
-            self.athlete_index.get_indexer(seats.athletes_personId),
-            self.competition_index.get_indexer(seats.race_event_competitionId)
-        ), self.athlete_competition_csc.shape)
+        i = np.ravel_multi_index(
+            (
+                self.athlete_index.get_indexer(seats.athletes_personId),
+                self.competition_index.get_indexer(seats.race_event_competitionId),
+            ),
+            self.athlete_competition_csc.shape,
+        )
         j = self.boat_index.get_indexer(seats.athletes_raceBoatId)
         return sparse.csc_array((self.seat_weights, (i, j)))
 
@@ -227,8 +219,7 @@ class ModelData:
 
     @cached_property
     def competition_athlete_indexers(self):
-        split_indices = np.split(
-            self.athlete_competition_csc.indices, self.athlete_competition_csc.indptr[1:-1])
+        split_indices = np.split(self.athlete_competition_csc.indices, self.athlete_competition_csc.indptr[1:-1])
         return dict(zip(self.competition_index, split_indices))
 
     @cached_property
@@ -237,10 +228,7 @@ class ModelData:
         ath_inds = self.competition_athlete_indexers
         boat_index = self.boat_index
         return {
-            comp: ath_boat[np.ix_(
-                ath_inds[comp],
-                boat_index.get_indexer_for(comp_results.index)
-            )].toarray()
+            comp: ath_boat[np.ix_(ath_inds[comp], boat_index.get_indexer_for(comp_results.index))].toarray()
             for comp, comp_results in self.competition_boats_groups
         }
 
@@ -249,24 +237,17 @@ class ModelData:
         event_boat = self.event_boat_csc
         boat_indexer = self.boat_index.get_indexer
         return {
-            comp: event_boat[
-                :, boat_indexer(comp_results.index)].toarray()
+            comp: event_boat[:, boat_indexer(comp_results.index)].toarray()
             for comp, comp_results in self.competition_boats_groups
         }
 
     @cached_property
     def competition_pgmts(self):
-        return {
-            comp: comp_results.PGMT.values
-            for comp, comp_results in self.competition_boats_groups
-        }
+        return {comp: comp_results.PGMT.values for comp, comp_results in self.competition_boats_groups}
 
     @cached_property
     def competition_models(self):
-        return {
-            comp: make_race_model(comp_results)
-            for comp, comp_results in self.competition_boats_groups
-        }
+        return {comp: make_race_model(comp_results) for comp, comp_results in self.competition_boats_groups}
 
     def split_competition_performance(self, vals):
         return np.split(vals, self.athlete_competition_csc.indptr[1:-1])
@@ -287,10 +268,10 @@ class ModelData:
 
 
 class JointModel:
-    def transform(self, dists: List[Message]):
+    def transform(self, dists: list[Message]):
         return dists
 
-    def inv_transform(self, dists: List[Message]):
+    def inv_transform(self, dists: list[Message]):
         return dists
 
     # def update(self, dists: List[Message], params=None):
@@ -298,17 +279,16 @@ class JointModel:
 
 
 class EventModel(JointModel):
-    def calc_posterior(self, dists: List[Message], params=None):
+    def calc_posterior(self, dists: list[Message], params=None):
         event_nats = jax.tree_map(to_natural, dists, is_leaf=ismessage)
-        event_nat = jax.tree_util.tree_reduce(
-            partial(jax.tree_map, jnp.add), event_nats, is_leaf=ismessage)
+        event_nat = jax.tree_util.tree_reduce(partial(jax.tree_map, jnp.add), event_nats, is_leaf=ismessage)
         return [from_natural(event_nat)] * len(dists), {}
 
 
 @dataclass
 class AthleteModel(JointModel):
     years: np.ndarray
-    athlete_year_inds: List[np.ndarray]
+    athlete_year_inds: list[np.ndarray]
 
     athlete_splits: np.ndarray
     athlete_order: np.ndarray
@@ -322,22 +302,19 @@ class AthleteModel(JointModel):
     def from_data(cls, data, **kwargs):
         comp_end = data.competitions["Competition End Date"]
         years = (comp_end.dt.year + comp_end.dt.day_of_year / 365.25).values
-        athete_year_inds = np.split(
-            data.competition_athlete_csc.indices,
-            data.competition_athlete_csc.indptr[1:-1])
+        athete_year_inds = np.split(data.competition_athlete_csc.indices, data.competition_athlete_csc.indptr[1:-1])
         return cls(
-            years, athete_year_inds,
+            years,
+            athete_year_inds,
             data.athlete_competition_csc.indptr[1:-1],
-            data.athlete_competition_csc.indices.argsort(kind='stable'),
+            data.athlete_competition_csc.indices.argsort(kind="stable"),
             data.competition_athlete_csc.indptr[1:-1],
-            data.competition_athlete_csc.indices.argsort(kind='stable'),
-            **kwargs
+            data.competition_athlete_csc.indices.argsort(kind="stable"),
+            **kwargs,
         )
 
     def apply(self, params, x0=None, x1=None):
-        return gp_utils.transform(
-            lambda x0, x1: self.athlete_kernel().K(x0, x1)
-        ).apply(
+        return gp_utils.transform(lambda x0, x1: self.athlete_kernel().K(x0, x1)).apply(
             params,
             self.years if x0 is None else x0,
             self.years if x1 is None else x1,
@@ -357,23 +334,20 @@ class AthleteModel(JointModel):
         vals = np.concatenate(comp_vals)[self.athlete_order]
         return self.split_athlete_performance(vals)
 
-    def ath2comp_message(self, ath_messages: List[Message]) -> List[Message]:
-        return treemaptuple(map(
-            self.athlete2competition, treemaplist(ath_messages)))
+    def ath2comp_message(self, ath_messages: list[Message]) -> list[Message]:
+        return treemaptuple(map(self.athlete2competition, treemaplist(ath_messages)))
 
-    def comp2ath_message(self, comp_messages: List[Message]) -> List[Message]:
-        return treemaptuple(map(
-            self.competition2athlete, treemaplist(comp_messages)))
+    def comp2ath_message(self, comp_messages: list[Message]) -> list[Message]:
+        return treemaptuple(map(self.competition2athlete, treemaplist(comp_messages)))
 
     transform = comp2ath_message
     inv_transform = ath2comp_message
 
-    def calc_posterior(self, dists: List[Message], K_athlete=None, params=None):
+    def calc_posterior(self, dists: list[Message], K_athlete=None, params=None):
         if K_athlete is None:
             K_athlete = self.apply(params)
 
-        post, res = calc_athletes_posterior(
-            K_athlete, self.athlete_year_inds, dists)
+        post, res = calc_athletes_posterior(K_athlete, self.athlete_year_inds, dists)
         return post, res
 
     def predict(self, dists, times, params):
@@ -382,23 +356,15 @@ class AthleteModel(JointModel):
         K_00 = self.apply(params, times, times)
 
         preds = jax.tree_map(
-            predict_athlete_scores,
-            [K_athlete] * len(dists),
-            [K_pred] * len(dists),
-            self.athlete_year_inds,
-            dists
+            predict_athlete_scores, [K_athlete] * len(dists), [K_pred] * len(dists), self.athlete_year_inds, dists
         )
-        return tree_map(
-            lambda m: (m[0], K_00 - m[1].T @ m[1]),
-            preds,
-            is_leaf=ismessage
-        )
+        return tree_map(lambda m: (m[0], K_00 - m[1].T @ m[1]), preds, is_leaf=ismessage)
 
 
 @jax.jit
 def predict_athlete_scores(
     K_athlete: jax.Array, K_pred: jax.Array, i: jax.Array, ath_dist: Message
-) -> Tuple[Message, Dict[str, jax.Array]]:
+) -> tuple[Message, dict[str, jax.Array]]:
 
     y, covar = mean_covar(ath_dist)
 
@@ -408,14 +374,14 @@ def predict_athlete_scores(
     a = solve_triangular(L, Ly, lower=True, trans=1)
 
     k_pr = K_pred[:, i]
-    y_pred = (K_pred[:, i] @ a)
+    y_pred = K_pred[:, i] @ a
     LK = gp_utils.solve_triangular(L, k_pr.T, lower=True, trans=0)
 
     return (y_pred, LK)
 
 
 @jax.jit
-def calc_athlete_posterior(K_athlete: jax.Array, i: jax.Array, ath_dist: Message) -> Tuple[Message, Dict[str, jax.Array]]:
+def calc_athlete_posterior(K_athlete: jax.Array, i: jax.Array, ath_dist: Message) -> tuple[Message, dict[str, jax.Array]]:
     y, covar = mean_covar(ath_dist)
 
     K_ath = K_athlete[jnp.ix_(i, i)]
@@ -423,21 +389,23 @@ def calc_athlete_posterior(K_athlete: jax.Array, i: jax.Array, ath_dist: Message
     Ly = solve_triangular(L, y, lower=True, trans=0)
     a = solve_triangular(L, Ly, lower=True, trans=1)
 
-    y_post = (K_ath @ a)
+    y_post = K_ath @ a
 
     chi2 = Ly.dot(Ly)
-    log_marg = - jnp.log(L.diagonal()).sum() - chi2/2
+    log_marg = -jnp.log(L.diagonal()).sum() - chi2 / 2
 
     LK = gp_utils.solve_triangular(L, K_ath, lower=True, trans=0)
     covar_post = K_ath - LK.T @ LK
 
-    return (y_post, covar_post), {'log_marg': log_marg, 'chi2': chi2}
+    return (y_post, covar_post), {"log_marg": log_marg, "chi2": chi2}
 
 
 def calc_athletes_posterior(K_athlete, athlete_inds, athlete_dists):
     ret = jax.tree_map(
         calc_athlete_posterior,
-        [K_athlete] * len(athlete_inds), athlete_inds, athlete_dists,
+        [K_athlete] * len(athlete_inds),
+        athlete_inds,
+        athlete_dists,
     )
     post, res = map(list, zip(*ret))
 
@@ -446,16 +414,15 @@ def calc_athletes_posterior(K_athlete, athlete_inds, athlete_dists):
 
 @dataclass
 class CompetitionModels:
-    competition_boat_results: List[jax.Array]
-    competition_race_models: List[RaceModel]
-    competition_weights: List[Dict[str, jax.Array]]
+    competition_boat_results: list[jax.Array]
+    competition_race_models: list[RaceModel]
+    competition_weights: list[dict[str, jax.Array]]
 
     def apply(self, params):
         return jax.tree_map(
-            lambda model: gp_utils.transform(
-                model.get_jitter_kernel).apply(params),
+            lambda model: gp_utils.transform(model.get_jitter_kernel).apply(params),
             self.competition_race_models,
-            is_leaf=lambda x: isinstance(x, RaceModel)
+            is_leaf=lambda x: isinstance(x, RaceModel),
         )
 
     @classmethod
@@ -473,11 +440,7 @@ class CompetitionModels:
             comp_kernels = self.apply(params)
 
         ret = jax.tree_map(
-            calc_comp_athlete_posterior,
-            self.competition_boat_results,
-            comp_kernels,
-            self.competition_weights,
-            messages
+            calc_comp_athlete_posterior, self.competition_boat_results, comp_kernels, self.competition_weights, messages
         )
         post, res = map(list, zip(*ret))
         return post, res
@@ -501,7 +464,7 @@ def calc_comp_athlete_posterior(y_boat, K_boat, weights, cavity_dists):
             var_k = jnp.diag(var_k)
         else:
             K_k = var_k @ Wk
-            Kkk = K_k.T @ jsp.linalg.solve(var_k, Wk, assume_a='pos')
+            Kkk = K_k.T @ jsp.linalg.solve(var_k, Wk, assume_a="pos")
 
         K_race += Kkk
         y_race -= y_k @ Wk
@@ -512,7 +475,7 @@ def calc_comp_athlete_posterior(y_boat, K_boat, weights, cavity_dists):
     a = gp_utils.solve_triangular(L, Ly, lower=True, trans=1)
 
     chi2 = Ly.dot(Ly)
-    log_marg = - jnp.log(L.diagonal()).sum() - chi2/2
+    log_marg = -jnp.log(L.diagonal()).sum() - chi2 / 2
 
     post_dists = {}
     for k, (K_k, Wk, y_k, var_k) in K_cavity.items():
@@ -521,7 +484,7 @@ def calc_comp_athlete_posterior(y_boat, K_boat, weights, cavity_dists):
         covar_post = jnp.diag(var_k) - LKab.T @ LKab
         post_dists[k] = y_post, covar_post
 
-    res = {'log_marg': log_marg, 'chi2': chi2}
+    res = {"log_marg": log_marg, "chi2": chi2}
     return post_dists, res
 
 
@@ -565,22 +528,17 @@ def mul_normal_var(cav1, cav2):
 
 
 def update_site_distribution(posterior: Messages, cavity: Messages) -> Messages:
-    return jax.tree_map(
-        div_normal_var,
-        posterior, cavity,
-        is_leaf=ismessage
-    )  # List[Dict[str, Message]]
+    return jax.tree_map(div_normal_var, posterior, cavity, is_leaf=ismessage)  # List[Dict[str, Message]]
 
 
 def update_site_messages(posterior: Messages, cavity: Messages) -> Messages:
-    site_dists = update_site_distribution(
-        posterior, cavity)  # List[Dict[str, Message]]
+    site_dists = update_site_distribution(posterior, cavity)  # List[Dict[str, Message]]
 
     # Dict[str, List[Message]]
     return treemaplist(site_dists, is_leaf=ismessage)
 
 
-def apply_normal_prior(prior, dists: List[Message]):
+def apply_normal_prior(prior, dists: list[Message]):
     if prior:
         return tree_map(partial(mul_normal_var, prior), dists, is_leaf=ismessage)
     else:
@@ -590,41 +548,36 @@ def apply_normal_prior(prior, dists: List[Message]):
 def predict_performances(times, athlete_model, athlete_dists, data, params):
     ath_preds = athlete_model.predict(athlete_dists, times, params)
 
-    athlete_preds = pd.concat({
-        "score": pd.concat({
-            ath: pd.Series(pred[0], times)
-            for ath, pred in zip(data.athlete_index, ath_preds)
-        }, names=['athlete_id']),
-        "score_std": pd.concat({
-            ath: pd.Series(pred[0], times)
-            for ath, pred in zip(data.athlete_index, ath_preds)
-        }, names=['athlete_id']),
-    }, axis=1).rename_axis(
-        index=['athlete_id', 'year']
-    ).reset_index().join(
-        data.athletes[[
-            'athletes_person_BirthDate', 'athletes_person'
-        ]],
-        on='athlete_id'
+    athlete_preds = (
+        pd.concat(
+            {
+                "score": pd.concat(
+                    {ath: pd.Series(pred[0], times) for ath, pred in zip(data.athlete_index, ath_preds)}, names=["athlete_id"]
+                ),
+                "score_std": pd.concat(
+                    {ath: pd.Series(pred[0], times) for ath, pred in zip(data.athlete_index, ath_preds)}, names=["athlete_id"]
+                ),
+            },
+            axis=1,
+        )
+        .rename_axis(index=["athlete_id", "year"])
+        .reset_index()
+        .join(data.athletes[["athletes_person_BirthDate", "athletes_person"]], on="athlete_id")
     )
-    athlete_preds['Date'] = year_to_date(athlete_preds.year).dt.normalize()
+    athlete_preds["Date"] = year_to_date(athlete_preds.year).dt.normalize()
 
     return athlete_preds
 
 
 def combine_performances(athlete_dists, data):
-    performance_post = np.concatenate([
-        m for m, _ in athlete_dists])
-    performance_std = np.concatenate([
-        np.sqrt(cov.diagonal()) for _, cov in athlete_dists])
+    performance_post = np.concatenate([m for m, _ in athlete_dists])
+    performance_std = np.concatenate([np.sqrt(cov.diagonal()) for _, cov in athlete_dists])
 
-    return pd.DataFrame({
-        "score": performance_post,
-        "score_std": performance_std,
-        "athlete_id": data.athlete_index[
-            data.athlete_competition_csc.nonzero()[0]
-        ],
-        "competition_id": data.competition_index[
-            data.athlete_competition_csc.nonzero()[1]
-        ]
-    })
+    return pd.DataFrame(
+        {
+            "score": performance_post,
+            "score_std": performance_std,
+            "athlete_id": data.athlete_index[data.athlete_competition_csc.nonzero()[0]],
+            "competition_id": data.competition_index[data.athlete_competition_csc.nonzero()[1]],
+        }
+    )

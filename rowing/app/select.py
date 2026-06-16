@@ -1,14 +1,13 @@
-
-import logging
 import datetime
+import logging
 import time
 from functools import partial, wraps
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-from rowing.world_rowing import api, utils, live, fields
-from rowing.app import state, inputs, threads
+from rowing.app import inputs, state, threads
+from rowing.world_rowing import api, fields, live, utils
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +42,7 @@ def get_competitions(**kwargs):
 @st.cache_data(persist=False, ttl=600)
 def get_races(competition_id):
     logger.debug("get_races(%s)", competition_id)
-    return api.get_races(competition_id=competition_id).sort_values(
-        fields.race_Date, ascending=False
-    )
+    return api.get_races(competition_id=competition_id).sort_values(fields.race_Date, ascending=False)
 
 
 @st.cache_data(persist=True)
@@ -72,51 +69,51 @@ def get_boat_classes():
 
 @st.cache_data(persist=False, ttl=600)
 def get_entries(competition_id):
-    events = api.get_events(
-        competition_id, include="boats.boatAthletes.person")
+    events = api.get_events(competition_id, include="boats.boatAthletes.person")
     if events.empty:
         return
 
-    boats = pd.concat({
-        e: pd.json_normalize(boats)
-        for e, boats in events.set_index(["Event"]).event_boats.items()
-    }, names=['event']).reset_index(level=0).reset_index(drop=True)
-    comp_athletes = pd.concat({
-        e: pd.json_normalize(athletes)
-        for e, athletes in boats.set_index("id").boatAthletes.items()
-    }, names=['boat_id']).reset_index(drop=True)
+    boats = (
+        pd.concat(
+            {e: pd.json_normalize(boats) for e, boats in events.set_index(["Event"]).event_boats.items()}, names=["event"]
+        )
+        .reset_index(level=0)
+        .reset_index(drop=True)
+    )
+    comp_athletes = pd.concat(
+        {e: pd.json_normalize(athletes) for e, athletes in boats.set_index("id").boatAthletes.items()}, names=["boat_id"]
+    ).reset_index(drop=True)
 
-    comp_athletes['Position'] = comp_athletes.athletePosition
-    comp_athletes.loc[
-        comp_athletes.athletePosition == 'b',
-        'Position'
-    ] = '1'
-    comp_athletes.loc[
-        comp_athletes.athletePosition == 's',
-        'Position'
-    ] = boats.set_index("id").boatAthletes.loc[
-        comp_athletes.boatId
-    ].map(len).replace({
-        5: 4, 9: 8
-    }).values[
-        comp_athletes.athletePosition == 's',
-    ].astype(str)
-    comp_athletes.loc[
-        comp_athletes.athletePosition == 'c',
-        'Position'
-    ] = 'cox'
+    comp_athletes["Position"] = comp_athletes.athletePosition
+    comp_athletes.loc[comp_athletes.athletePosition == "b", "Position"] = "1"
+    comp_athletes.loc[comp_athletes.athletePosition == "s", "Position"] = (
+        boats.set_index("id")
+        .boatAthletes.loc[comp_athletes.boatId]
+        .map(len)
+        .replace({5: 4, 9: 8})
+        .values[comp_athletes.athletePosition == "s",]
+        .astype(str)
+    )
+    comp_athletes.loc[comp_athletes.athletePosition == "c", "Position"] = "cox"
 
-    comp_boat_athletes = comp_athletes.reset_index().rename(
-        columns={
-            # 'athletePosition': 'Position',
-            'person.DisplayName': 'Athlete',
-        }
-    ).join(
-        boats.set_index('id').rename(columns={
-            'event': 'Event',
-            'DisplayName': 'Boat',
-        }),
-        on='boatId', rsuffix='_'
+    comp_boat_athletes = (
+        comp_athletes.reset_index()
+        .rename(
+            columns={
+                # 'athletePosition': 'Position',
+                "person.DisplayName": "Athlete",
+            }
+        )
+        .join(
+            boats.set_index("id").rename(
+                columns={
+                    "event": "Event",
+                    "DisplayName": "Boat",
+                }
+            ),
+            on="boatId",
+            rsuffix="_",
+        )
     )
     return comp_boat_athletes
 
@@ -126,10 +123,9 @@ def get_competition_boat_classes(competition_id):
     logger.debug("get_competition_boat_classes(%s)", competition_id)
     events = get_events(competition_id)
     boat_classes = get_boat_classes()
-    event_boat_classes = boat_classes[
-        boat_classes[fields.boatClass_id].isin(
-            events[fields.event_boatClassId])
-    ][fields.boatClass].sort_values()
+    event_boat_classes = boat_classes[boat_classes[fields.boatClass_id].isin(events[fields.event_boatClassId])][
+        fields.boatClass
+    ].sort_values()
     return event_boat_classes
 
 
@@ -157,18 +153,24 @@ def get_races_livedata(races, max_workers=10):
         return live_data, intermediates, lane_info
 
     live_data = live_data.join(
-        races[[
-            fields.race_Date, fields.Race, fields.race_event,
-            fields.Gender, fields.Category, fields.Phase,
-            fields.boatClass, fields.GMT
-        ]],
+        races[
+            [
+                fields.race_Date,
+                fields.Race,
+                fields.race_event,
+                fields.Gender,
+                fields.Category,
+                fields.Phase,
+                fields.boatClass,
+                fields.GMT,
+            ]
+        ],
         on=fields.live_raceId,
-        lsuffix='',
-        rsuffix="_1"
+        lsuffix="",
+        rsuffix="_1",
     )
     live_data[fields.race_Date] = pd.to_datetime(live_data[fields.race_Date])
-    live_data[fields.crew] = (
-        live_data[fields.raceBoats] + " " + live_data[fields.boatClass])
+    live_data[fields.crew] = live_data[fields.raceBoats] + " " + live_data[fields.boatClass]
     return live_data, intermediates, lane_info
 
 
@@ -194,7 +196,8 @@ def select_competition(current=True, start_date=None, end_date=None, fisa=False)
         """
         The most recent FISA competition will be loaded by default, 
         'select other competition' will allow you to choose older competitions. 
-        """)
+        """
+    )
     current = inputs.modal_button(
         "select other competition",
         "Use current competition",
@@ -203,28 +206,17 @@ def select_competition(current=True, start_date=None, end_date=None, fisa=False)
     )
 
     if current:
-        competition_id = st.text_input(
-            "Competition id:", api.get_most_recent_competition(
-                fisa=fisa).competition_id
-        )
-        competition = api.get_worldrowing_record(
-            "competition", competition_id, include="competitionType,venue"
-        )
-        competition.loc["started"] = pd.to_datetime(
-            competition[fields.competition_StartDate]) < datetime.datetime.now()
-        competition.loc["finished"] = pd.to_datetime(
-            competition[fields.competition_StartDate]) < datetime.datetime.now()
+        competition_id = st.text_input("Competition id:", api.get_most_recent_competition(fisa=fisa).competition_id)
+        competition = api.get_worldrowing_record("competition", competition_id, include="competitionType,venue")
+        competition.loc["started"] = pd.to_datetime(competition[fields.competition_StartDate]) < datetime.datetime.now()
+        competition.loc["finished"] = pd.to_datetime(competition[fields.competition_StartDate]) < datetime.datetime.now()
     else:
         today = datetime.date.today()
-        start_date = pd.to_datetime(start_date or today, errors='coerce')
-        end_date = pd.to_datetime(end_date, errors='coerce')
+        start_date = pd.to_datetime(start_date or today, errors="coerce")
+        end_date = pd.to_datetime(end_date, errors="coerce")
         start_date = today if pd.isna(start_date) else start_date
-        end_date = (
-            today - datetime.timedelta(days=365*2) if pd.isna(end_date) else end_date)
-        date_input = st.date_input(
-            "Select date range to load",
-            value=[end_date, start_date]
-        )
+        end_date = today - datetime.timedelta(days=365 * 2) if pd.isna(end_date) else end_date
+        date_input = st.date_input("Select date range to load", value=[end_date, start_date])
         if len(date_input) == 2:
             end_date = date_input[0].isoformat()
             start_date = date_input[1].isoformat()
@@ -246,18 +238,10 @@ def select_competition(current=True, start_date=None, end_date=None, fisa=False)
             st.write("No competitions found")
             st.stop()
 
-        competitions['started'] = \
-            pd.to_datetime(
-                competitions[fields.competition_StartDate]) < datetime.datetime.now()
-        competitions['finished'] = \
-            pd.to_datetime(
-                competitions[fields.competition_EndDate]) < datetime.datetime.now()
+        competitions["started"] = pd.to_datetime(competitions[fields.competition_StartDate]) < datetime.datetime.now()
+        competitions["finished"] = pd.to_datetime(competitions[fields.competition_EndDate]) < datetime.datetime.now()
         competitions = inputs.filter_dataframe(
-            competitions[COMPETITION_COL],
-            default=["started"],
-            started=[True],
-            key='competition',
-            filters=False
+            competitions[COMPETITION_COL], default=["started"], started=[True], key="competition", filters=False
         ).sort_values(fields.competition_StartDate, ascending=False)
 
         if competitions.empty:
@@ -269,8 +253,7 @@ def select_competition(current=True, start_date=None, end_date=None, fisa=False)
         competition = inputs.select_dataframe(competitions, "competition")
 
     competition.loc[fields.WBTCompetitionType] = api.COMPETITION_TYPES.get(
-        competition[fields.competition_competitionType],
-        competition[fields.competition_competitionType]
+        competition[fields.competition_competitionType], competition[fields.competition_competitionType]
     )
     # competition.index.name = 'CompetitionId'
     st.write(competition.loc[COMPETITION_COL + [fields.WBTCompetitionType]])
@@ -291,37 +274,27 @@ RACE_COL = [
 ]
 
 
-def filter_races(
-        races,
-        filters=False, select_all=True, select_first=False,
-        **kwargs
-):
+def filter_races(races, filters=False, select_all=True, select_first=False, **kwargs):
     logger.debug("filter_races(races[%d], filters=%s)", len(races), filters)
 
     boat_classes = get_boat_classes()
     races = pd.merge(
-        races, boat_classes,
+        races,
+        boat_classes,
         left_on=fields.race_event_boatClassId,
         right_on=fields.boatClass_id,
-        how='left',
-        suffixes=("", "_1")
+        how="left",
+        suffixes=("", "_1"),
     )
     st.subheader("Filter races to look at")
 
-    a_finals = races[
-        (races[fields.Phase] == 'Final A')
-        & (races[fields.race_raceStatus] == 'Official')
-    ]
-    phases = races[fields.race_raceStatus].unique() if a_finals.size else [
-        'Final A']
+    a_finals = races[(races[fields.Phase] == "Final A") & (races[fields.race_raceStatus] == "Official")]
+    phases = races[fields.race_raceStatus].unique() if a_finals.size else ["Final A"]
 
     kwargs.setdefault(fields.Phase, phases)
-    kwargs.setdefault(
-        fields.Gender, ['Men', 'Women', 'Mixed'])
-    kwargs.setdefault(
-        fields.Category, ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3'])
-    kwargs.setdefault(
-        fields.race_raceStatus, ["Official", "Unofficial"])
+    kwargs.setdefault(fields.Gender, ["Men", "Women", "Mixed"])
+    kwargs.setdefault(fields.Category, ["Open", "Lightweight", "PR1", "PR2", "PR3"])
+    kwargs.setdefault(fields.race_raceStatus, ["Official", "Unofficial"])
     # kwargs.setdefault(
     #     "default", [fields.Gender, fields.Category, fields.race_raceStatus])
     # kwargs.setdefault(
@@ -334,7 +307,7 @@ def filter_races(
         filters=filters,
         select_all=select_all,
         select_first=select_first,
-        key='filter_races',
+        key="filter_races",
         **kwargs,
     ).reset_index(drop=True)
     races[fields.race_Date] = pd.to_datetime(races[fields.race_Date])
@@ -342,13 +315,12 @@ def filter_races(
 
 
 def select_races(
-        competition_id=None,
-        competition_container=None,
-        races_container=None,
-        **kwargs,
+    competition_id=None,
+    competition_container=None,
+    races_container=None,
+    **kwargs,
 ):
-    logger.debug(
-        "select_races(%r, filters=%s)", competition_id, kwargs.get("filters"))
+    logger.debug("select_races(%r, filters=%s)", competition_id, kwargs.get("filters"))
     # with st.expander("Select competition", state.get("expander.filter_competition", False)):
     with competition_container or st.container():
         if competition_id is None:
@@ -366,7 +338,8 @@ def select_races(
 
 def select_race(races):
     sel_race = st.selectbox(
-        "select race to load", races[fields.Race],
+        "select race to load",
+        races[fields.Race],
     )
     race = races.loc[races[fields.Race] == sel_race]
     return race.iloc[0]
@@ -389,19 +362,12 @@ def wait_for_next_race(n=5):
         if st.button("refresh"):
             st.rerun()
 
-    st.write(
-        "no live race could be loaded, "
-        "check replay in sidebar to see race replay")
+    st.write("no live race could be loaded, check replay in sidebar to see race replay")
 
 
 def select_live_race(replay=False, **kwargs):
     if replay:
-        races = select_races(
-            filters=True,
-            select_all=True,
-            default=[fields.race_raceStatus],
-            **kwargs
-        )
+        races = select_races(filters=True, select_all=True, default=[fields.race_raceStatus], **kwargs)
         with kwargs.get("select_race") or st.container():
             if races.empty:
                 st.write("no live races could be loaded")
@@ -448,11 +414,8 @@ RESULT_COLS = [
 ]
 
 
-def select_results(race_results, key='race_results', **kwargs):
-    filtered = inputs.filter_dataframe(
-        race_results[RESULT_COLS].sort_values("PGMT", ascending=False),
-        key=key, **kwargs
-    )
+def select_results(race_results, key="race_results", **kwargs):
+    filtered = inputs.filter_dataframe(race_results[RESULT_COLS].sort_values("PGMT", ascending=False), key=key, **kwargs)
     return filtered
 
 
@@ -476,18 +439,15 @@ def select_best_times(boat_classes=None, *competition_types):
     if boat_classes is None:
         boat_classes = cbts[fields.bestTimes_BoatClass].unique()
 
-    pick = inputs.modal_button(
-        "Select competition best times", "Use world best times", "pickCBT", mode=True
-    )
+    pick = inputs.modal_button("Select competition best times", "Use world best times", "pickCBT", mode=True)
     if not pick:
         filtered_cbts = inputs.filter_dataframe(
-            cbts[CBT_COLS].sort_values(
-                fields.bestTimes_ResultTime, ascending=True),
+            cbts[CBT_COLS].sort_values(fields.bestTimes_ResultTime, ascending=True),
             default=[fields.WBTCompetitionType, fields.bestTimes_BoatClass],
             categories={fields.bestTimes_BoatClass},
-            key='GMT',
+            key="GMT",
             **{
-                fields.WBTCompetitionType: ['Elite Overall', *competition_types],
+                fields.WBTCompetitionType: ["Elite Overall", *competition_types],
                 fields.bestTimes_BoatClass: boat_classes,
             },
         )
@@ -497,34 +457,29 @@ def select_best_times(boat_classes=None, *competition_types):
 
 
 def set_gmts(cbts, *competition_types):
-    wbts = cbts.groupby(fields.bestTimes_BoatClass)[
-        fields.bestTimes_ResultTime].min()
+    wbts = cbts.groupby(fields.bestTimes_BoatClass)[fields.bestTimes_ResultTime].min()
     col1, col2 = st.columns(2)
     gmts = {
         "GMT": wbts,
         "best time": wbts,
     }
     for competition_type in competition_types:
-        gmts[f"{competition_type} best time"] = cbts[
-            cbts[fields.bestTimes_CompetitionType] == competition_type
-        ].groupby(fields.bestTimes_BoatClass)[fields.bestTimes_ResultTime].min()
+        gmts[f"{competition_type} best time"] = (
+            cbts[cbts[fields.bestTimes_CompetitionType] == competition_type]
+            .groupby(fields.bestTimes_BoatClass)[fields.bestTimes_ResultTime]
+            .min()
+        )
 
     with col2:
-        uploaded = inputs.upload_csv(
-            "Upload GMTs csv", key='upload_csv', index_col=0
-        )
+        uploaded = inputs.upload_csv("Upload GMTs csv", key="upload_csv", index_col=0)
         if uploaded is not None:
-            uploaded = uploaded.rename(
-                columns=dict(zip(uploaded.columns, ['GMT']))
-            )
-            uploaded_gmt = pd.to_timedelta(uploaded.iloc[:, 0], unit='s')
-            gmts['Uploaded'] = uploaded_gmt
+            uploaded = uploaded.rename(columns=dict(zip(uploaded.columns, ["GMT"])))
+            uploaded_gmt = pd.to_timedelta(uploaded.iloc[:, 0], unit="s")
+            gmts["Uploaded"] = uploaded_gmt
             gmts[fields.GMT].update(uploaded_gmt)
 
     with col1:
-        gmt_set = pd.concat(gmts, axis=1).apply(
-            lambda s: s.dt.total_seconds().apply(utils.format_totalseconds)
-        )
+        gmt_set = pd.concat(gmts, axis=1).apply(lambda s: s.dt.total_seconds().apply(utils.format_totalseconds))
         gmts = utils.read_times(st.data_editor(gmt_set)[fields.GMT])
 
     with col2:
@@ -552,9 +507,7 @@ def set_competition_gmts(competition_id, competition_type=None):
     return gmts
 
 
-def select_competition_results(
-    competition_id, gmts, stop_if_empty=True, **kwargs
-):
+def select_competition_results(competition_id, gmts, stop_if_empty=True, **kwargs):
     st.write(
         """
         Filter which race results to show.
@@ -574,36 +527,31 @@ def select_competition_results(
     if results.empty:
         return
 
-    merged_results = api.merge_competition_results(
-        results, races, events, boat_classes, gmts)
-    results = select_results(
-        merged_results, **kwargs
-    )
-    results[fields.crew] = \
-        results[fields.raceBoats] + " " + results[fields.boatClass]
+    merged_results = api.merge_competition_results(results, races, events, boat_classes, gmts)
+    results = select_results(merged_results, **kwargs)
+    results[fields.crew] = results[fields.raceBoats] + " " + results[fields.boatClass]
     results = results.set_index(fields.crew)
-    results = results.join(
-        results.groupby('Race').Distance.max().rename('Finish Distance'),
-        on='Race'
-    ).reset_index()
+    results = results.join(results.groupby("Race").Distance.max().rename("Finish Distance"), on="Race").reset_index()
 
     results = results.join(
         results.loc[
-            results['Finish Distance'] == results.Distance,
-            [fields.crew, 'Race', 'Intermediate Time', 'Intermediate Position']
-        ].rename(columns={
-            'Intermediate Time': "Finish Time",
-            'Intermediate Position': 'Finish Position',
-        }).set_index([fields.crew, 'Race']),
-        on=[fields.crew, 'Race'], how='inner'
+            results["Finish Distance"] == results.Distance, [fields.crew, "Race", "Intermediate Time", "Intermediate Position"]
+        ]
+        .rename(
+            columns={
+                "Intermediate Time": "Finish Time",
+                "Intermediate Position": "Finish Position",
+            }
+        )
+        .set_index([fields.crew, "Race"]),
+        on=[fields.crew, "Race"],
+        how="inner",
     )
     if results.empty and stop_if_empty:
         st.write("no results loaded")
         st.stop()
 
-    return results.drop_duplicates(
-        subset=['Boat', 'Distance', 'Race']
-    ).set_index(fields.crew)
+    return results.drop_duplicates(subset=["Boat", "Distance", "Race"]).set_index(fields.crew)
 
 
 LIVE_COLS = [
@@ -623,7 +571,8 @@ LIVE_COLS = [
 
 def filter_livetracker(live_data):
     live_data = inputs.filter_dataframe(
-        live_data, key='live_data',
+        live_data,
+        key="live_data",
         options=LIVE_COLS,
         # default=[fields.lane_Rank],
         select=False,
@@ -631,11 +580,7 @@ def filter_livetracker(live_data):
             fields.Event,
             fields.boatClass,
         },
-        **{
-            fields.lane_Rank: pd.Series(
-                live_data[fields.lane_Rank].unique()
-            ).dropna().sort_values().to_list()
-        }
+        **{fields.lane_Rank: pd.Series(live_data[fields.lane_Rank].unique()).dropna().sort_values().to_list()},
     )
     # live_data[fields.split] = pd.to_datetime(
     #     500 / live_data[fields.live_raceBoatTracker_metrePerSecond],
@@ -654,16 +599,10 @@ def set_livetracker_PGMT(live_data):
         st.caption("input %GMT for pace boat")
     with col2:
         PGMT = st.number_input(
-            "input %GMT for pace boat",
-            min_value=0.01, max_value=1.1, value=1.,
-            label_visibility="collapsed",
-            key='setPGMT'
+            "input %GMT for pace boat", min_value=0.01, max_value=1.1, value=1.0, label_visibility="collapsed", key="setPGMT"
         )
 
-    gmt_speed = (
-        live_data[fields.race_distance]
-        / live_data[fields.GMT].dt.total_seconds()
-    )
+    gmt_speed = live_data[fields.race_distance] / live_data[fields.GMT].dt.total_seconds()
     gmt_distance = live_data[fields.live_time] * gmt_speed
     pace_distance = gmt_distance * PGMT
 
@@ -676,17 +615,12 @@ def set_livetracker_PGMT(live_data):
 
 def set_livetracker_paceboat(live_data, pace_percent=None):
     distance = live_data[fields.live_raceBoatTracker_distanceTravelled]
-    gmt_speed = (
-        live_data[fields.race_distance]
-        / live_data[fields.GMT].dt.total_seconds()
-    )
+    gmt_speed = live_data[fields.race_distance] / live_data[fields.GMT].dt.total_seconds()
     gmt_distance = live_data[fields.live_time] * gmt_speed
 
     live_data[fields.PGMT] = distance / gmt_distance
     if not pace_percent:
-        pace_percent = (distance / gmt_distance)[
-            distance == live_data[fields.race_distance]
-        ].max()
+        pace_percent = (distance / gmt_distance)[distance == live_data[fields.race_distance]].max()
 
     pace_distance = gmt_distance * pace_percent
     live_data[fields.distance_from_paceboat] = pace_distance - distance
@@ -697,46 +631,39 @@ def set_livetracker_paceboat(live_data, pace_percent=None):
 
 def last_race_results(n=10, fisa=True, cached=False):
     races = api.get_last_races(n, fisa=fisa, cached=cached)
-    race_boats = pd.json_normalize(
-        sum(races.Boat, [])
-    ).join(
-        races.set_index('race_id').Race, on='raceId'
+    race_boats = pd.json_normalize(sum(races.Boat, [])).join(races.set_index("race_id").Race, on="raceId")
+    boat_name = (
+        race_boats.set_index("id")[["DisplayName", "Race", "Lane"]].drop_duplicates().rename(columns={"DisplayName": "Boat"})
     )
-    boat_name = race_boats.set_index(
-        'id'
-    )[
-        ['DisplayName', 'Race', 'Lane']
-    ].drop_duplicates().rename(
-        columns={'DisplayName': "Boat"})
-    intermediates = pd.json_normalize(
-        sum(race_boats.raceBoatIntermediates, [])
-    )
+    intermediates = pd.json_normalize(sum(race_boats.raceBoatIntermediates, []))
     if not intermediates.empty:
-        intermediates = intermediates.join(boat_name, on='raceBoatId')
-        intermediates['Distance'] = intermediates[
-            'distance.DisplayName'].str.extract("([\d]+)")[0].astype(int)
-        intermediates['ResultTime'] = pd.to_timedelta(
-            intermediates['ResultTime'])
-        intermediates['Time'] = intermediates['ResultTime'].apply(
-            utils.format_timedelta)
-        intermediates['Intermediate'] = ''
+        intermediates = intermediates.join(boat_name, on="raceBoatId")
+        intermediates["Distance"] = intermediates["distance.DisplayName"].str.extract("([\d]+)")[0].astype(int)
+        intermediates["ResultTime"] = pd.to_timedelta(intermediates["ResultTime"])
+        intermediates["Time"] = intermediates["ResultTime"].apply(utils.format_timedelta)
+        intermediates["Intermediate"] = ""
 
     return races, race_boats, intermediates
 
 
-def unstack_intermediates(intermediates, col='Time'):
-    table = pd.concat([
-        intermediates.groupby(
-            ['Race', 'Lane', 'Intermediate']
-        ).Boat.first().reset_index(),
-        intermediates[
-            ['Race', 'Lane', 'Distance', col]
-        ].rename(columns={
-            "Distance": "Intermediate",
-            col: "Boat",
-        })
-    ]).groupby(
-        ["Race", "Intermediate", "Lane"]
-    ).Boat.first().unstack().sort_index(ascending=False).fillna("")
-    table.index.names = ['Race', 'Inter']
+def unstack_intermediates(intermediates, col="Time"):
+    table = (
+        pd.concat(
+            [
+                intermediates.groupby(["Race", "Lane", "Intermediate"]).Boat.first().reset_index(),
+                intermediates[["Race", "Lane", "Distance", col]].rename(
+                    columns={
+                        "Distance": "Intermediate",
+                        col: "Boat",
+                    }
+                ),
+            ]
+        )
+        .groupby(["Race", "Intermediate", "Lane"])
+        .Boat.first()
+        .unstack()
+        .sort_index(ascending=False)
+        .fillna("")
+    )
+    table.index.names = ["Race", "Inter"]
     return table.rename(index=str)

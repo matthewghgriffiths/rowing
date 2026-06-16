@@ -1,19 +1,18 @@
-
-from math import prod
-import yaml
+from collections.abc import Generator
 from functools import partial
-from typing import Dict, List, Tuple, Optional, Generator, NamedTuple
+from math import prod
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
-import numpy as np
-
+import haiku as hk
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
+import numpy as np
+import yaml
 from jax._src.flatten_util import ravel_pytree
-import haiku as hk
 
 from ...utils import map_concurrent
-from .linalg import vdot, get_pos_def, solve_triangular
+from .linalg import get_pos_def, solve_triangular, vdot
 
 
 def norm_jax(x):
@@ -39,7 +38,7 @@ def load_params(obj, *args, **kwargs):
 
 
 def open_params(path="params.yaml"):
-    with open(path, "r") as f:
+    with open(path) as f:
         return load_params(f)
 
 
@@ -71,8 +70,7 @@ def get_full_kernel(self):
 
 def get_jitter_kernel(self):
     K = self.get_full_kernel()
-    race_var = jnp.exp(hk.get_parameter(
-        "log_noise", [], init=jnp.zeros, dtype=jnp.float64))
+    race_var = jnp.exp(hk.get_parameter("log_noise", [], init=jnp.zeros, dtype=jnp.float64))
     K_noise = jnp.eye(len(K)) * race_var
     return K + K_noise
 
@@ -107,10 +105,7 @@ class GPSystem(NamedTuple):
     def log_marginal(self, constant=1):
         L = self.L
         Ly = self.Ly
-        log_like = constant * (
-            - jnp.dot(Ly, Ly)/2
-            - jnp.log(L.diagonal()).sum()
-        )
+        log_like = constant * (-jnp.dot(Ly, Ly) / 2 - jnp.log(L.diagonal()).sum())
         return log_like
 
     def loss(self):
@@ -118,14 +113,7 @@ class GPSystem(NamedTuple):
 
     def inv_K(self):
         L, y = self.L, self.y
-        invK = solve_triangular(
-            L,
-            solve_triangular(
-                L, jnp.eye(len(y)),
-                lower=True, trans=0
-            ),
-            lower=True, trans=1
-        )
+        invK = solve_triangular(L, solve_triangular(L, jnp.eye(len(y)), lower=True, trans=0), lower=True, trans=1)
         return invK
 
     def leave_one_out(self):
@@ -162,10 +150,7 @@ class GPSystem(NamedTuple):
             y_pred[i] = (
                 KiK[ij] @ yj
                 - np.linalg.multi_dot([K[ii], iK[ij], yj])
-                - np.linalg.multi_dot([
-                    (KiK[ii] - K[ii] @ iKii),
-                    np.linalg.inv(iKii), iK[ij], yj
-                ])
+                - np.linalg.multi_dot([(KiK[ii] - K[ii] @ iKii), np.linalg.inv(iKii), iK[ij], yj])
             )
 
         return y_pred
@@ -175,9 +160,7 @@ class GPSystem(NamedTuple):
 
     def var(self, Kvar, K):
         L = self.L
-        LdivK = solve_triangular(
-            L, K.T, lower=True, trans=0
-        )
+        LdivK = solve_triangular(L, K.T, lower=True, trans=0)
         if jnp.ndim(Kvar) == 2:
             Kvar = Kvar.diagonal()
 
@@ -186,9 +169,7 @@ class GPSystem(NamedTuple):
 
     def covar(self, Kcov, K):
         L = self.L
-        LdivK = solve_triangular(
-            L, K.T, lower=True, trans=0
-        )
+        LdivK = solve_triangular(L, K.T, lower=True, trans=0)
         return Kcov - LdivK.T @ LdivK
 
     def mean_loss(self):
@@ -221,9 +202,8 @@ class OptModel:
         self.pbar = pbar
         return self
 
-    def __call__(self, params, *args,  **kwargs):
-        jax.debug.callback(
-            self.callback, params, *args, ordered=True, **kwargs)
+    def __call__(self, params, *args, **kwargs):
+        jax.debug.callback(self.callback, params, *args, ordered=True, **kwargs)
         return self.loss(params, *args, **kwargs)
 
     def callback(self, *args, **kwargs):
@@ -275,14 +255,11 @@ class MatrixProduct:
         self.subscripts = out[0] if out else "".join(self.dims)
 
     @property
-    def dims(self) -> Dict[str, int]:
-        return {
-            i: n for A, ind in zip(self.operands, self.indices)
-            for i, n in zip(ind, A.shape)
-        }
+    def dims(self) -> dict[str, int]:
+        return {i: n for A, ind in zip(self.operands, self.indices) for i, n in zip(ind, A.shape)}
 
     @property
-    def shape(self) -> Tuple[int, ...]:
+    def shape(self) -> tuple[int, ...]:
         return tuple(self.dims[i] for i in self.subscripts)
 
     @property
@@ -293,7 +270,7 @@ class MatrixProduct:
         subscript, operands = self.norm_subscripts(subscripts, *args)
         return jnp.einsum(subscript, *operands, **kwargs)
 
-    def expand_subscript(self, mat_subscript) -> List[str]:
+    def expand_subscript(self, mat_subscript) -> list[str]:
         replace = dict(zip(self.subscripts, mat_subscript))
         return ["".join(replace[i] for i in ind) for ind in self.indices]
 
@@ -303,11 +280,12 @@ class MatrixProduct:
         operand_subs = inputs.split(",")
         expanded_subs, expanded_ops = map(
             lambda l: sum(l, []),
-            zip(*(
-                (M.expand_subscript(sub), list(M.operands))
-                if isinstance(M, type(self)) else ([sub], [M])
-                for M, sub in zip(operands, operand_subs)
-            ))
+            zip(
+                *(
+                    (M.expand_subscript(sub), list(M.operands)) if isinstance(M, type(self)) else ([sub], [M])
+                    for M, sub in zip(operands, operand_subs)
+                )
+            ),
         )
         norm_subscripts = "->".join([",".join(expanded_subs)] + out)
         return norm_subscripts, expanded_ops
@@ -349,29 +327,21 @@ class MatrixProduct:
                 break
             sub_index[j] = i
 
-        new_operands = (
-            op[tuple(sub_index.get(j, slice(None)) for j in ind)]
-            for op, ind in zip(self.operands, self.indices)
-        )
-        new_indices = ",".join(
-            "".join(j for j in ind if not jnp.isscalar(sub_index.get(j)))
-            for ind in self.indices
-        )
-        out = "".join(
-            j for j in self.subscripts if not jnp.isscalar(sub_index.get(j)))
+        new_operands = (op[tuple(sub_index.get(j, slice(None)) for j in ind)] for op, ind in zip(self.operands, self.indices))
+        new_indices = ",".join("".join(j for j in ind if not jnp.isscalar(sub_index.get(j))) for ind in self.indices)
+        out = "".join(j for j in self.subscripts if not jnp.isscalar(sub_index.get(j)))
         return MatrixProduct(new_indices + "->" + out, *new_operands)
 
-    def diagonal(self, subscripts: Optional[str] = None, axis1: Optional[str] = None, axis2: Optional[str] = None):
+    def diagonal(self, subscripts: str | None = None, axis1: str | None = None, axis2: str | None = None):
         subs: str = subscripts or self.subscripts
         ax1: str = axis1 or subs[-2]
         ax2: str = axis2 or subs[-1]
 
-        def diagonals() -> Generator[Tuple[np.ndarray, str], None, None]:
+        def diagonals() -> Generator[tuple[np.ndarray, str], None, None]:
             for M, sub in zip(self.operands, self.expand_subscript(subs)):
                 if ax2 in sub:
                     if ax1 in sub:
-                        M = M.diagonal(axis1=sub.index(
-                            ax1), axis2=sub.index(ax2))
+                        M = M.diagonal(axis1=sub.index(ax1), axis2=sub.index(ax2))
                         sub = sub.replace(ax2, "")
                     sub = sub.replace(ax2, ax1)
                 yield M, sub
@@ -383,7 +353,7 @@ class MatrixProduct:
 
 def func_jac(func, params, *args, **kwargs):
     l, vjp = jax.vjp(lambda p: func(p, *args, **kwargs), params)
-    grad = vjp(1.)
+    grad = vjp(1.0)
     return l, grad
 
 
@@ -403,30 +373,21 @@ class OptMultiFunction:
         self.concurrent_kws = concurrent_kws or {}
 
     def map_concurrent(self, func, x, **kwargs):
-        kwargs = {
-            **self.concurrent_kws, **self.kwargs, **kwargs
-        }
+        kwargs = {**self.concurrent_kws, **self.kwargs, **kwargs}
         params = self.unravel(x)
         res, errors = map_concurrent(
             func,
-            {
-                k: (params, *args)
-                for k, args in self.args_groups.items()
-            },
+            {k: (params, *args) for k, args in self.args_groups.items()},
             **kwargs,
         )
         return res, errors
 
     def __call__(self, x, **kwargs):
-        res, errors = self.map_concurrent(
-            self.func, x, **kwargs
-        )
+        res, errors = self.map_concurrent(self.func, x, **kwargs)
         return res
 
     def func_jac(self, x, **kwargs):
-        res, errors = self.map_concurrent(
-            self._func_jac, x, **kwargs
-        )
+        res, errors = self.map_concurrent(self._func_jac, x, **kwargs)
         return res
 
 
@@ -464,9 +425,8 @@ class OptTransform:
 
     def func_jac(self, x):
         params = self.unravel(x)
-        l, vjp = jax.vjp(lambda p: self.func(
-            p, *self.args, **self.kwargs), params)
-        grad = vjp(1.)
+        l, vjp = jax.vjp(lambda p: self.func(p, *self.args, **self.kwargs), params)
+        grad = vjp(1.0)
         G = self.sign * self.ravel(grad)
         return self.sign * l, G
 
@@ -479,17 +439,15 @@ class OptTransform:
     def ravel(params):
         return np.array(ravel_pytree(params)[0], float)
 
-    def minimize(self, params, jac=True, method='L-BFGS-B', **kwargs):
+    def minimize(self, params, jac=True, method="L-BFGS-B", **kwargs):
         from scipy import optimize
 
         x0 = self.ravel(params)
         if jac:
-            res = optimize.minimize(
-                self.func_jac, x0, method=method, jac=True, **kwargs)
+            res = optimize.minimize(self.func_jac, x0, method=method, jac=True, **kwargs)
         else:
-            res = optimize.minimize(
-                self, x0, method=method, jac=self.jac, **kwargs)
+            res = optimize.minimize(self, x0, method=method, jac=self.jac, **kwargs)
 
-        res['params'] = self.unravel(res.x)
-        res['gradient'] = self.unravel(res.jac)
+        res["params"] = self.unravel(res.x)
+        res["gradient"] = self.unravel(res.jac)
         return res

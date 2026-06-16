@@ -1,11 +1,10 @@
 from functools import partial
 
-import numpy as np
-from scipy import linalg
-
 import jax
-from jax import numpy as jnp, scipy as jsp
-
+import numpy as np
+from jax import numpy as jnp
+from jax import scipy as jsp
+from scipy import linalg
 
 from rowing.model import banded
 from rowing.model.banded import BandedMatrix, bands
@@ -88,7 +87,7 @@ def test_solve_triangular():
 
     L = banded.bands(np.random.randn(n, n), -k, 0)
     i = np.arange(n)
-    L = L.at[i, i].set(L[i, i]**2 + 1)
+    L = L.at[i, i].set(L[i, i] ** 2 + 1)
     Lb = banded.BandedMatrix.from_dense(L, -k, 0)
     A = L @ L.T
     Ab = Lb @ Lb.T
@@ -120,13 +119,8 @@ def test_solve_triangular():
         (Rb.T, L.T, False, 1),
     ]
     for _Lb, _L, lower, trans in groups:
-        check(
-            banded.solve_triangular_banded(_Lb, b),
-            jsp.linalg.solve_triangular(_L, b, lower=lower, trans=trans)
-        )
-        x, vjp = jax.vjp(
-            partial(func, k=k, lower=lower, trans=trans), _L, b
-        )
+        check(banded.solve_triangular_banded(_Lb, b), jsp.linalg.solve_triangular(_L, b, lower=lower, trans=trans))
+        x, vjp = jax.vjp(partial(func, k=k, lower=lower, trans=trans), _L, b)
         x1, vjp1 = jax.vjp(banded.solve_triangular_banded, _Lb, b)
         g = np.random.randn(*x.shape)
 
@@ -139,9 +133,7 @@ def test_solve_triangular():
             check(gL1, gL.T)
             check(gb1, gb)
 
-        x, vjp = jax.vjp(
-            partial(func2, k=k, lower=lower, trans=trans), _L, b
-        )
+        x, vjp = jax.vjp(partial(func2, k=k, lower=lower, trans=trans), _L, b)
         x1, vjp1 = jax.vjp(banded.banded_triangular_matmul, _Lb, b)
         g = np.random.randn(*x.shape)
 
@@ -162,7 +154,7 @@ def test_cholesky():
 
     L = banded.bands(np.random.randn(n, n), -k, 0)
     i = np.arange(n)
-    L = L.at[i, i].set(L[i, i]**2 + 1)
+    L = L.at[i, i].set(L[i, i] ** 2 + 1)
     Lb = banded.BandedMatrix.from_dense(L, -k, 0)
     A = L @ L.T
     Ab = Lb @ Lb.T
@@ -175,12 +167,12 @@ def test_cholesky():
 
     L, vjp = jax.vjp(partial(func, k=k), A)
     dL = np.random.randn(n, n)
-    dA, = vjp(dL)
+    (dA,) = vjp(dL)
 
     Lb, vjp1 = jax.vjp(banded.cholesky_banded, Sl)
-    dSb, = vjp1(Lb.set(dL))
+    (dSb,) = vjp1(Lb.set(dL))
     check(banded.bands(dA, -k, 0), dSb)
 
     Rb, vjp1 = jax.vjp(banded.cholesky_banded, Su)
-    dSu, = vjp1(Rb.set(dL.T))
+    (dSu,) = vjp1(Rb.set(dL.T))
     check(banded.bands(dA, 0, k), dSu)

@@ -1,8 +1,6 @@
-
+import logging
 import os
 from pathlib import Path
-import logging
-
 
 import click
 import streamlit
@@ -13,12 +11,7 @@ from rowing.app import inputs, plots, select, state, threads
 DIR = Path(__file__).absolute().parent
 PACKAGE_DIR = (DIR / "../../..").resolve()
 
-LOG_LEVELS = {
-    "error": logging.ERROR,
-    "warning": logging.WARNING,
-    "info": logging.WARNING,
-    "debug": logging.DEBUG
-}
+LOG_LEVELS = {"error": logging.ERROR, "warning": logging.WARNING, "info": logging.WARNING, "debug": logging.DEBUG}
 
 
 def get_working_directory(folder="app/world_rowing", start_dir=DIR):
@@ -48,9 +41,7 @@ def main(dir, application, log_level):
     work_dir = get_working_directory(application, dir)
 
     streamlit._is_running_with_streamlit = True
-    flag_options = {
-        "global.developmentMode": False
-    }
+    flag_options = {"global.developmentMode": False}
     os.chdir(work_dir)
     cli.bootstrap.load_config_options(flag_options=flag_options)
     cli._main_run("home.py", flag_options)

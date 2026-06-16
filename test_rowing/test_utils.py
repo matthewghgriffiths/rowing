@@ -1,4 +1,5 @@
 """Unit tests for rowing.utils (interpolation, formatting, concurrency)."""
+
 from datetime import timedelta
 
 import numpy as np

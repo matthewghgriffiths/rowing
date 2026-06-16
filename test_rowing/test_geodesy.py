@@ -1,4 +1,5 @@
 """Unit tests for rowing.analysis.geodesy (pure spherical-geometry helpers)."""
+
 import numpy as np
 import pytest
 
@@ -24,8 +25,8 @@ def test_haversine_km_known_distance():
 @pytest.mark.parametrize(
     "dest, expected",
     [
-        (LatLon(1.0, 0.0), 0.0),     # north
-        (LatLon(0.0, 1.0), 90.0),    # east
+        (LatLon(1.0, 0.0), 0.0),  # north
+        (LatLon(0.0, 1.0), 90.0),  # east
         (LatLon(-1.0, 0.0), 180.0),  # south
         (LatLon(0.0, -1.0), 270.0),  # west
     ],

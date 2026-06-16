@@ -1,20 +1,16 @@
-
-import streamlit as st
 import io
-from functools import partial
-import yaml
 import json
-
 import logging
+from functools import partial
 
 import numpy as np
 import pandas as pd
-
-from tqdm import tqdm
-
-import plotly.graph_objects as go
 import plotly.express as px
+import plotly.graph_objects as go
 import plotly.io as pio
+import streamlit as st
+import yaml
+from tqdm import tqdm
 
 from rowing import utils
 from rowing.analysis import app, telemetry
@@ -32,11 +28,7 @@ def main(state=None):
     st.session_state.update(state)
 
     logger.info("telemetry")
-    st.set_page_config(
-        page_title="Peach Telemetry Analysis",
-        layout='wide',
-        initial_sidebar_state='collapsed'
-    )
+    st.set_page_config(page_title="Peach Telemetry Analysis", layout="wide", initial_sidebar_state="collapsed")
     """
     # Peach Telemetry processing
     """
@@ -50,7 +42,7 @@ def main(state=None):
             "&quietzone=1&errorcorrection=H"
         )
         st.markdown(
-            r'''
+            r"""
             ### Page Navigation
             - [Landmarks](#landmarks-from-activities)
             - [Map](#map)
@@ -62,7 +54,7 @@ def main(state=None):
             - [Plot Piece Data](#plot-piece-data)
             - [Plot Stroke Profiles](#plot-stroke-profiles)
             - [Download Data](#download-data)
-            '''
+            """
         )
         default_height = st.number_input(
             "Default Figure Height",
@@ -78,20 +70,23 @@ def main(state=None):
     with st.expander("Upload Telemetry Data", True):
         use_names = st.checkbox("Use crew list", True)
         with_timings = st.checkbox("Calc timings", True)
-        tabs = st.tabs([
-            'Upload peach-data',
-            "Upload", "Upload text", "Upload csv",
-            "Upload xlsx", "Upload Zip",
-        ])
+        tabs = st.tabs(
+            [
+                "Upload peach-data",
+                "Upload",
+                "Upload text",
+                "Upload csv",
+                "Upload xlsx",
+                "Upload Zip",
+            ]
+        )
         with tabs[0]:
             uploaded_files = st.file_uploader(
                 "Upload peach-data and peach-data-index files",
                 accept_multiple_files=True,
                 # type=['peach-data', 'peach-data-index'],
             )
-            telemetry_data.update(
-                app.parse_peach_data_files(uploaded_files)
-            )
+            telemetry_data.update(app.parse_peach_data_files(uploaded_files))
 
         with tabs[1]:
             uploaded_files = st.file_uploader(
@@ -111,9 +106,7 @@ def main(state=None):
                 Zip: `zip`
                 """
             )
-            telemetry_data.update(
-                app.parse_telemetry_files(
-                    uploaded_files, use_names=use_names, with_timings=with_timings))
+            telemetry_data.update(app.parse_telemetry_files(uploaded_files, use_names=use_names, with_timings=with_timings))
 
         with tabs[2]:
             uploaded_files = st.file_uploader(
@@ -132,17 +125,17 @@ def main(state=None):
                 00.0000000000	00.0000000000	01 Jan 2023 00:00:00 (UTC)	00000
                 =====	Crew Info
                 ...
-                """, None)
+                """,
+                None,
+            )
             telemetry_data.update(
-                app.parse_telemetry_text(
-                    uploaded_files, use_names=use_names, sep='\t', with_timings=with_timings
-                )
+                app.parse_telemetry_text(uploaded_files, use_names=use_names, sep="\t", with_timings=with_timings)
             )
         with tabs[3]:
             uploaded_files = st.file_uploader(
                 "Upload All Data Export from PowerLine (comma separated)",
                 accept_multiple_files=True,
-                type=['csv'],
+                type=["csv"],
             )
             st.write("Text should should be formatted like below")
             st.code(
@@ -154,36 +147,28 @@ def main(state=None):
                 Lat,Lon,UTC,PeachTime,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
                 00.00000000,00.00000000,Sun 01 Jan 2023 00:00:00 (UTC),00000,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
                 ...
-                """, None)
+                """,
+                None,
+            )
             telemetry_data.update(
-                app.parse_telemetry_text(
-                    uploaded_files, use_names=use_names, sep=',', with_timings=with_timings
-                )
+                app.parse_telemetry_text(uploaded_files, use_names=use_names, sep=",", with_timings=with_timings)
             )
         with tabs[4]:
             uploaded_files = st.file_uploader(
                 "Upload Data Export from PowerLine",
                 accept_multiple_files=True,
-                type=['xlsx', 'xls'],
+                type=["xlsx", "xls"],
             )
-            telemetry_data.update(
-                app.parse_telemetry_excel(
-                    uploaded_files, use_names=use_names
-                )
-            )
+            telemetry_data.update(app.parse_telemetry_excel(uploaded_files, use_names=use_names))
         with tabs[5]:
             uploaded_files = st.file_uploader(
                 "Upload Zip of Data Exports",
                 accept_multiple_files=True,
-                type=['zip'],
+                type=["zip"],
             )
-            telemetry_data.update(
-                app.parse_telemetry_zip(uploaded_files)
-            )
+            telemetry_data.update(app.parse_telemetry_zip(uploaded_files))
 
-        gps_data = {
-            k: split_data['positions'] for k, split_data in telemetry_data.items()
-        }
+        gps_data = {k: split_data["positions"] for k, split_data in telemetry_data.items()}
 
         if st.toggle("save as zip"):
             with st.spinner("Creating Zip File"):
@@ -217,10 +202,12 @@ def main(state=None):
             heat_map_settings = st.popover("heat map settings")
         fig, file_col = app.set_gps_heatmap(
             telemetry_data,
-            cols[0], cols[1], heat_map_settings,
-            key='_primary',
+            cols[0],
+            cols[1],
+            heat_map_settings,
+            key="_primary",
         )
-        st.plotly_chart(fig, width='stretch', theme=None)
+        st.plotly_chart(fig, width="stretch", theme=None)
 
         with heat_map_settings:
             if st.toggle(":inbox_tray: Download Heatmap"):
@@ -229,39 +216,37 @@ def main(state=None):
                     fig,
                     ":inbox_tray: Download Heatmap",
                     f"heatmap-{c0, c1}.html",
-                    include_plotlyjs='cdn',
+                    include_plotlyjs="cdn",
                 )
 
     logger.info("Crossing Times")
     with st.spinner("Processing Crossing Times"):
         crossing_times = app.get_crossing_times(gps_data, locations=locations)
-        all_crossing_times = pd.concat(crossing_times, names=['name'])
+        all_crossing_times = pd.concat(crossing_times, names=["name"])
 
     if all_crossing_times.empty:
         return
 
     with st.expander("Crossing times"):
         st.subheader("Crossing Times")
-        show_times = pd.concat({
-            "date": all_crossing_times.dt.normalize(),
-            "time": all_crossing_times,
-        }, axis=1)
+        show_times = pd.concat(
+            {
+                "date": all_crossing_times.dt.normalize(),
+                "time": all_crossing_times,
+            },
+            axis=1,
+        )
         st.dataframe(
             show_times,
             column_config={
                 "date": st.column_config.DateColumn("Date"),
-                "time": st.column_config.TimeColumn(
-                    "Time", format="hh:mm:ss.SS"
-                )
-            }
+                "time": st.column_config.TimeColumn("Time", format="hh:mm:ss.SS"),
+            },
         )
 
-        landmark_times = all_crossing_times.droplevel(
-            ["location", "distance"]
-        ).unstack("landmark")
+        landmark_times = all_crossing_times.droplevel(["location", "distance"]).unstack("landmark")
         landmark_times = landmark_times.loc[
-            landmark_times.min(1).sort_values().index,
-            landmark_times.min().sort_values().index
+            landmark_times.min(1).sort_values().index, landmark_times.min().sort_values().index
         ]
         st.write(landmark_times)
         app.download_csv("all-crossings.csv", show_times)
@@ -270,18 +255,19 @@ def main(state=None):
         tabs = st.tabs(crossing_times)
         for tab, (name, crossings) in zip(tabs, crossing_times.items()):
             with tab:
-                show_crossings = pd.concat({
-                    "date": crossings.dt.normalize(),
-                    "time": crossings,
-                }, axis=1)
+                show_crossings = pd.concat(
+                    {
+                        "date": crossings.dt.normalize(),
+                        "time": crossings,
+                    },
+                    axis=1,
+                )
                 st.dataframe(
                     show_crossings,
                     column_config={
                         "date": st.column_config.DateColumn("Date"),
-                        "time": st.column_config.TimeColumn(
-                            "Time", format="hh:mm:ss.SS"
-                        )
-                    }
+                        "time": st.column_config.TimeColumn("Time", format="hh:mm:ss.SS"),
+                    },
                 )
                 app.download_csv(f"{name}-crossings.csv", show_crossings)
 
@@ -292,25 +278,20 @@ def main(state=None):
         if piece_information is None:
             st.write("No valid pieces could be found")
         else:
-            piece_information['piece_data'].update(
-                telemetry.get_interval_averages(
-                    piece_information['piece_data']['Timestamp'],
-                    telemetry_data)
+            piece_information["piece_data"].update(
+                telemetry.get_interval_averages(piece_information["piece_data"]["Timestamp"], telemetry_data)
             )
-            piece_information['gps_data'] = gps_data
-            piece_information['telemetry_data'] = telemetry_data
-            piece_information.update(app.make_stroke_profiles(
-                piece_information['telemetry_data'],
-                piece_information['piece_data']
-            ))
-            piece_information['piece_rowers'] = pd.MultiIndex.from_tuples([
-                (r, k)
-                for k, data in telemetry_data.items()
-                for r in data['power'].columns.levels[1]
-                if r
-            ], names=('Position', 'name'))
+            piece_information["gps_data"] = gps_data
+            piece_information["telemetry_data"] = telemetry_data
+            piece_information.update(
+                app.make_stroke_profiles(piece_information["telemetry_data"], piece_information["piece_data"])
+            )
+            piece_information["piece_rowers"] = pd.MultiIndex.from_tuples(
+                [(r, k) for k, data in telemetry_data.items() for r in data["power"].columns.levels[1] if r],
+                names=("Position", "name"),
+            )
 
-            app.show_piece_data(piece_information['piece_data'])
+            app.show_piece_data(piece_information["piece_data"])
 
     with st.expander("Report", True):
         st.subheader("Report")
@@ -352,7 +333,7 @@ def main(state=None):
 
                 template = st.file_uploader(
                     "Upload report template",
-                    type=['yaml', 'json'],
+                    type=["yaml", "json"],
                 )
                 if template:
                     template_data = yaml.safe_load(template)
@@ -364,35 +345,30 @@ def main(state=None):
                             st.session_state[k] = v
 
         window, show_rowers, n_views, height = app.setup_plots(
-            piece_information['piece_rowers'], state,
-            key='report_setup.',
+            piece_information["piece_rowers"],
+            state,
+            key="report_setup.",
             cols=settings_cols,
             toggle=False,
             nview=True,
-            default_height=default_height
+            default_height=default_height,
         )
-        piece_information = app.setup_plot_data(
-            piece_information, window, show_rowers)
+        piece_information = app.setup_plot_data(piece_information, window, show_rowers)
 
         report_outputs = {}
         with report:
             if n_views:
                 st.markdown(
-                    r'[Go to Bottom of Report](#report-settings)'
+                    r"[Go to Bottom of Report](#report-settings)"
                     # r"[#report-settings](Go to Report Settings)"
                 )
             if st.toggle("Show Summary", True) and piece_information:
                 initial = {
-                    t: piece_information['piece_data'][t]
-                    for t in [
-                        'Elapsed Time',
-                        'Distance Travelled',
-                        'Average Split',
-                        'Interval Split'
-                    ]
+                    t: piece_information["piece_data"][t]
+                    for t in ["Elapsed Time", "Distance Travelled", "Average Split", "Interval Split"]
                 }
                 st.header("Summary")
-                report_outputs[-1, 'Summary'] = outputs = {}
+                report_outputs[-1, "Summary"] = outputs = {}
                 for t, table in initial.items():
                     st.subheader(t)
                     table = table.copy()
@@ -400,12 +376,8 @@ def main(state=None):
                         if pd.api.types.is_timedelta64_dtype(col.dtype):
                             table[c] = col.map(utils.format_timedelta)
 
-                    st.dataframe(
-                        table,
-                        height=(len(table) + 1) * 35 + 3,
-                        width='stretch'
-                    )
-                    outputs[-1, 'table', 'Piece profile', t] = table
+                    st.dataframe(table, height=(len(table) + 1) * 35 + 3, width="stretch")
+                    outputs[-1, "table", "Piece profile", t] = table
 
             for i in range(n_views):
                 key = f"report_{i}."
@@ -427,7 +399,7 @@ def main(state=None):
                             "Interval averages",
                             "Piece averages",
                             "Heatmap",
-                        ]
+                        ],
                     )
                     st.divider()
 
@@ -436,12 +408,10 @@ def main(state=None):
                         plot_data_type = st.selectbox(
                             "What data would you like to plot?",
                             key=key + "select piece",
-                            options=["Pace Boat"] + list(telemetry.FIELDS)
-                            + telemetry.TIMING_FIELDS if with_timings else []
+                            options=["Pace Boat"] + list(telemetry.FIELDS) + telemetry.TIMING_FIELDS if with_timings else [],
                         )
                     figures, tables = app.plot_piece_col(
-                        plot_data_type, piece_information, default_height=height, key=key,
-                        input_container=inputs
+                        plot_data_type, piece_information, default_height=height, key=key, input_container=inputs
                     )
 
                 elif plot_type == "Stroke profile":
@@ -453,52 +423,41 @@ def main(state=None):
                                 "Rower profile",
                                 "Crew profiles",
                                 "Boat profile",
-                            ]
+                            ],
                         )
 
                     if plot_data_type == "Rower profile":
-                        figures, tables = app.plot_rower_profiles(
-                            piece_information, default_height=height, key=key,
-                            cols=cols)
+                        figures, tables = app.plot_rower_profiles(piece_information, default_height=height, key=key, cols=cols)
                     elif plot_data_type == "Crew profiles":
-                        figures, tables = app.plot_crew_profile(
-                            piece_information, default_height=height, key=key,
-                            cols=cols)
+                        figures, tables = app.plot_crew_profile(piece_information, default_height=height, key=key, cols=cols)
                     elif plot_data_type == "Boat profile":
-                        figures, tables = app.plot_boat_profile(
-                            piece_information, default_height=height, key=key,
-                            cols=cols)
+                        figures, tables = app.plot_boat_profile(piece_information, default_height=height, key=key, cols=cols)
 
                 elif plot_type == "Overlay multiple plots":
                     figures, tables, plot_data_type = app.plot_multiple_profile(
-                        piece_information,
-                        settings_container=inputs,
-                        key=key + "multiple",
-                        height=height
+                        piece_information, settings_container=inputs, key=key + "multiple", height=height
                     )
 
                 elif plot_type == "Interval averages":
                     with inputs:
                         plot_data_type = st.selectbox(
-                            "What data would you like to show?",
-                            key=key + "select piece",
-                            options=list(telemetry.FIELDS)
+                            "What data would you like to show?", key=key + "select piece", options=list(telemetry.FIELDS)
                         )
                         tables = {
-                            f"Interval {plot_data_type}": piece_information['piece_data_filter'].get(
-                                f"Interval {plot_data_type}")
+                            f"Interval {plot_data_type}": piece_information["piece_data_filter"].get(
+                                f"Interval {plot_data_type}"
+                            )
                         }
 
                 elif plot_type == "Piece averages":
                     with inputs:
                         plot_data_type = st.selectbox(
-                            "What data would you like to show?",
-                            key=key + "select piece",
-                            options=list(telemetry.FIELDS)
+                            "What data would you like to show?", key=key + "select piece", options=list(telemetry.FIELDS)
                         )
                         tables = {
-                            f"Average {plot_data_type}": piece_information['piece_data_filter'].get(
-                                f"Average {plot_data_type}")
+                            f"Average {plot_data_type}": piece_information["piece_data_filter"].get(
+                                f"Average {plot_data_type}"
+                            )
                         }
 
                 elif plot_type == "Heatmap":
@@ -506,13 +465,8 @@ def main(state=None):
                         select0 = st.container()
                         st.divider()
                         select1 = st.container()
-                    fig, file_col = app.set_gps_heatmap(
-                        telemetry_data, select0, select0, select1,
-                        key=key
-                    )
-                    plot_data_type = ", ".join(
-                        f"{k}: {c0}-{c1}" for k, (c0, c1) in file_col.items()
-                    )
+                    fig, file_col = app.set_gps_heatmap(telemetry_data, select0, select0, select1, key=key)
+                    plot_data_type = ", ".join(f"{k}: {c0}-{c1}" for k, (c0, c1) in file_col.items())
                     figures = {plot_data_type: fig}
 
                 header = f"{plot_type}: {plot_data_type}"
@@ -523,18 +477,14 @@ def main(state=None):
 
                 for c, fig in figures.items():
                     st.subheader(c)
-                    fig_key = i, 'figure', plot_type, plot_data_type, c
-                    st.plotly_chart(fig, width='stretch', key=fig_key)
+                    fig_key = i, "figure", plot_type, plot_data_type, c
+                    st.plotly_chart(fig, width="stretch", key=fig_key)
                     outputs[fig_key] = fig
 
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(
-                        table,
-                        height=(len(table) + 1) * 35 + 3,
-                        width='stretch'
-                    )
-                    outputs[i, 'table', plot_type, plot_data_type, t] = table
+                    st.dataframe(table, height=(len(table) + 1) * 35 + 3, width="stretch")
+                    outputs[i, "table", plot_type, plot_data_type, t] = table
 
         with template_container:
             report_state = {}
@@ -552,14 +502,12 @@ def main(state=None):
             if st.toggle(f":inbox_tray: Get Static Report"):
                 file_name = f"report-{'-'.join(telemetry_data)}.html"
                 app.make_static_report(report_outputs, file_name)
-                st.write(
-                    "note: to open report on iPhone, use Edge internet browser")
+                st.write("note: to open report on iPhone, use Edge internet browser")
 
             if st.toggle(f":inbox_tray: Get Offline Static Report"):
                 file_name = f"offline-{'-'.join(telemetry_data)}.html"
                 app.make_offline_static_report(report_outputs, file_name)
-                st.write(
-                    "note: to open report on iPhone, use Edge internet browser")
+                st.write("note: to open report on iPhone, use Edge internet browser")
 
     logger.info("Plot piece data")
     telemetry_figures = {}
@@ -567,9 +515,9 @@ def main(state=None):
         st.subheader("Plot piece data")
         if piece_information:
             window, show_rowers, all_plots, height = app.setup_plots(
-                piece_information['piece_rowers'], state, default_height=default_height)
-            piece_information = app.setup_plot_data(
-                piece_information, window, show_rowers)
+                piece_information["piece_rowers"], state, default_height=default_height
+            )
+            piece_information = app.setup_plot_data(piece_information, window, show_rowers)
 
             tab_names = ["Pace Boat"] + list(telemetry.FIELDS)
             telem_tabs = dict(zip(tab_names, st.tabs(tab_names)))
@@ -577,60 +525,50 @@ def main(state=None):
                 with tab:
                     cols = st.columns((1, 7))
                     with cols[0]:
-                        on = st.toggle('Make plot', value=all_plots,
-                                       key=col + ' make plot')
+                        on = st.toggle("Make plot", value=all_plots, key=col + " make plot")
 
                     if on:
                         figures, tables = app.plot_piece_col(
-                            col, piece_information,
-                            default_height=default_height,
-                            key=col, input_container=cols[1]
+                            col, piece_information, default_height=default_height, key=col, input_container=cols[1]
                         )
                         for c, fig in figures.items():
-                            st.plotly_chart(fig, width='stretch')
+                            st.plotly_chart(fig, width="stretch")
                         for t, table in tables.items():
                             st.subheader(t)
-                            st.dataframe(table, width='stretch')
+                            st.dataframe(table, width="stretch")
 
     with st.expander("Plot Stroke Profiles"):
         st.subheader("Plot Stroke Profiles")
-        if st.toggle(
-            'Make profile plots',
-            key='Make profile plots'
-        ) and piece_information:
+        if st.toggle("Make profile plots", key="Make profile plots") and piece_information:
             # for p, profile in piece_information['crew_profiles'].items():
             #     print(p)
             #     print(profile)
 
-            tabs = st.tabs(
-                ["Rower Profiles", "Boat Profile", "Grouped Profiles"])
+            tabs = st.tabs(["Rower Profiles", "Boat Profile", "Grouped Profiles"])
             with tabs[0]:
-                figures, tables = app.plot_rower_profiles(
-                    piece_information, default_height=default_height)
+                figures, tables = app.plot_rower_profiles(piece_information, default_height=default_height)
 
                 for c, fig in figures.items():
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, width="stretch")
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(table, width='stretch')
+                    st.dataframe(table, width="stretch")
 
             with tabs[1]:
-                figures, tables = app.plot_boat_profile(
-                    piece_information, default_height=default_height)
+                figures, tables = app.plot_boat_profile(piece_information, default_height=default_height)
                 for c, fig in figures.items():
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, width="stretch")
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(table, width='stretch')
+                    st.dataframe(table, width="stretch")
 
             with tabs[2]:
-                figures, tables = app.plot_crew_profile(
-                    piece_information, default_height=default_height)
+                figures, tables = app.plot_crew_profile(piece_information, default_height=default_height)
                 for c, fig in figures.items():
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, width="stretch")
                 for t, table in tables.items():
                     st.subheader(t)
-                    st.dataframe(table, width='stretch')
+                    st.dataframe(table, width="stretch")
 
     logger.info("Download data")
     with st.expander("Download Data"):
@@ -640,33 +578,29 @@ def main(state=None):
             with cols[0], st.spinner("Generating excel file"):
                 xldata = io.BytesIO()
                 with pd.ExcelWriter(xldata) as xlf:
-                    for name, data in piece_information['piece_data'].items():
+                    for name, data in piece_information["piece_data"].items():
                         save_data = data.copy()
                         for c, vals in data.items():
                             if pd.api.types.is_datetime64_any_dtype(vals.dtype):
                                 save_data[c] = vals.dt.tz_localize(None)
                             elif pd.api.types.is_timedelta64_dtype(vals.dtype):
-                                save_data[c] = vals.map(
-                                    partial(utils.format_timedelta, hours=True)
-                                )
+                                save_data[c] = vals.map(partial(utils.format_timedelta, hours=True))
 
-                        save_data.to_excel(
-                            xlf, sheet_name=name.replace("/", " per "))
+                        save_data.to_excel(xlf, sheet_name=name.replace("/", " per "))
 
                 xldata.seek(0)
-                start_landmark = piece_information['start_landmark']
-                finish_landmark = piece_information['finish_landmark']
+                start_landmark = piece_information["start_landmark"]
+                finish_landmark = piece_information["finish_landmark"]
                 st.download_button(
                     f":inbox_tray: Download telemetry-{start_landmark}-{finish_landmark}.xlsx",
                     xldata,
                     # type='primary',
-                    file_name=f'telemetry-{start_landmark}-{finish_landmark}.xlsx'
+                    file_name=f"telemetry-{start_landmark}-{finish_landmark}.xlsx",
                     # file_name="telemetry_piece_data.xlsx",
                 )
 
         if telemetry_figures:
-            save_figures = {
-                f"{col}/{name}": fig for (col, name), fig in telemetry_figures.items()}
+            save_figures = {f"{col}/{name}": fig for (col, name), fig in telemetry_figures.items()}
             with cols[2]:
                 width = st.number_input(
                     "Save figure width",
@@ -686,8 +620,7 @@ def main(state=None):
             with cols[1]:
                 download_figures = st.multiselect(
                     "Download Figures as",
-                    options=['html', 'png', 'svg', 'pdf',
-                             'jpg', 'webp', 'online-html'],
+                    options=["html", "png", "svg", "pdf", "jpg", "webp", "online-html"],
                     default=[],
                 )
                 for file_type in download_figures:
@@ -698,15 +631,13 @@ def main(state=None):
                             height=height,
                             width=width,
                         )
-                        if file_type == 'html':
+                        if file_type == "html":
                             kwargs = {}
-                        if file_type == 'online-html':
-                            file_type = 'html'
+                        if file_type == "online-html":
+                            file_type = "html"
                             kwargs = {"include_plotlyjs": "cdn"}
 
-                        zipdata = app.figures_to_zipfile(
-                            save_figures, file_type, **kwargs
-                        )
+                        zipdata = app.figures_to_zipfile(save_figures, file_type, **kwargs)
                         st.download_button(
                             f":inbox_tray: Download {file_name}",
                             zipdata,

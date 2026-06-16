@@ -7,6 +7,7 @@ Two things are set up here:
 * fixtures that resolve the sample data files under ``<repo>/data`` and skip
   (rather than error) when a fixture file is absent.
 """
+
 from pathlib import Path
 
 import pytest

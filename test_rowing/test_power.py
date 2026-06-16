@@ -1,4 +1,5 @@
 """Unit tests for rowing.analysis.power (max-mean power and piece detection)."""
+
 import numpy as np
 import pandas as pd
 

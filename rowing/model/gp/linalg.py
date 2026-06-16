@@ -1,26 +1,20 @@
-
-from typing import NamedTuple, Tuple
 from functools import partial
+from typing import NamedTuple, Tuple
 
-import numpy as np
-
+import haiku as hk
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-import haiku as hk
+import numpy as np
 
 vdot = jax.vmap(jnp.dot)
 
 
-def get_pos_def(n, dof=None, log_diag=0., name="pos_def"):
-    diag = jnp.exp(hk.get_parameter(
-        f"{name}_diag", shape=(n,), dtype="f", init=lambda s, d: jnp.full(s, log_diag, d)
-    ))
+def get_pos_def(n, dof=None, log_diag=0.0, name="pos_def"):
+    diag = jnp.exp(hk.get_parameter(f"{name}_diag", shape=(n,), dtype="f", init=lambda s, d: jnp.full(s, log_diag, d)))
     P = jnp.diag(diag)
     if dof:
-        W = hk.get_parameter(
-            f"{name}_W", shape=(n, dof), dtype='f', init=jnp.zeros
-        )
+        W = hk.get_parameter(f"{name}_W", shape=(n, dof), dtype="f", init=jnp.zeros)
         return W.dot(W.T) + P
     else:
         return P
@@ -28,41 +22,35 @@ def get_pos_def(n, dof=None, log_diag=0., name="pos_def"):
 
 def solve_triangular(A: jax.Array, b: jax.Array, **kwargs):
     return jax.vmap(
-        lambda b: jsp.linalg.solve_triangular(A, b, **kwargs), 0,
+        lambda b: jsp.linalg.solve_triangular(A, b, **kwargs),
+        0,
     )(b.reshape(b.shape[0], -1).T).T.reshape(b.shape)
 
 
-partial(jax.jit, static_argnames=('min_eig',))
+partial(jax.jit, static_argnames=("min_eig",))
 
 
-def closest_cholesky(A, min_eig=0.):
+def closest_cholesky(A, min_eig=0.0):
     l, V = jnp.linalg.eigh(A)
     min_eig = jax.lax.select(
         min_eig < 0,
         jnp.where(l > 0, l, l.max()).min(),
-        min_eig
+        min_eig,
         # jnp.asarray(min_eig, dtype=l.dtype)
     )
 
-    _, R = jnp.linalg.qr(
-        (V * jnp.sqrt(jnp.clip(l, min_eig, None))).T
-    )
+    _, R = jnp.linalg.qr((V * jnp.sqrt(jnp.clip(l, min_eig, None))).T)
     L = R.T * jnp.sign(R.diagonal())
     return L
 
 
-partial(jax.jit, static_argnames=('min_eig',))
+partial(jax.jit, static_argnames=("min_eig",))
 
 
 def cholesky(A, min_eig=0):
     L = jnp.linalg.cholesky(A)
     isposdef = jnp.isfinite(L[0, 0])
-    return jax.lax.cond(
-        isposdef,
-        lambda A: L,
-        lambda A: closest_cholesky(A, min_eig=jnp.float_(min_eig)),
-        A
-    )
+    return jax.lax.cond(isposdef, lambda A: L, lambda A: closest_cholesky(A, min_eig=jnp.float_(min_eig)), A)
 
 
 def maximum(x, *args):
@@ -78,25 +66,17 @@ def minimum(x, *args):
 
 
 def _tot_blocks(nblocks, k0, k1):
-    return (
-        nblocks * (k1 - k0 + 1) - (k0 * (k0 - 1)) // 2 - (k1 * (k1 + 1)) // 2
-    )
+    return nblocks * (k1 - k0 + 1) - (k0 * (k0 - 1)) // 2 - (k1 * (k1 + 1)) // 2
 
 
 def _block_matmul(A, B, args):
     i, j, ak0, ak1, kc = args
 
     def body(ka, val):
-        CB = (
-            A.get_diag_block(jnp.minimum(i, i + ka), ka)
-            @ B.get_diag_block(jnp.minimum(j, i + ka), kc - ka)
-        )
+        CB = A.get_diag_block(jnp.minimum(i, i + ka), ka) @ B.get_diag_block(jnp.minimum(j, i + ka), kc - ka)
         return val + CB
 
-    res = jax.lax.fori_loop(
-        ak0, ak1 + 1, body,
-        jnp.zeros(A.blockshape[:1] + B.blockshape[1:])
-    )
+    res = jax.lax.fori_loop(ak0, ak1 + 1, body, jnp.zeros(A.blockshape[:1] + B.blockshape[1:]))
     return res
 
 
@@ -104,13 +84,12 @@ def _block_matmul(A, B, args):
 def _blocks_matmul_indexes(nblocks, ak0, ak1, bk0, bk1):
     ck0, ck1 = ak0 + bk0, ak1 + bk1
     size = BlockBanded._tot_blocks(nblocks, ck0, ck1)
-    cks, cblocksizes, cblockstart, _ = BlockBanded.block_shapes(
-        nblocks, ck0, ck1)
+    cks, cblocksizes, cblockstart, _ = BlockBanded.block_shapes(nblocks, ck0, ck1)
     ck = jnp.repeat(cks, cblocksizes, total_repeat_length=size)
     kstart = jnp.repeat(cblockstart, cblocksizes, total_repeat_length=size)
     cn = jnp.arange(ck.size) - kstart
     ci, cj = jnp.maximum(cn - ck, cn), jnp.maximum(cn + ck, cn)
-    k0 = maximum(ak0, - ci, ck - bk1, ck - cj)
+    k0 = maximum(ak0, -ci, ck - bk1, ck - cj)
     k1 = minimum(ak1, nblocks - ci - 1, ck - bk0, ck - cj + nblocks - 1)
     return (ci, cj, k0, k1, ck), (int(ck0), int(ck1))
 
@@ -150,7 +129,14 @@ class BlockBanded:
         # self.k1 = jnp.array(k1, int).item()
 
     def tree_flatten(self):
-        return ((self.blocks,), (self.nblocks, self.k0, self.k1,))
+        return (
+            (self.blocks,),
+            (
+                self.nblocks,
+                self.k0,
+                self.k1,
+            ),
+        )
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
@@ -158,11 +144,7 @@ class BlockBanded:
 
     @staticmethod
     def _tot_blocks(nblocks, k0, k1):
-        return (
-            nblocks * (k1 - k0 + 1)
-            - (k0 * (k0 - 1)) // 2
-            - (k1 * (k1 + 1)) // 2
-        )
+        return nblocks * (k1 - k0 + 1) - (k0 * (k0 - 1)) // 2 - (k1 * (k1 + 1)) // 2
 
     @staticmethod
     def block_coords(n, k):
@@ -195,8 +177,7 @@ class BlockBanded:
         nblocks = len(blocks[0])
         blockshape = blocks[0][0].shape
         k1 = len(blocks) + k0 - 1
-        ks, blocksizes, blockstart, blocktot = cls.block_shapes(
-            nblocks, k0, k1)
+        ks, blocksizes, blockstart, blocktot = cls.block_shapes(nblocks, k0, k1)
         flat_blocks = jnp.zeros((blocktot,) + blockshape)
         for k in ks:
             for i, M in enumerate(blocks[k]):
@@ -208,8 +189,7 @@ class BlockBanded:
     def block_diag_indexes(cls, nblocks, k0, k1):
         ks, blocksizes, blockstart, size = cls.block_shapes(nblocks, k0, k1)
         k = jnp.repeat(ks, blocksizes, total_repeat_length=size)
-        n = jnp.arange(size) - jnp.repeat(blockstart,
-                                          blocksizes, total_repeat_length=size)
+        n = jnp.arange(size) - jnp.repeat(blockstart, blocksizes, total_repeat_length=size)
         return n, k
 
     @classmethod
@@ -219,8 +199,7 @@ class BlockBanded:
         assert A.shape[1] // n1 == nblocks
         ks, blocksizes, blockstart, size = cls.block_shapes(nblocks, k0, k1)
         k = jnp.repeat(ks, blocksizes, total_repeat_length=size)
-        n = jnp.arange(size) - jnp.repeat(blockstart,
-                                          blocksizes, total_repeat_length=size)
+        n = jnp.arange(size) - jnp.repeat(blockstart, blocksizes, total_repeat_length=size)
         i, j = cls.block_coords(n, k)
 
         def Aindex(args):
@@ -271,11 +250,9 @@ class BlockBanded:
                 yield self.block_coords(n, k), self.blocks[kstart + n]
 
     def diag_indexes(self):
-        ks, blocksizes, blockstart, size = self.block_shapes(
-            self.nblocks, self.k0, self.k1)
+        ks, blocksizes, blockstart, size = self.block_shapes(self.nblocks, self.k0, self.k1)
         k = jnp.repeat(ks, blocksizes, total_repeat_length=len(self.blocks))
-        n = jnp.arange(len(self.blocks)) - jnp.repeat(blockstart,
-                                                      blocksizes, total_repeat_length=len(self.blocks))
+        n = jnp.arange(len(self.blocks)) - jnp.repeat(blockstart, blocksizes, total_repeat_length=len(self.blocks))
         return n, k
 
     def dense(self):
@@ -288,6 +265,7 @@ class BlockBanded:
 
         def body(k, A):
             return jax.lax.dynamic_update_slice(A, self.blocks[k], (ni[k], mj[k]))
+
         return jax.lax.fori_loop(0, len(self.blocks), body, A)
 
     def __matmul__(self, other):
@@ -300,10 +278,7 @@ class BlockBanded:
         nblocks, k0, k1 = self.nblocks, self.k0, self.k1
         n, k = BlockBanded.block_diag_indexes(nblocks, -k1, -k0)
         _, _, blockstart, _ = BlockBanded.block_shapes(nblocks, k0, k1)
-        return BlockBanded(
-            block_transpose(self.blocks)[n + blockstart[- k]],
-            nblocks, -k1, -k0
-        )
+        return BlockBanded(block_transpose(self.blocks)[n + blockstart[-k]], nblocks, -k1, -k0)
 
 
 block_transpose = jax.vmap(jnp.transpose)
@@ -312,13 +287,11 @@ block_transpose = jax.vmap(jnp.transpose)
 class SymmetricBlockBanded(BlockBanded):
     def get_diag_block(self, n, k):
         return jax.lax.cond(
-            k < 0,
-            lambda n, k: self.blocks[self.blockstart[-k] + n].T,
-            lambda n, k: self.blocks[self.blockstart[k] + n]
+            k < 0, lambda n, k: self.blocks[self.blockstart[-k] + n].T, lambda n, k: self.blocks[self.blockstart[k] + n]
         )
 
 
-@partial(jax.jit, static_argnames=['k', 'trans'])
+@partial(jax.jit, static_argnames=["k", "trans"])
 def set_block_diag(A, D, k=0, trans=0):
     blocksize = jnp.shape(D)[1]
     if k >= 0:
@@ -343,10 +316,7 @@ def set_block_diag(A, D, k=0, trans=0):
 
 def block_tridiagonal(D, D1, upper=True):
     A = jsp.linalg.block_diag(*D)
-    return set_block_diag(
-        set_block_diag(A, D1, k=-1, trans=upper),
-        D1, k=1, trans=not upper
-    )
+    return set_block_diag(set_block_diag(A, D1, k=-1, trans=upper), D1, k=1, trans=not upper)
 
 
 def block_diag(A, blocksize=None, k=0):
@@ -354,15 +324,19 @@ def block_diag(A, blocksize=None, k=0):
         kblock = k * blocksize
         n = len(A)
         if k >= 0:
-            return jnp.array([
-                A[i0:i0 + blocksize, i0 + kblock:i0 + blocksize + kblock]
-                for i0 in range(0, n - k * blocksize, blocksize)
-            ])
+            return jnp.array(
+                [
+                    A[i0 : i0 + blocksize, i0 + kblock : i0 + blocksize + kblock]
+                    for i0 in range(0, n - k * blocksize, blocksize)
+                ]
+            )
         else:
-            return jnp.array([
-                A[i0 - kblock:i0 + blocksize - kblock, i0:i0 + blocksize]
-                for i0 in range(0, n + k * blocksize, blocksize)
-            ])
+            return jnp.array(
+                [
+                    A[i0 - kblock : i0 + blocksize - kblock, i0 : i0 + blocksize]
+                    for i0 in range(0, n + k * blocksize, blocksize)
+                ]
+            )
     else:
         if k == 0:
             return jsp.linalg.block_diag(*A)
@@ -375,28 +349,22 @@ def block_diag(A, blocksize=None, k=0):
         return set_block_diag(jnp.zeros((n, n)), A, k=k)
 
 
-@partial(jax.jit, static_argnames=('lower', 'trans'))
-def solve_block_triangular_bidiagonal(
-    D: jax.Array, D1: jax.Array, y: jax.Array, lower=False, trans=0
-):
+@partial(jax.jit, static_argnames=("lower", "trans"))
+def solve_block_triangular_bidiagonal(D: jax.Array, D1: jax.Array, y: jax.Array, lower=False, trans=0):
     forward = not lower
-    if trans == 0 or trans == 'N':
+    if trans == 0 or trans == "N":
         forward = lower
 
         def _blockbidiagscan(carry, xs):
             yi, Ui, D1i = xs
-            xi = jsp.linalg.solve_triangular(
-                Ui, yi - D1i @ carry, lower=lower, trans=trans
-            )
+            xi = jsp.linalg.solve_triangular(Ui, yi - D1i @ carry, lower=lower, trans=trans)
             return xi, xi
     else:
         forward = not lower
 
         def _blockbidiagscan(carry, xs):
             yi, Ui, D1i = xs
-            xi = jsp.linalg.solve_triangular(
-                Ui, yi - D1i.T @ carry, lower=lower, trans=trans
-            )
+            xi = jsp.linalg.solve_triangular(Ui, yi - D1i.T @ carry, lower=lower, trans=trans)
             return xi, xi
 
         if trans == 2 or trans == "C":
@@ -404,42 +372,33 @@ def solve_block_triangular_bidiagonal(
 
     Y = jnp.reshape(y, jnp.shape(D)[:-1] + jnp.shape(y)[1:])
     if forward:
-        xp = jsp.linalg.solve_triangular(
-            D[0], Y[0], lower=lower, trans=trans
-        )
+        xp = jsp.linalg.solve_triangular(D[0], Y[0], lower=lower, trans=trans)
         xs = (Y[1:], D[1:], D1)
         _, x0 = jax.lax.scan(
-            _blockbidiagscan, xp, xs, reverse=False,
+            _blockbidiagscan,
+            xp,
+            xs,
+            reverse=False,
         )
         X = jnp.concatenate([xp[None], x0])
     else:
-        xp = jsp.linalg.solve_triangular(
-            D[-1], Y[-1], lower=lower, trans=trans
-        )
+        xp = jsp.linalg.solve_triangular(D[-1], Y[-1], lower=lower, trans=trans)
         xs = (Y[:-1], D[:-1], D1)
-        _, x0 = jax.lax.scan(
-            _blockbidiagscan, xp, xs, reverse=True
-        )
+        _, x0 = jax.lax.scan(_blockbidiagscan, xp, xs, reverse=True)
         X = jnp.concatenate([x0, xp[None]])
 
     return X.reshape(y.shape)
 
 
-@partial(jax.jit, static_argnames=('lower', 'trans'))
-def solve_block_triangular_tridiagonal(
-    D: jax.Array, D1: jax.Array, D2: jax.Array, y: jax.Array,
-    lower=False, trans=0
-):
+@partial(jax.jit, static_argnames=("lower", "trans"))
+def solve_block_triangular_tridiagonal(D: jax.Array, D1: jax.Array, D2: jax.Array, y: jax.Array, lower=False, trans=0):
     def _scan(carry, xs):
         xp0, xp1 = carry
         y2, DL22, DL21, DL20 = xs
-        xp2 = jsp.linalg.solve_triangular(
-            DL22, y2 - DL21 @ xp1 - DL20 @ xp0,
-            lower=lower, trans=trans
-        )
+        xp2 = jsp.linalg.solve_triangular(DL22, y2 - DL21 @ xp1 - DL20 @ xp0, lower=lower, trans=trans)
         return (xp1, xp2), xp2
 
-    if trans == 0 or trans == 'N':
+    if trans == 0 or trans == "N":
         forward = lower
     else:
         forward = not lower
@@ -452,30 +411,22 @@ def solve_block_triangular_tridiagonal(
     Y = jnp.reshape(y, jnp.shape(D)[:-1] + jnp.shape(y)[1:])
     if forward:
         xp0 = jsp.linalg.solve_triangular(D[0], Y[0], lower=lower, trans=trans)
-        xp1 = jsp.linalg.solve_triangular(
-            D[1], Y[1] - D1[0] @ xp0, lower=lower, trans=trans)
-        _, x2 = jax.lax.scan(
-            _scan, (xp0, xp1), (Y[2:], D[2:], D1[1:], D2)
-        )
+        xp1 = jsp.linalg.solve_triangular(D[1], Y[1] - D1[0] @ xp0, lower=lower, trans=trans)
+        _, x2 = jax.lax.scan(_scan, (xp0, xp1), (Y[2:], D[2:], D1[1:], D2))
         X = jnp.concatenate([xp0[None], xp1[None], x2])
     else:
-        xp0 = jsp.linalg.solve_triangular(
-            D[-1], Y[-1], lower=lower, trans=trans)
-        xp1 = jsp.linalg.solve_triangular(
-            D[-2], Y[-2] - D1[-1] @ xp0, lower=lower, trans=trans)
-        _, x2 = jax.lax.scan(
-            _scan, (xp0, xp1), (Y[:-2], D[:-2], D1[:-1], D2),
-            reverse=True
-        )
+        xp0 = jsp.linalg.solve_triangular(D[-1], Y[-1], lower=lower, trans=trans)
+        xp1 = jsp.linalg.solve_triangular(D[-2], Y[-2] - D1[-1] @ xp0, lower=lower, trans=trans)
+        _, x2 = jax.lax.scan(_scan, (xp0, xp1), (Y[:-2], D[:-2], D1[:-1], D2), reverse=True)
         X = jnp.concatenate([x2, xp1[None], xp0[None]])
 
     return X.reshape(y.shape)
 
 
-partial(jax.jit, static_argnames=('min_eig',))
+partial(jax.jit, static_argnames=("min_eig",))
 
 
-def cholesky_block_tridiagonal(D: jax.Array, D1: jax.Array, min_eig=-1.):
+def cholesky_block_tridiagonal(D: jax.Array, D1: jax.Array, min_eig=-1.0):
     def _blockbidiagscan(L0, xs):
         D11, D01 = xs
         L01 = jsp.linalg.solve_triangular(L0, D01, lower=True, trans=0).T
@@ -483,19 +434,15 @@ def cholesky_block_tridiagonal(D: jax.Array, D1: jax.Array, min_eig=-1.):
         return L11, (L11, L01)
 
     L0 = cholesky(D[0], min_eig=min_eig)
-    _, (DL, DL1) = jax.lax.scan(
-        _blockbidiagscan, L0, (D[1:], D1)
-    )
+    _, (DL, DL1) = jax.lax.scan(_blockbidiagscan, L0, (D[1:], D1))
     DL = jnp.concatenate([L0[None], DL], axis=0)
     return DL, DL1
 
 
-partial(jax.jit, static_argnames=('min_eig',))
+partial(jax.jit, static_argnames=("min_eig",))
 
 
-def cholesky_block_pentadiagaonal(
-    D: jax.Array, D1: jax.Array, D2: jax.Array, min_eig=-1.
-):
+def cholesky_block_pentadiagaonal(D: jax.Array, D1: jax.Array, D2: jax.Array, min_eig=-1.0):
     L00 = cholesky(D[0], min_eig=min_eig)
     L01 = jsp.linalg.solve_triangular(L00, D1[0], lower=True, trans=0).T
     L11 = cholesky(D[1] - L01 @ L01.T, min_eig=min_eig)
@@ -504,17 +451,12 @@ def cholesky_block_pentadiagaonal(
         L00, L11, L01 = carry
         D02, D11, D20 = xs
 
-        L02 = jsp.linalg.solve_triangular(
-            L00, D20, lower=True, trans=0).T
-        L12 = jsp.linalg.solve_triangular(
-            L11, D11 - L01 @ L02.T, lower=True, trans=0).T
-        L22 = cholesky(
-            D02 - L02 @ L02.T - L12 @ L12.T, min_eig=min_eig)
+        L02 = jsp.linalg.solve_triangular(L00, D20, lower=True, trans=0).T
+        L12 = jsp.linalg.solve_triangular(L11, D11 - L01 @ L02.T, lower=True, trans=0).T
+        L22 = cholesky(D02 - L02 @ L02.T - L12 @ L12.T, min_eig=min_eig)
         return (L11, L22, L12), (L22, L12, L02)
 
-    _, (dL, dL1, DL2) = jax.lax.scan(
-        _blocktridiagscan, (L00, L11, L01), (D[2:], D1[1:], D2)
-    )
+    _, (dL, dL1, DL2) = jax.lax.scan(_blocktridiagscan, (L00, L11, L01), (D[2:], D1[1:], D2))
     DL = jnp.concatenate([L00[None], L11[None], dL], axis=0)
     DL1 = jnp.concatenate([L01[None], dL1], axis=0)
     return DL, DL1, DL2
@@ -525,9 +467,7 @@ class BlockTriangularBidiagonal(NamedTuple):
     D1: jax.Array
 
     def solve(self, y, trans=0):
-        return solve_block_triangular_bidiagonal(
-            *self, y, lower=True, trans=trans
-        )
+        return solve_block_triangular_bidiagonal(*self, y, lower=True, trans=trans)
 
 
 class BlockTriangularTridiagonal(NamedTuple):
@@ -536,19 +476,15 @@ class BlockTriangularTridiagonal(NamedTuple):
     D2: jax.Array
 
     def solve(self, y, trans=0):
-        return solve_block_triangular_tridiagonal(
-            *self, y, lower=True, trans=trans
-        )
+        return solve_block_triangular_tridiagonal(*self, y, lower=True, trans=trans)
 
 
 class SymmetricBlockTridiagonal(NamedTuple):
     D: jax.Array
     D1: jax.Array
 
-    def cholesky(self, min_eig=-1.):
-        return BlockTriangularBidiagonal(
-            *cholesky_block_tridiagonal(*self, min_eig=min_eig)
-        )
+    def cholesky(self, min_eig=-1.0):
+        return BlockTriangularBidiagonal(*cholesky_block_tridiagonal(*self, min_eig=min_eig))
 
 
 class SymmetricBlockPentadiagonal(NamedTuple):
@@ -556,7 +492,5 @@ class SymmetricBlockPentadiagonal(NamedTuple):
     D1: jax.Array
     D2: jax.Array
 
-    def cholesky(self, min_eig=-1.):
-        return BlockTriangularTridiagonal(
-            *cholesky_block_pentadiagaonal(*self, min_eig=min_eig)
-        )
+    def cholesky(self, min_eig=-1.0):
+        return BlockTriangularTridiagonal(*cholesky_block_pentadiagaonal(*self, min_eig=min_eig))
