@@ -417,8 +417,8 @@ def banded_matmul(ab, b, check_finite=False):
 def _banded_matmul(ab: BandedMatrix, b, check_finite=False):
     return jax.pure_callback(
         partial(_blas_banded_matmul, check_finite=check_finite),
+        jax.ShapeDtypeStruct(b.shape, b.dtype),
         (*ab, b, 1),
-        result_shape=jax.ShapeDtypeStruct(b.shape, b.dtype)
     )
 
 
@@ -445,8 +445,8 @@ def _scipy_solve_banded(l_and_u, arg, check_finite=False):
 def _solve_banded(ab: BandedMatrix, b: Array, check_finite=False):
     return jax.pure_callback(
         partial(_scipy_solve_banded, (-ab.l, ab.u), check_finite=check_finite),
+        jax.ShapeDtypeStruct(b.shape, b.dtype),
         (ab.bands, b),
-        result_shape=jax.ShapeDtypeStruct(b.shape, b.dtype)
     )
 
 
@@ -481,8 +481,8 @@ def _solve_triangular_banded(ab: BandedMatrix, b, check_finite=False):
     return jax.pure_callback(
         partial(
             _blas_solve_triangular_banded, check_finite=check_finite),
+        jax.ShapeDtypeStruct(b.shape, b.dtype),
         (ab, b),
-        result_shape=jax.ShapeDtypeStruct(b.shape, b.dtype)
     )
 
 
@@ -496,8 +496,10 @@ def bwd_solve_triangular_banded(
 ):
     (x, ab, b, check_finite) = res
     db = solve_triangular_banded(ab.T, g)
-    x, db = jnp.atleast_2d(x.T, db.T)
-    dab = ab.set(-db.T @ x)
+    # Reshape only for the dense outer product feeding dab; the cotangent
+    # returned for b must keep b's original shape (jax checks this strictly).
+    x2, db2 = jnp.atleast_2d(x.T, db.T)
+    dab = ab.set(-db2.T @ x2)
     return dab, db, None
 
 
@@ -535,8 +537,8 @@ def _banded_triangular_matmul(ab: BandedMatrix, b, check_finite=False,):
     return jax.pure_callback(
         partial(
             _blas_banded_triangular_matmul, check_finite=check_finite),
+        jax.ShapeDtypeStruct(b.shape, b.dtype),
         (*ab, b),
-        result_shape=jax.ShapeDtypeStruct(b.shape, b.dtype)
     )
 
 
@@ -587,8 +589,8 @@ def cholesky_banded(ab: BandedMatrix):
             _cholesky_banded,
             lower=bool(ab.l), check_finite=False, overwrite_ab=False
         ),
+        jax.ShapeDtypeStruct(ab.bands.shape, ab.bands.dtype),
         ab.bands,
-        result_shape=jax.ShapeDtypeStruct(ab.bands.shape, ab.bands.dtype)
     )
     return ab._replace(bands=chol, trans=0)
 

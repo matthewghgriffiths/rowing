@@ -80,7 +80,7 @@ def test_matmul():
         all(map(check, vjp1(Gb), vjp(G)))
 
 
-def _test_solve_triangular():
+def test_solve_triangular():
     np.random.seed(1)
 
     n = 50
@@ -155,7 +155,7 @@ def _test_solve_triangular():
             check(gb1, gb)
 
 
-def _test_cholesky():
+def test_cholesky():
     n = 50
     k = 3
     np.random.seed(1)
