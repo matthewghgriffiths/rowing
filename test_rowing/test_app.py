@@ -1,6 +1,6 @@
 
+import sys
 from pathlib import Path
-import importlib
 import logging
 
 import pytest
@@ -8,9 +8,7 @@ import pytest
 pytest.importorskip("streamlit")
 
 import streamlit as st
-from rowing.app import select, inputs, state, plots
 from rowing.analysis import files, telemetry
-from rowing.utils import timeout
 from rowing.world_rowing import pages
 
 logging.basicConfig(level=logging.INFO)
@@ -18,18 +16,15 @@ logging.getLogger().setLevel(logging.INFO)
 
 dirpath = Path(__file__).resolve().parent
 
-# app_GMTs = importlib.import_module("world_rowing.pages.1_GMTs", "..")
-# app_livetracker = importlib.import_module(
-#     "world_rowing.pages.2_livetracker", "..")
-# app_realtime = importlib.import_module(
-#     "world_rowing.pages.3_realtime", "..")
-app_gpx = importlib.import_module("gps", "..")
-app_telemetry = importlib.import_module("telemetry", "..")
+# gps.py / telemetry.py are the Streamlit entry points at the repository root,
+# so make sure the repo root is importable regardless of the working directory.
+sys.path.insert(0, str(dirpath.parent))
+import gps as app_gpx
+import telemetry as app_telemetry
 
 TIMEOUT = 120
 
 
-# @timeout(TIMEOUT)
 def run_streamlit(main, params):
     try:
         main(params)
@@ -40,6 +35,7 @@ def run_streamlit(main, params):
         pass
 
 
+@pytest.mark.network
 @pytest.mark.parametrize(
     "params", [
         None,
@@ -69,6 +65,7 @@ def test_GMTs(params):
     run_streamlit(pages.pgmts.main, params)
 
 
+@pytest.mark.network
 @pytest.mark.parametrize(
     "params", [
         None,
@@ -97,19 +94,20 @@ def test_livetracker(params):
     run_streamlit(pages.livetracker.main, params)
 
 
+@pytest.mark.network
 @pytest.mark.parametrize(
     "params", [
         {'replay': 50, 'replay_step': 50, "replay_race": False},
     ]
 )
-def _test_realtime(params):
+def test_realtime(params):
     run_streamlit(pages.realtime.main, params)
 
 
-def test_telemetry():
+def test_telemetry(powerline_txt):
     telemetry_data = {
         "powerline": telemetry.parse_powerline_text_data(
-            open(dirpath / "../data/powerline.txt").read()
+            powerline_txt.read_text()
         )
     }
     params = {
@@ -120,9 +118,9 @@ def test_telemetry():
     run_streamlit(app_telemetry.main, params)
 
 
-def test_gpx():
+def test_gpx(cam_gpx):
     gpx_data = {
-        "cam": files.read_gpx(dirpath / "../data/cam.gpx"),
+        "cam": files.read_gpx(cam_gpx),
     }
     params = {
         "gpx_data": gpx_data
