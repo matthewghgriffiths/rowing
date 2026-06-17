@@ -29,6 +29,19 @@ from rowing.world_rowing import fields
 # Categorical boat fields -> the code attribute / size attribute on ModelInputs.
 _CATEGORICAL = {"venue": "n_venues", "class": "n_classes", "type": "n_types", "comp": "n_comps"}
 
+# Senior international competition types kept by from_world_rowing_data.
+SENIOR_COMPETITION_TYPES = (
+    "Olympic Games",
+    "Paralympics",
+    "World Rowing Championships",
+    "European Rowing Championships",
+    "World Rowing Olympic Qualification Regatta",
+    "World Rowing Olympic and Paralympic Qualification regatta",
+    "World Rowing Cup I",
+    "World Rowing Cup II",
+    "World Rowing Cup III",
+)
+
 
 @flax.struct.dataclass
 class ModelInputs:
@@ -220,6 +233,66 @@ class RowingData:
 
         d = Path(dir)
         return cls(**{k: pd.read_feather(d / fn) for k, fn in cls._CACHE_FILES.items()})
+
+    @classmethod
+    def from_world_rowing_data(cls, data_dir, *, senior_types=None, phases=("Final A", "Final B", "Final C")):
+        """Aggregate the per-year World Rowing API dump into the senior dataset.
+
+        Replicates the World Rowing Data workflow: concatenate the per-year ``competitions-*`` /
+        ``results-*`` / ``race_boat_athletes-*`` feathers, keep final-phase results from senior
+        competition types with a finish time, and reduce to the racing athletes. Fully offline.
+        """
+        from pathlib import Path
+
+        d = Path(data_dir)
+        senior_types = SENIOR_COMPETITION_TYPES if senior_types is None else senior_types
+
+        def stack(pattern, transform=None):
+            frames = {int(f.stem[-4:]): pd.read_feather(f) for f in d.glob(pattern)}
+            if transform:
+                frames = {y: transform(df) for y, df in frames.items()}
+            return pd.concat(frames, names=["year"]).sort_index()
+
+        competitions = stack("competitions-*.feather")
+        race_boat_athletes = stack("race_boat_athletes-*.feather")
+        final_results = stack("results-*.feather", lambda df: df[df.Phase.isin(phases)])
+
+        senior_competitions = (
+            competitions[competitions["Competition Type"].isin(senior_types)].reset_index(0).reset_index(drop=True)
+        )
+        senior_results = (
+            final_results[
+                final_results.race_event_competition_id.isin(senior_competitions.competition_id)
+                & final_results["Finish Time"].notna()
+            ]
+            .reset_index(0)
+            .reset_index(drop=True)
+        )
+        senior_seats = (
+            race_boat_athletes[race_boat_athletes.athletes_raceBoatId.isin(senior_results.raceBoats_id)]
+            .reset_index(0)
+            .reset_index(drop=True)
+        )
+        senior_athletes = (
+            senior_seats.groupby("athletes_personId")
+            .first()
+            .drop(columns=["athletes_boatPosition", "athletes_raceBoatId"])
+            .reset_index()
+        )
+        return cls(
+            competitions=senior_competitions,
+            results=senior_results,
+            athletes=senior_athletes,
+            seats=senior_seats,
+        )
+
+    def save_cache(self, dir="."):
+        """Write the senior_*.feather caches (so from_cache / the notebooks see this data)."""
+        from pathlib import Path
+
+        d = Path(dir)
+        for attr, fn in self._CACHE_FILES.items():
+            getattr(self, attr).reset_index(drop=True).to_feather(d / fn)
 
     @classmethod
     def from_api(cls, years=range(2019, 2030), **kwargs):
