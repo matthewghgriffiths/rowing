@@ -173,7 +173,7 @@ class PredictRace:
             pred_pace[cnt] -= pace_diff
             pred_times[cnt] = M.dot(pred_pace[cnt]) - mean_diff
 
-        leader_time = pred_times.min(1)
+        leader_time = pred_times.min(axis=1)
         for cnt in pred_times.columns:
             maxi = pred_times[cnt].searchsorted(leader_time.iloc[-1]) + 1
             pred_distance[cnt] = np.interp(

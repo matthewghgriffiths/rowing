@@ -153,7 +153,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
         )
         intermediate_distances = intermediate_times.index.values
 
-    live_data = live_boat_data.loc[live_boat_data[fields.live_trackCount].min(1).sort_values().index].reset_index(drop=True)
+    live_data = live_boat_data.loc[live_boat_data[fields.live_trackCount].min(axis=1).sort_values().index].reset_index(drop=True)
     countries = live_data.columns.levels[1]
     distances = live_data[fields.live_raceBoatTracker_distanceTravelled]
     speed = live_data[fields.live_raceBoatTracker_metrePerSecond]
@@ -161,7 +161,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     # Estimate times
     diffs = -distances.diff(-1).replace(0, np.nan)
     boat_time_diff = diffs / speed.replace(0, np.nan)
-    mean_time_diff = boat_time_diff.mean(1).fillna(0)
+    mean_time_diff = boat_time_diff.mean(axis=1).fillna(0)
     times = mean_time_diff.cumsum().rename(fields.live_time)
 
     # Make sure timepoints around intermediates are correct
@@ -388,7 +388,7 @@ class LiveRaceData:
     @property
     def distance(self):
         if self.livetracker is not None:
-            return int(self.livetracker[fields.live_distanceOfLeader].max(1).max())
+            return int(self.livetracker[fields.live_distanceOfLeader].max(axis=1).max())
         return 0
 
     def gen_data(self, *funcs):

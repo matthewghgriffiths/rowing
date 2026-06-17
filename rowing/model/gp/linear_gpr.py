@@ -28,7 +28,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
         K = self.K()
         Kf = K.einsum("ijkl,ik,jl->ij", self.W, self.W) + jnp.eye(self.n_obs) * self.obs_var
         L = jsp.linalg.cho_factor(Kf)
-        y = self.y - (self.W * self.mean(self.X)).sum(1)
+        y = self.y - (self.W * self.mean(self.X)).sum(axis=1)
         a = jsp.linalg.cho_solve(L, y)
         return Kf, L, y, a
 
@@ -39,7 +39,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
 
     def predict(self, X1, W1):
         Z1 = self.predict_coef(X1)
-        return (W1 * Z1).sum(1)
+        return (W1 * Z1).sum(axis=1)
 
     def predict_var(self, X1, W1):
         Z1, Z1_var = self.predict_coef_var(X1)
@@ -63,7 +63,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
         LWk1 = solve_triangular(L[0] if L[1] else L[0].T, k1.einsum("ijkl,jl->jik", self.W), lower=True)
         k11 = self.kernel.k(X1, X1)
 
-        Z1_var = k11.diagonal().values - jnp.square(LWk1).sum(0)
+        Z1_var = k11.diagonal().values - jnp.square(LWk1).sum(axis=0)
         return Z1, Z1_var
 
 

@@ -140,7 +140,7 @@ def show_livetracker(live_data, fig_params, filter_container=None):
         facet_format[col] = facet_format[fields.distance_from_paceboat]
         fig = plots.make_livetracker_plot(facets, plot_data, facet_axes, facet_format)
         fig = plots.update_figure(fig, **fig_params)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     state.reset_button()
     return state.get_state()

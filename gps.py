@@ -219,7 +219,7 @@ def plot_activity_data(gps_data):
                 yaxis2=dict(title=" + ".join(right_axis)),
                 xaxis=dict(title="Distance (km)"),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
 
 def clear_state():
@@ -314,7 +314,7 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
     )
 
     landmark_distances = piece_data["Distance Travelled"].loc[use_pieces].mean()[piece_data["Total Distance"].columns]
-    pace_boat_time = piece_data["Elapsed Time"].loc[use_pieces].max(1).min()
+    pace_boat_time = piece_data["Elapsed Time"].loc[use_pieces].max(axis=1).min()
 
     aligned_data = app.align_pieces(
         gpx_data, piece_data, landmark_distances=landmark_distances, pace_boat_time=pace_boat_time, pieces=use_pieces
@@ -381,7 +381,7 @@ def plot_piece_profiles(piece_information, gpx_data, keep=None):
                 height=height,
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
 
 @st.fragment

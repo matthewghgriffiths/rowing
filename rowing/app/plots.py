@@ -294,7 +294,7 @@ def show_intermediates(intermediates):
     inter_time = fields.to_streamlit_dataframe(intermediates[fields.intermediates_ResultTime])
     inters = pd.concat([inter_pos, row, inter_time], axis=0)
     inters.index.name = "Rank"
-    st.dataframe(inters, use_container_width=True)
+    st.dataframe(inters, width="stretch")
 
 
 def show_lane_info(lane_info):
@@ -344,7 +344,7 @@ def show_lane_info(lane_info):
             ),
             fields.split: st.column_config.TimeColumn(fields.split, format="m:ss"),
         },
-        use_container_width=True,
+        width="stretch",
     )
 
 
@@ -360,16 +360,16 @@ def show_lane_intermediates(lane_info, intermediates):
                     except (ValueError, TypeError):
                         return ""
 
-                st.dataframe(intermediates[fields.intermediates_Rank].map(to_int_str), use_container_width=True)
+                st.dataframe(intermediates[fields.intermediates_Rank].map(to_int_str), width="stretch")
 
             if fields.intermediates_ResultTime in intermediates:
                 st.markdown("#### Intermediate time")
-                show_intermediates(intermediates[fields.intermediates_ResultTime], use_container_width=True)
+                show_intermediates(intermediates[fields.intermediates_ResultTime], width="stretch")
                 # st.dataframe(
                 #     fields.to_streamlit_dataframe(
                 #         intermediates[fields.intermediates_ResultTime]
                 #     ),
-                #     use_container_width=True
+                #     width="stretch"
                 # )
 
         if lane_info is not None and lane_info.size and "Speed" in lane_info.columns:

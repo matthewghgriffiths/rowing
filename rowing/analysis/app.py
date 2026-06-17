@@ -353,7 +353,7 @@ def align_pieces(gps_data, piece_data, landmark_distances=None, pace_boat_time=N
     pieces = piece_data["Total Distance"].index if pieces is None else pieces
 
     aligned_data = {}
-    start_times = piece_data["Timestamp"].min(1)
+    start_times = piece_data["Timestamp"].min(axis=1)
 
     for piece in pieces:
         distances = piece_data["Total Distance"].loc[piece]

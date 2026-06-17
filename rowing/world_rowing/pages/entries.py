@@ -84,7 +84,7 @@ def main(params=None):
                 boat_athlete_pos = event_boats.set_index(["Boat", "Position"]).Athlete.unstack(fill_value="")
                 st.dataframe(
                     boat_athlete_pos,
-                    use_container_width=True,
+                    width="stretch",
                     column_config={p: st.column_config.TextColumn(width="small") for p in boat_athlete_pos.columns},
                 )
 

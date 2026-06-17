@@ -244,7 +244,7 @@ class RaceTracker:
         violins = {}
         lines = {}
         if width:
-            y_dens = y_dens / y_dens.max(0) * width / 2
+            y_dens = y_dens / y_dens.max(axis=0) * width / 2
 
         for x0, cnt in self.lane_country.items():
             if cnt not in y_dens:
@@ -275,7 +275,7 @@ class RaceTracker:
 
     def update_violins(self, violins, lines, y_dens, width=0.8):
         if width:
-            y_dens = y_dens / y_dens.max(0) * width / 2
+            y_dens = y_dens / y_dens.max(axis=0) * width / 2
 
         for x0, cnt in self.lane_country.items():
             if cnt not in y_dens:
@@ -467,7 +467,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     intermediate_distances = intermediates.distance.values[:, 0].astype(float)
     intermediate_times.index = intermediate_distances
 
-    live_data = live_boat_data.loc[live_boat_data.trackCount.min(1).sort_values().index].reset_index(drop=True)
+    live_data = live_boat_data.loc[live_boat_data.trackCount.min(axis=1).sort_values().index].reset_index(drop=True)
 
     countries = live_data.columns.levels[1]
     distances = live_data.distanceTravelled
@@ -476,7 +476,7 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
     # Estimate times
     diffs = -distances.diff(-1).replace(0, np.nan)
     boat_time_diff = diffs / speed.replace(0, np.nan)
-    mean_time_diff = boat_time_diff.mean(1).fillna(0)
+    mean_time_diff = boat_time_diff.mean(axis=1).fillna(0)
     times = mean_time_diff.cumsum().rename("time")
 
     # Make sure timepoints around intermediates are correct
@@ -565,7 +565,7 @@ def calc_behind(live_time_data, gmt_speed=None, PGMT=1):
 def get_current_data(live_data):
     current_data = live_data.iloc[[-1]].copy()
     current_data.PGMT = current_data.PGMT.map("{:.1%}".format)
-    current_data["time elapsed"] = current_data.time.max(1).map(utils.format_totalseconds)
+    current_data["time elapsed"] = current_data.time.max(axis=1).map(utils.format_totalseconds)
     current_data.time = current_data.time.map(utils.format_totalseconds)
     return current_data.set_index("time elapsed").astype("string").T.unstack(1)
 
@@ -736,7 +736,7 @@ def estimate_times(live_boat_data, finish_distance=2000):
 
     Dx = distance.diff()
     V = (speed + speed.shift()) / 2
-    dT = (Dx / V).mean(1).fillna(0)
+    dT = (Dx / V).mean(axis=1).fillna(0)
     T = dT.cumsum()
 
     keep = dT > 0
@@ -772,7 +772,7 @@ def estimate_live_times(live_boat_data, gmt, race_distance=2000):
     boat_diffs = np.diff(distances, axis=0)
     boat_times = boat_diffs / speed
 
-    mean_time_diffs = np.ma.masked_array(boat_times, mask=boat_diffs == 0).mean(1).data
+    mean_time_diffs = np.ma.masked_array(boat_times, mask=boat_diffs == 0).mean(axis=1).data
     for cnt in countries:
         live_data["time", cnt] = np.where(
             live_data.distanceTravelled[cnt] == race_distance, boat_times[cnt], mean_time_diffs

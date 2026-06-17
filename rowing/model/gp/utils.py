@@ -163,7 +163,7 @@ class GPSystem(NamedTuple):
         if jnp.ndim(Kvar) == 2:
             Kvar = Kvar.diagonal()
 
-        y_var = Kvar - jnp.square(LdivK).sum(0)
+        y_var = Kvar - jnp.square(LdivK).sum(axis=0)
         return y_var
 
     def covar(self, Kcov, K):

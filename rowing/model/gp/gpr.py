@@ -69,7 +69,7 @@ class GaussianProcessRegression(hk.Module):
         pred = k1.dot(a) + self.mean(X1)
 
         Lk1 = jsp.linalg.solve_triangular(L[0] if L[1] else L[0].T, k1.T, lower=True)
-        pred_var = self.kernel.k(X1, X1) - jnp.square(Lk1).sum(0)
+        pred_var = self.kernel.k(X1, X1) - jnp.square(Lk1).sum(axis=0)
 
         return pred, pred_var
 
@@ -109,7 +109,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
         covW = self.W.dot(self.coef_cov)
         Kf = covW.dot(self.W.T) * K + jnp.eye(self.n_obs) * self.obs_var
         L = jsp.linalg.cho_factor(Kf)
-        y = self.y - (self.W * self.mean(self.X)).sum(1)
+        y = self.y - (self.W * self.mean(self.X)).sum(axis=1)
         a = jsp.linalg.cho_solve(L, y)
         acovW = a[:, None] * covW
         return Kf, L, y, a, covW, acovW
@@ -120,7 +120,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
 
     def predict(self, X1, W1):
         Z1 = self.predict_coef(X1)
-        return (W1 * Z1).sum(1)
+        return (W1 * Z1).sum(axis=1)
 
     def predict_coef(self, X1):
         Kf, L, y, a, covW, acovW = self._linear_gp_init()
@@ -145,7 +145,7 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
         LcovWk1 = solve_triangular(L[0] if L[1] else L[0].T, (covW[:, None, :] * k1.T[..., None]), lower=True)
         k11 = self.kernel.k(X1, X1)
 
-        Z1_var = (self.coef_cov.diagonal()[None, :] * k11[:, None]) - jnp.square(LcovWk1).sum(0)
+        Z1_var = (self.coef_cov.diagonal()[None, :] * k11[:, None]) - jnp.square(LcovWk1).sum(axis=0)
         return Z1, Z1_var
 
 

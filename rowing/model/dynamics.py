@@ -9,7 +9,7 @@ def estimate_orientation(accel_data, gyro_data):
     z /= np.linalg.norm(z)
 
     gyro_cov = gyro_data.cov()
-    x = ((1 - np.eye(3).dot(z)) * np.eye(3)).sum(1)
+    x = ((1 - np.eye(3).dot(z)) * np.eye(3)).sum(axis=1)
     for i in range(5):
         x = gyro_cov.values.dot(x)
         x -= x.dot(z) * z
@@ -38,9 +38,9 @@ def rowing_stroke_model(dt, n, s, v0, cs, ds):
     cosn1 = jnp.cos(n1s)
     sinn1 = jnp.sin(n1s)
 
-    a1 = (cs * cosn + ds * sinn).sum(0)
-    v1 = v0 + (cj * sinn - dj * cosn).sum(0) / s
-    dx = v0 * dt + (cjj * cosn + djj * sinn - cjj * cosn1 - djj * sinn1).sum(0) / s / s
+    a1 = (cs * cosn + ds * sinn).sum(axis=0)
+    v1 = v0 + (cj * sinn - dj * cosn).sum(axis=0) / s
+    dx = v0 * dt + (cjj * cosn + djj * sinn - cjj * cosn1 - djj * sinn1).sum(axis=0) / s / s
 
     return n1, dx, v1, a1
 

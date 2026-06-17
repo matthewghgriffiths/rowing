@@ -447,4 +447,4 @@ def plot_stats(health_stats):
         yaxis2=dict(title=" + ".join(right_axis)),
         xaxis=dict(title=x),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")

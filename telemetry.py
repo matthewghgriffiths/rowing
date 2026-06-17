@@ -221,7 +221,7 @@ def main(state=None):
 
         landmark_times = all_crossing_times.droplevel(["location", "distance"]).unstack("landmark")
         landmark_times = landmark_times.loc[
-            landmark_times.min(1).sort_values().index, landmark_times.min().sort_values().index
+            landmark_times.min(axis=1).sort_values().index, landmark_times.min().sort_values().index
         ]
         st.write(landmark_times)
         app.download_csv("all-crossings.csv", show_times)

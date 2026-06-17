@@ -78,7 +78,7 @@ def filter_dataframe(
     column_order=None,
     column_config=None,
     num_rows="fixed",
-    use_container_width=False,
+    width="content",
     disabled=False,
     modification_container=None,
     **kwargs,
@@ -103,7 +103,7 @@ def filter_dataframe(
             df,
             column_order=column_order,
             column_config=column_config,
-            use_container_width=use_container_width,
+            width=width,
         )
         return df
 
@@ -172,7 +172,7 @@ def filter_dataframe(
             column_order=column_order,
             column_config=column_config,
             num_rows=num_rows,
-            use_container_width=use_container_width,
+            width=width,
             disabled=disabled,
         )
         df = df.copy()

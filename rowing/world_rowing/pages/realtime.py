@@ -72,7 +72,7 @@ def main(params=None):
     with race_expander:
         race = select.select_live_race(replay, **kwargs)
         if st.toggle("## Race details", True):
-            st.dataframe(race, use_container_width=True)
+            st.dataframe(race, width="stretch")
 
         if st.toggle("## Crew lists", True):
             st.dataframe(select.get_crewlist(race.race_id))
@@ -85,14 +85,14 @@ def main(params=None):
                 st.markdown("#### Details:")
                 st.dataframe(
                     select.fields.to_streamlit_dataframe(wbts).T,
-                    # use_container_width=True
+                    # width="stretch"
                 )
 
             fastest_id = wbts.loc[wbts["Best Time"].idxmin(), "bestTimes_RaceId"]
             inters = select.get_race_intermediates(fastest_id)
             if not inters.empty:
                 st.markdown("#### Intermediates:")
-                plots.show_intermediates(inters.ResultTime, use_container_width=True)
+                plots.show_intermediates(inters.ResultTime, width="stretch")
 
     state.reset_button()
 
@@ -146,7 +146,7 @@ def main(params=None):
             with fig_plot:
                 if fig is not None:
                     fig = plots.update_figure(fig, **fig_params)
-                    st.plotly_chart(fig, use_container_width=True, key=time.time())
+                    st.plotly_chart(fig, width="stretch", key=time.time())
                 else:
                     st.write("no live data could be loaded")
         except Exception as e:

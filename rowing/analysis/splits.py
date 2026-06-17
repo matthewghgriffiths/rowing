@@ -171,7 +171,7 @@ def get_closest_locations(loc_dists, locs=None):
     return pd.DataFrame(
         {
             "location": locs.index[loc_dists.values.argmin(1)],
-            "distance": loc_dists.values.min(1),
+            "distance": loc_dists.values.min(axis=1),
         },
         index=loc_dists.index,
     )
@@ -185,7 +185,7 @@ def group_positions(positions, locations=None, freq="1h", thresh=10, update=Fals
         positions = positions.copy()
     location_distances = get_distance_to_locations(positions, locations)[0]
     closest_location = location_distances.idxmin(1)
-    closest_distance = location_distances.min(1)
+    closest_distance = location_distances.min(axis=1)
     closest_location[closest_distance > thresh] = np.nan
 
     positions["location"] = closest_location.reindex(positions.index)
@@ -230,7 +230,7 @@ def find_best_times(positions, distance, cols=None):
     best_timesplits = pd.DataFrame.from_dict({"time": best_times, "split": best_times / distance / 2})
     if cols:
         dist_cols = positions.set_index("distance")[cols]
-        avg_col_vals = pd.DataFrame([dist_cols[d : d + distance][cols].mean(0) for d in distances[best]], columns=cols).round(
+        avg_col_vals = pd.DataFrame([dist_cols[d : d + distance][cols].mean(axis=0) for d in distances[best]], columns=cols).round(
             1
         )
         avg_col_vals.index = best

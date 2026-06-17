@@ -163,10 +163,10 @@ def main(state=None):
         ).droplevel(0).unstack() * 1e3
     ).round(1)[options]
     errors.index.name = "Name"
-    errors['score'] = errors['avg'] = errors.mean(1).round(2)
+    errors['score'] = errors['avg'] = errors.mean(axis=1).round(2)
     errors = errors[['score'] + options + ['avg']]
-    errors['min'] = errors.min(1)
-    errors['max'] = errors.max(1)
+    errors['min'] = errors.min(axis=1)
+    errors['max'] = errors.max(axis=1)
 
     st.header("Scores")
     st.dataframe(
