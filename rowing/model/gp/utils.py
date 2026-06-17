@@ -27,13 +27,13 @@ def is_list(x):
 
 
 def dump_params(params, *args, **kwargs):
-    norm_params = jax.tree_map(norm_jax, params)
+    norm_params = jax.tree_util.tree_map(norm_jax, params)
     return yaml.safe_dump(norm_params, *args, **kwargs)
 
 
 def load_params(obj, *args, **kwargs):
     norm_params = yaml.safe_load(obj, *args, **kwargs)
-    return jax.tree_map(jnp.array, norm_params, is_leaf=is_list)
+    return jax.tree_util.tree_map(jnp.array, norm_params, is_leaf=is_list)
 
 
 def open_params(path="params.yaml"):

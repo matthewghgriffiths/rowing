@@ -11,6 +11,17 @@ pytest.importorskip("haiku")
 from rowing.model.gp import linalg
 
 
+def test_performance_models_import():
+    """Guard against jax/dependency API drift breaking the crew-speed models.
+
+    These modules (and gp.utils) previously broke when jax removed
+    ``jax.tree_map``; importing them here catches such regressions in CI.
+    """
+    import rowing.model.gp.utils  # noqa: F401
+    import rowing.model.performance.competition_model  # noqa: F401
+    import rowing.model.performance.joint_model  # noqa: F401
+
+
 def make_tridiagonal(nblock, blocksize):
     n = blocksize * nblock
     W = stats.wishart(blocksize, np.eye(blocksize))

@@ -8,7 +8,7 @@ import pandas as pd
 from flax.struct import dataclass
 from jax import numpy as jnp
 from jax import scipy as jsp
-from jax import tree_map
+from jax.tree_util import tree_map
 from jax.scipy.linalg import solve_triangular
 
 # from scipy import sparse
@@ -57,7 +57,7 @@ def listdictzip(**kwargs):
 
 
 def treestarmap(func, vals, **kwargs):
-    return jax.tree_map(lambda *x: func(x), *vals, **kwargs)
+    return jax.tree_util.tree_map(lambda *x: func(x), *vals, **kwargs)
 
 
 treemaptuple = partial(treestarmap, tuple)
@@ -66,11 +66,11 @@ treemapcat = partial(treestarmap, np.concatenate)
 
 
 # def treemapcat(vals):
-#     return jax.tree_map(lambda *x: np.concatenate(x), *vals)
+#     return jax.tree_util.tree_map(lambda *x: np.concatenate(x), *vals)
 
 
 # def treemaplist(vals):
-#     return jax.tree_map(lambda *x: list(x), *vals)
+#     return jax.tree_util.tree_map(lambda *x: list(x), *vals)
 
 
 def make_race_model(comp_results):
@@ -270,8 +270,8 @@ class JointModel:
 
 class EventModel(JointModel):
     def calc_posterior(self, dists: list[Message], params=None):
-        event_nats = jax.tree_map(to_natural, dists, is_leaf=ismessage)
-        event_nat = jax.tree_util.tree_reduce(partial(jax.tree_map, jnp.add), event_nats, is_leaf=ismessage)
+        event_nats = jax.tree_util.tree_map(to_natural, dists, is_leaf=ismessage)
+        event_nat = jax.tree_util.tree_reduce(partial(jax.tree_util.tree_map, jnp.add), event_nats, is_leaf=ismessage)
         return [from_natural(event_nat)] * len(dists), {}
 
 
@@ -345,7 +345,7 @@ class AthleteModel(JointModel):
         K_pred = self.apply(params, times)
         K_00 = self.apply(params, times, times)
 
-        preds = jax.tree_map(
+        preds = jax.tree_util.tree_map(
             predict_athlete_scores, [K_athlete] * len(dists), [K_pred] * len(dists), self.athlete_year_inds, dists
         )
         return tree_map(lambda m: (m[0], K_00 - m[1].T @ m[1]), preds, is_leaf=ismessage)
@@ -391,7 +391,7 @@ def calc_athlete_posterior(K_athlete: jax.Array, i: jax.Array, ath_dist: Message
 
 
 def calc_athletes_posterior(K_athlete, athlete_inds, athlete_dists):
-    ret = jax.tree_map(
+    ret = jax.tree_util.tree_map(
         calc_athlete_posterior,
         [K_athlete] * len(athlete_inds),
         athlete_inds,
@@ -409,7 +409,7 @@ class CompetitionModels:
     competition_weights: list[dict[str, jax.Array]]
 
     def apply(self, params):
-        return jax.tree_map(
+        return jax.tree_util.tree_map(
             lambda model: gp_utils.transform(model.get_jitter_kernel).apply(params),
             self.competition_race_models,
             is_leaf=lambda x: isinstance(x, RaceModel),
@@ -429,7 +429,7 @@ class CompetitionModels:
         if comp_kernels is None:
             comp_kernels = self.apply(params)
 
-        ret = jax.tree_map(
+        ret = jax.tree_util.tree_map(
             calc_comp_athlete_posterior, self.competition_boat_results, comp_kernels, self.competition_weights, messages
         )
         post, res = map(list, zip(*ret))
@@ -502,7 +502,7 @@ def div_normal_var(cav1, cav2):
     # m = (m1 / var1 - m2 / var2) * var
     # return m, var
     cav1, cav2 = to_natural(mean_var(cav1)), to_natural(mean_var(cav2))
-    return from_natural(jax.tree_map(jnp.subtract, cav1, cav2))
+    return from_natural(jax.tree_util.tree_map(jnp.subtract, cav1, cav2))
 
 
 def mul_normal_var(cav1, cav2):
@@ -514,11 +514,11 @@ def mul_normal_var(cav1, cav2):
     # m = (prec1 * m1 + prec2 * m2) * var
     # return m, var
     cav1, cav2 = to_natural(mean_var(cav1)), to_natural(mean_var(cav2))
-    return from_natural(jax.tree_map(jnp.add, cav1, cav2))
+    return from_natural(jax.tree_util.tree_map(jnp.add, cav1, cav2))
 
 
 def update_site_distribution(posterior: Messages, cavity: Messages) -> Messages:
-    return jax.tree_map(div_normal_var, posterior, cavity, is_leaf=ismessage)  # List[Dict[str, Message]]
+    return jax.tree_util.tree_map(div_normal_var, posterior, cavity, is_leaf=ismessage)  # List[Dict[str, Message]]
 
 
 def update_site_messages(posterior: Messages, cavity: Messages) -> Messages:
