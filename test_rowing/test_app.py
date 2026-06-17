@@ -128,3 +128,29 @@ def test_telemetry(powerline_txt):
     }
     at = run_app("telemetry:main", params)
     assert not at.exception
+
+
+def _run_world_rowing_home():
+    import world_rowing
+
+    world_rowing.main()
+
+
+def test_world_rowing_home():
+    # The landing page is pure markdown/image, so it runs offline.
+    at = AppTest.from_function(_run_world_rowing_home, default_timeout=APP_TIMEOUT)
+    at.run()
+    assert not at.exception
+    assert any("World Rowing" in t.value for t in at.title)
+
+
+@pytest.mark.network
+def test_results():
+    at = run_app("rowing.world_rowing.pages.results:main", None)
+    assert not at.exception
+
+
+@pytest.mark.network
+def test_entries():
+    at = run_app("rowing.world_rowing.pages.entries:main", None)
+    assert not at.exception
