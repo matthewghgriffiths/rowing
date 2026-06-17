@@ -29,6 +29,7 @@ def _synthetic_filtered():
     results = pd.DataFrame(
         {
             "PGMT": [0.95, 0.93, 0.97, 0.91],
+            "year": [2022.4, 2022.4, 2023.4, 2023.4],
             "Boat Type": ["M2-"] * 4,
             "Boat Class": ["M2-"] * 4,
             "race_event_competition_venueId": ["v1", "v1", "v2", "v2"],
@@ -94,3 +95,27 @@ def test_model_inputs_subset():
     # subset Gram equals the full Gram restricted to the kept boats
     full_g = np.asarray(mi.gram_athlete())[np.ix_([0, 2], [0, 2])]
     assert np.allclose(np.asarray(sub.gram_athlete()), full_g)
+
+
+def test_predict_competition_smoke():
+    rd = RowingData(**_synthetic_filtered())
+    gp = rd.performance_gp()  # zero-init params
+
+    # target competition: one event of two boats drawn from the training athletes
+    boats = pd.DataFrame({"id": [0, 1], "Event": ["E1", "E1"], "Boat Type": ["M2-", "M2-"], "DisplayName": ["USA", "ITA"]})
+    comp_athletes = pd.DataFrame(
+        {
+            "personId": ["a", "b", "a", "c"],
+            "boatId": [0, 0, 1, 1],
+            "athletePosition": ["b", "s", "b", "s"],
+        }
+    )
+
+    out = rd.predict_competition(gp, boats, comp_athletes, start=2023.5, n_samples=2000, seed=0)
+
+    assert set(out) >= {"y_boat", "cov_boat", "boat_class", "athlete_scores", "exp_score", "event_ranks"}
+    assert list(out["y_boat"].index) == [0, 1]
+    assert np.isfinite(np.asarray(out["y_boat"])).all()
+    # rank 1 scores 6 points .. rank 6 scores 1; a 2-boat event lands in [5, 6]
+    assert out["exp_score"].between(5, 6).all()
+    assert np.isfinite(np.asarray(out["athlete_scores"])).all()

@@ -21,6 +21,7 @@ from functools import cached_property
 import flax.struct
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pandas as pd
 
 from rowing.world_rowing import fields
@@ -203,3 +204,144 @@ class RowingData:
             n_types=len(self.type_labels),
             n_comps=len(self.comp_labels),
         )
+
+    # --- IO -----------------------------------------------------------------------------------
+    _CACHE_FILES = {
+        "competitions": "senior_competitions.feather",
+        "results": "senior_results.feather",
+        "athletes": "senior_athletes.feather",
+        "seats": "senior_raceBoats.feather",
+    }
+
+    @classmethod
+    def from_cache(cls, dir="."):
+        """Load the senior_*.feather caches written by the World Rowing Data workflow."""
+        from pathlib import Path
+
+        d = Path(dir)
+        return cls(**{k: pd.read_feather(d / fn) for k, fn in cls._CACHE_FILES.items()})
+
+    @classmethod
+    def from_api(cls, years=range(2019, 2030), **kwargs):
+        """Build the senior dataset from the live World Rowing API (network; user-run).
+
+        Not wired yet -- the download is the ``World Rowing Data.ipynb`` workflow. Run that to
+        refresh the ``senior_*.feather`` caches, then use :meth:`from_cache`.
+        """
+        raise NotImplementedError(
+            "Live download is the World Rowing Data workflow; refresh the senior_*.feather caches "
+            "and use RowingData.from_cache(). See world_rowing_model/World Rowing Data.ipynb."
+        )
+
+    def add_competition(self, competition_id, *, events=None, crews=None, competitors=None):
+        """Attach a target competition's entry tables (boats/athletes) for prediction.
+
+        Pass the already-fetched ``crews``/``competitors`` frames (e.g. from a cached raw-data
+        workbook); live fetching via the API is the user-run World Rowing Data workflow.
+        """
+        if crews is None or competitors is None:
+            raise NotImplementedError(
+                "Pass crews=/competitors= (e.g. from the cached raw-data workbook); live API fetch "
+                "is the user-run World Rowing Data workflow."
+            )
+        self.entries = {"events": events, "crews": crews, "competitors": competitors}
+        return self
+
+    def to_excel(self, path):
+        tables = {
+            "competitions": self.competitions,
+            "results": self.results,
+            "athletes": self.athletes,
+            "seats": self.seats,
+        }
+        if self.entries:
+            tables.update(self.entries)
+        with pd.ExcelWriter(path) as xlf:
+            for name, df in tables.items():
+                df.to_excel(xlf, merge_cells=False, sheet_name=name)
+
+    # --- filtering ----------------------------------------------------------------------------
+    def filter(self, *, dedup_seats=True, **kwargs) -> "RowingData":
+        """Return a filtered RowingData (wraps competition_model.filter_results)."""
+        from rowing.model.performance import competition_model
+
+        senior = {
+            "results": self.results,
+            "athletes": self.athletes,
+            "seats": self.seats,
+            "competitions": self.competitions,
+        }
+        filtered = competition_model.filter_results(senior, **kwargs)
+        if dedup_seats:
+            filtered["seats"] = filtered["seats"].loc[~filtered["seats"].index.duplicated()]
+        return RowingData(**filtered, entries=self.entries)
+
+    # --- model builders -----------------------------------------------------------------------
+    def performance_gp(self, params=None, **kernels):
+        """Build a PerformanceGP from this (filtered) data, optionally loading legacy params."""
+        from rowing.model.performance.competition_model import PerformanceGP
+
+        return PerformanceGP.from_inputs(self.to_inputs(), params=params, **kernels)
+
+    # --- prediction ---------------------------------------------------------------------------
+    def predict_competition(self, gp, boats, comp_athletes, *, start, n_samples=50_000, seed=2):
+        """Predict a target competition's athlete/boat scores and per-event rank probabilities.
+
+        Lifts the Predict_Competition workflow: athlete posterior scores -> boat scores+cov ->
+        Monte-Carlo rank simulation per event. Returns a dict of pandas frames keyed back to the
+        competition's labels (boat ids, athletes). ``boats``/``comp_athletes`` are the entry tables.
+        """
+        from scipy import stats
+
+        from rowing.model.performance.competition_model import predict_boat_scores
+
+        mi = self.to_inputs()
+        athlete_cols = self.athlete_index
+        system = gp.gp_system()
+        noise = float(jnp.exp(gp.log_noise[...]))
+
+        # best historical athlete score -> boat scores + covariance
+        ascore_years = gp.predict_athletes_scores(gp.years, athletes_index=athlete_cols, system=system)
+        _, cov_ath = gp.predict_athletes_score(start, system=system)
+        y_boat, cov_boat = predict_boat_scores(
+            ascore_years.max(axis=1).values, np.asarray(cov_ath), comp_athletes, athlete_cols, noise=noise
+        )
+
+        boatclass_var = float(gp.boatclass_var.value)
+        boat_class = pd.Series(
+            np.asarray(system.a @ (boatclass_var * np.asarray(mi.one_hot("class")))), index=self.class_labels
+        )
+
+        # athlete score trajectories over a year grid (for the predictions table)
+        times = np.arange(self.results.year.min(), np.ceil(start) + 0.1, 0.25)
+        score_year = times[times.searchsorted(start)]
+        athlete_scores = gp.predict_athletes_scores(times, athletes_index=self.athlete_index, system=system)
+
+        # Monte-Carlo finishing-rank probabilities per event
+        np.random.seed(seed)
+        event_ranks = {}
+        for event, event_boats in boats.groupby("Event"):
+            mvn = stats.multivariate_normal(
+                y_boat.loc[event_boats.id].values, cov_boat.loc[event_boats.id, event_boats.id].values, allow_singular=True
+            )
+            ranks = (
+                pd.DataFrame(stats.rankdata(-mvn.rvs(size=n_samples), axis=1), columns=event_boats.id)
+                .apply(pd.Series.value_counts)
+                .fillna(0)
+                .T
+            )
+            event_ranks[event] = ranks / ranks.values.sum(1, keepdims=True)
+        event_ranks = pd.concat(event_ranks, names=["event", "boatId"])
+        event_ranks.columns = event_ranks.columns.astype(int)
+        # Expected rank-score from P(rank=1..6); reindex so events with <6 boats don't KeyError.
+        exp_score = event_ranks.reindex(columns=range(1, 7), fill_value=0).fillna(0) @ np.arange(6, 0, -1)
+
+        return {
+            "y_boat": y_boat,
+            "cov_boat": cov_boat,
+            "boat_class": boat_class,
+            "athlete_scores": athlete_scores,
+            "score_year": score_year,
+            "event_ranks": event_ranks,
+            "exp_score": exp_score,
+        }
