@@ -252,7 +252,7 @@ def main(state=None):
         app.download_csv("all-crossings.csv", show_times)
 
         st.subheader("By file")
-        tabs = st.tabs(crossing_times)
+        tabs = st.tabs(list(crossing_times))
         for tab, (name, crossings) in zip(tabs, crossing_times.items()):
             with tab:
                 show_crossings = pd.concat(

@@ -153,7 +153,9 @@ def main(state=None):
 
 @st.fragment
 def plot_activity_data(gps_data):
-    tabs = st.tabs(gps_data)
+    if not gps_data:
+        return
+    tabs = st.tabs(list(gps_data))
     st.divider()
     with st.popover("Figure settings"):
         height = st.number_input(
