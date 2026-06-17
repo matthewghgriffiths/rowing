@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from typing import NamedTuple
 
+import flax.nnx as nnx
 import haiku as hk
 import jax
 import numpy as np
@@ -11,6 +12,8 @@ from jax import numpy as jnp
 
 from rowing.model.gp import kernels
 from rowing.model.gp import utils as gp_utils
+from rowing.model.gp.kernels import Hyper
+from rowing.model.gp.utils import GPSystem
 from rowing.world_rowing import fields
 
 
@@ -267,6 +270,62 @@ class PerformanceModel(NamedTuple):
                 "results": results,
             },
         )
+
+
+class PerformanceGP(nnx.Module, pytree=False):
+    """Eager flax.nnx view of a :class:`PerformanceModel`.
+
+    Instantiates the model's kernels once (so their params are persistent and shared
+    across evaluations) and holds the boat-class and observation-noise scalars as
+    ``nnx.Param``s. Exposes the same kernels / GP system / loss as the old Haiku flow;
+    optimise by ``nnx.split(gp, nnx.Param)`` and updating the param state.
+    """
+
+    def __init__(self, model: "PerformanceModel"):
+        am, rm = model.athlete_model, model.race_model
+        self.athlete_kernel = am.athlete_kernel()
+        self.race_kernel = rm.race_kernel()
+        self.lane_kernel = rm.lane_kernel() if rm.lane_kernel is not None else None
+        self.boatclass_var = Hyper(None)
+        self.log_noise = nnx.Param(jnp.zeros((), jnp.float64))
+
+        # data (static, not optimised)
+        self.years = am.years - am.year0
+        self.gram_athlete = am.gram_athlete
+        self.W_athlete = am.W_athlete
+        self.hours = rm.hours
+        self.gram_venue = rm.gram_venue
+        self.gram_lane = rm.gram_lane
+        self.gram_boatclass = rm.gram_boatclass
+        self.y = model.y
+
+    def get_kernels(self):
+        K_athlete = self.athlete_kernel.K(self.years, self.years) * self.gram_athlete
+
+        K_race = self.race_kernel.K(self.hours, self.hours) * self.gram_venue
+        if self.lane_kernel is not None:
+            gram_lane = jnp.where(jnp.isfinite(self.gram_lane), self.gram_lane, 0)
+            K_race = K_race + jnp.where(
+                jnp.isfinite(self.gram_lane),
+                self.lane_kernel.K(self.hours, self.hours) * self.gram_venue * gram_lane,
+                0,
+            )
+
+        K_boatclass = self.boatclass_var.value * self.gram_boatclass
+        return K_athlete, K_race, K_boatclass
+
+    def get_full_kernel(self):
+        return sum(self.get_kernels())
+
+    def get_jitter_kernel(self):
+        K = self.get_full_kernel()
+        return K + jnp.eye(len(K)) * jnp.exp(self.log_noise[...])
+
+    def gp_system(self):
+        return GPSystem.from_gram(self.get_jitter_kernel(), self.y)
+
+    def loss(self):
+        return self.gp_system().loss()
 
 
 class CompetitionModel(NamedTuple):
