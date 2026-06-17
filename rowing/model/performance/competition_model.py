@@ -400,6 +400,23 @@ def _iter_named_kernels(kernel):
         yield from _iter_named_kernels(inner)
 
 
+def load_kernel_haiku_params(kernel, params: dict):
+    """Copy legacy Haiku params onto a single (possibly composite) nnx kernel, in place.
+
+    ``params`` is the flat ``{kernel_name: {log_var, log_scale, ...}}`` dict; each named sub-kernel
+    of ``kernel`` receives the matching stored (log-space) values. Fixed Hypers (e.g. a pinned
+    ``scale``) and unmatched keys are skipped. Returns ``kernel``.
+    """
+    for k in _iter_named_kernels(kernel):
+        entry = params.get(k.name, {})
+        for hk_key, attr in _HAIKU_KEY_TO_HYPER.items():
+            if hk_key in entry:
+                hyper = getattr(k, attr, None)
+                if hyper is not None and hyper.param is not None:
+                    hyper.param = nnx.Param(jnp.asarray(entry[hk_key], dtype=jnp.float64))
+    return kernel
+
+
 def load_haiku_params(gp: "PerformanceGP", params: dict) -> "PerformanceGP":
     """Load a legacy Haiku ``params.yaml`` dict into an nnx :class:`PerformanceGP`, in place.
 
@@ -415,13 +432,8 @@ def load_haiku_params(gp: "PerformanceGP", params: dict) -> "PerformanceGP":
             hyper.param = nnx.Param(jnp.asarray(value, dtype=jnp.float64))
 
     for kernel in (gp.athlete_kernel, gp.race_kernel, gp.lane_kernel):
-        if kernel is None:
-            continue
-        for k in _iter_named_kernels(kernel):
-            entry = params.get(k.name, {})
-            for hk_key, attr in _HAIKU_KEY_TO_HYPER.items():
-                if hk_key in entry:
-                    set_param(getattr(k, attr, None), entry[hk_key])
+        if kernel is not None:
+            load_kernel_haiku_params(kernel, params)
 
     root = params.get("~", {})
     if fields.BoatType in root:

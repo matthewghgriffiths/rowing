@@ -8,14 +8,20 @@ import pandas as pd
 from flax.struct import dataclass
 from jax import numpy as jnp
 from jax import scipy as jsp
-from jax.tree_util import tree_map
 from jax.scipy.linalg import solve_triangular
+from jax.tree_util import tree_map
 
 # from scipy import sparse
 from scipy import sparse
 
 from rowing.model.gp import utils as gp_utils
-from rowing.model.performance.competition_model import GetKernel, RaceModel, get_athlete_kernel, year_to_date
+from rowing.model.performance.competition_model import (
+    GetKernel,
+    RaceModel,
+    get_athlete_kernel,
+    load_kernel_haiku_params,
+    year_to_date,
+)
 from rowing.world_rowing import fields
 
 Message = tuple[jax.Array, jax.Array]
@@ -304,11 +310,10 @@ class AthleteModel(JointModel):
         )
 
     def apply(self, params, x0=None, x1=None):
-        return gp_utils.transform(lambda x0, x1: self.athlete_kernel().K(x0, x1)).apply(
-            params,
-            self.years if x0 is None else x0,
-            self.years if x1 is None else x1,
-        )
+        kernel = load_kernel_haiku_params(self.athlete_kernel(), params)
+        x0 = self.years if x0 is None else x0
+        x1 = self.years if x1 is None else x1
+        return kernel.K(x0, x1)
 
     def split_competition_performance(self, vals):
         return np.split(vals, self.athlete_splits)
@@ -402,6 +407,31 @@ def calc_athletes_posterior(K_athlete, athlete_inds, athlete_dists):
     return post, res
 
 
+def race_jitter_gram(rm: RaceModel, params: dict) -> jax.Array:
+    """nnx replacement for ``RaceModel.get_jitter_kernel``: race + lane + boat-class + noise Gram.
+
+    Mirrors ``RaceModel.get_kernels`` / ``boatclass_kernel`` exactly, reading the legacy Haiku
+    ``params`` dict (named kernel hypers, plus ``'~'`` root ``Boat Type`` / ``log_noise``).
+    """
+    race_kernel = load_kernel_haiku_params(rm.race_kernel(), params)
+    K = race_kernel.K(rm.hours, rm.hours) * rm.gram_venue
+
+    if rm.lane_kernel:
+        lane_kernel = load_kernel_haiku_params(rm.lane_kernel(), params)
+        gram_lane = jnp.where(jnp.isfinite(rm.gram_lane), rm.gram_lane, 0)
+        K = K + jnp.where(
+            jnp.isfinite(rm.gram_lane),
+            lane_kernel.K(rm.hours, rm.hours) * rm.gram_venue * gram_lane,
+            0,
+        )
+
+    boatclass_var = jnp.exp(params["~"][fields.BoatType])
+    K = K + boatclass_var * rm.gram_boatclass
+
+    noise = jnp.exp(params["~"]["log_noise"])
+    return K + jnp.eye(len(K)) * noise
+
+
 @dataclass
 class CompetitionModels:
     competition_boat_results: list[jax.Array]
@@ -409,11 +439,7 @@ class CompetitionModels:
     competition_weights: list[dict[str, jax.Array]]
 
     def apply(self, params):
-        return jax.tree_util.tree_map(
-            lambda model: gp_utils.transform(model.get_jitter_kernel).apply(params),
-            self.competition_race_models,
-            is_leaf=lambda x: isinstance(x, RaceModel),
-        )
+        return [race_jitter_gram(model, params) for model in self.competition_race_models]
 
     @classmethod
     def from_data(cls, data):
