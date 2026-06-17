@@ -638,7 +638,7 @@ def last_race_results(n=10, fisa=True, cached=False):
     intermediates = pd.json_normalize(sum(race_boats.raceBoatIntermediates, []))
     if not intermediates.empty:
         intermediates = intermediates.join(boat_name, on="raceBoatId")
-        intermediates["Distance"] = intermediates["distance.DisplayName"].str.extract("([\d]+)")[0].astype(int)
+        intermediates["Distance"] = intermediates["distance.DisplayName"].str.extract(r"([\d]+)")[0].astype(int)
         intermediates["ResultTime"] = pd.to_timedelta(intermediates["ResultTime"])
         intermediates["Time"] = intermediates["ResultTime"].apply(utils.format_timedelta)
         intermediates["Intermediate"] = ""

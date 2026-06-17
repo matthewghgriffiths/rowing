@@ -408,7 +408,7 @@ def load_zipfile(file):
         for f in z.filelist:
             name, key = f.filename.removesuffix(".parquet").split("/")
             data = pd.read_parquet(z.open(f.filename))
-            if data.columns.str.contains("\(").any():
+            if data.columns.str.contains(r"\(").any():
                 data.columns = data.columns.map(ast.literal_eval)
             telem_data.setdefault(name, {})[key] = data
 
