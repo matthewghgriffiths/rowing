@@ -8,6 +8,7 @@ matched bit-for-bit (max abs diff 0.0).
 """
 
 import numpy as np
+import pandas as pd
 import pytest
 
 pytest.importorskip("flax")
@@ -91,3 +92,44 @@ def test_race_jitter_gram_matches_haiku():
         lane_kernel=lambda: kernels.SumKernel(kernels.SEKernel(name="lane_kernel0", scale=2)),
     )
     _check("K_race", jm.race_jitter_gram(rm, _params()))
+
+
+def test_predict_performances_score_std_is_posterior_std():
+    """Regression for the score_std fix: it must be sqrt(diag(cov)), not the mean."""
+    years = np.array([2021.0, 2022.0, 2023.0])
+    athlete_year_inds = [np.array([0, 1]), np.array([1, 2])]  # two athletes' competition indices
+    dummy = np.array([], dtype=int)
+    am = jm.AthleteModel(
+        years=years,
+        athlete_year_inds=athlete_year_inds,
+        athlete_splits=dummy,
+        athlete_order=dummy,
+        competition_splits=dummy,
+        competition_order=dummy,
+        athlete_kernel=cm.get_athlete_kernel,
+    )
+    athlete_dists = [
+        (jnp.array([0.1, 0.2]), jnp.array([0.1, 0.1])),
+        (jnp.array([0.0, -0.1]), jnp.array([0.1, 0.1])),
+    ]
+    times = np.array([2021.5, 2022.5])
+
+    data = type(
+        "Data",
+        (),
+        {
+            "athlete_index": pd.Index([10, 20], name="athlete_id"),
+            "athletes": pd.DataFrame(
+                {"athletes_person_BirthDate": ["1990", "1991"], "athletes_person": ["A", "B"]},
+                index=[10, 20],
+            ),
+        },
+    )()
+
+    preds = jm.predict_performances(times, am, athlete_dists, data, _params())
+
+    assert {"score", "score_std"}.issubset(preds.columns)
+    assert (preds.score_std > 0).all()
+    assert np.isfinite(preds.score_std).all()
+    # The bug set score_std == score; they must now differ.
+    assert not np.allclose(preds.score_std.values, preds.score.values)

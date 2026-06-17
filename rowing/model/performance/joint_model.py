@@ -83,7 +83,7 @@ def make_race_model(comp_results):
     boat_order = comp_results.index
     start_times = comp_results["Race Start"]
     times = (start_times - start_times.min()).dt.total_seconds().values
-    hours = times / 60 * 60
+    hours = times / 60 / 60
 
     weights = {}
     for f in [
@@ -571,7 +571,11 @@ def predict_performances(times, athlete_model, athlete_dists, data, params):
                     {ath: pd.Series(pred[0], times) for ath, pred in zip(data.athlete_index, ath_preds)}, names=["athlete_id"]
                 ),
                 "score_std": pd.concat(
-                    {ath: pd.Series(pred[0], times) for ath, pred in zip(data.athlete_index, ath_preds)}, names=["athlete_id"]
+                    {
+                        ath: pd.Series(np.sqrt(np.asarray(pred[1]).diagonal()), times)
+                        for ath, pred in zip(data.athlete_index, ath_preds)
+                    },
+                    names=["athlete_id"],
                 ),
             },
             axis=1,
