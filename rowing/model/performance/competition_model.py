@@ -9,7 +9,6 @@ import pandas as pd
 from jax import numpy as jnp
 
 # from scipy import sparse
-
 from rowing.model.gp import kernels
 from rowing.model.gp import utils as gp_utils
 from rowing.model.gp.kernels import Hyper
@@ -290,7 +289,8 @@ class PerformanceGP(nnx.Module, pytree=False):
         self.log_noise = nnx.Param(jnp.zeros((), jnp.float64))
 
         # data (static, not optimised)
-        self.years = am.years - am.year0
+        self.years = am.years
+        self.year0 = am.year0
         self.gram_athlete = am.gram_athlete
         self.W_athlete = am.W_athlete
         self.hours = rm.hours
@@ -300,7 +300,8 @@ class PerformanceGP(nnx.Module, pytree=False):
         self.y = model.y
 
     def get_kernels(self):
-        K_athlete = self.athlete_kernel.K(self.years, self.years) * self.gram_athlete
+        years = self.years - self.year0
+        K_athlete = self.athlete_kernel.K(years, years) * self.gram_athlete
 
         K_race = self.race_kernel.K(self.hours, self.hours) * self.gram_venue
         if self.lane_kernel is not None:
@@ -326,6 +327,109 @@ class PerformanceGP(nnx.Module, pytree=False):
 
     def loss(self):
         return self.gp_system().loss()
+
+    def predict_athletes_scores(self, times, athletes_index=None, system=None):
+        """Posterior mean athlete score at each ``time`` (years), one column per time."""
+        if system is None:
+            system = self.gp_system()
+        K_pred = self.athlete_kernel.K(times, self.years)
+        return pd.DataFrame(
+            jnp.einsum("ij,jk,j->ki", K_pred, self.W_athlete, system.a),
+            index=athletes_index,
+            columns=times,
+        )
+
+    def predict_athletes_score(self, start, system=None):
+        """Posterior mean and covariance of athlete scores at a single time ``start``."""
+        if system is None:
+            system = self.gp_system()
+        k_pred = self.athlete_kernel.K(np.r_[start], self.years)[0]
+        k00 = self.athlete_kernel.K(np.r_[start], np.r_[start])
+
+        y_ath = jnp.einsum("j,jk,j->k", k_pred, self.W_athlete, system.a)
+        Cov_ath = k00 * np.eye(self.W_athlete.shape[1]) - jnp.einsum(
+            "j,ji,jk,kl,k->il",
+            k_pred,
+            self.W_athlete,
+            system.inv_K(),
+            self.W_athlete,
+            k_pred,
+        )
+        return y_ath, Cov_ath
+
+
+def predict_boat_scores(y_ath, cov_ath, athletes, athlete_ids, noise=1e-4):
+    boat_ids = pd.Index(athletes.boatId.unique()).sort_values()
+
+    boat_athlete_W = np.zeros((boat_ids.size, athlete_ids.size))
+    boat_athlete_W[
+        boat_ids.get_indexer_for(athletes[athletes.athletePosition != "c"].boatId),
+        athlete_ids.get_indexer_for(athletes[athletes.athletePosition != "c"].personId),
+    ] = 1
+    w1 = boat_athlete_W.sum(1, keepdims=True)
+    boat_athlete_W /= np.where(w1 > 0, w1, 1)
+
+    y_boat = pd.Series(boat_athlete_W @ y_ath, index=boat_ids)
+    cov_boat = pd.DataFrame(
+        boat_athlete_W @ cov_ath @ boat_athlete_W.T + np.eye(len(boat_ids)) * noise,
+        index=boat_ids,
+        columns=boat_ids,
+    )
+    return y_boat, cov_boat
+
+
+# Legacy Haiku param key -> nnx Hyper attribute on the kernel.
+_HAIKU_KEY_TO_HYPER = {
+    "log_var": "variance",
+    "log_scale": "scale",
+    "log_period": "period",
+    "offset": "offset",
+    "bias": "bias",
+    "t0": "t0",
+}
+
+
+def _iter_named_kernels(kernel):
+    """Yield every kernel in a (possibly composite) kernel tree that carries a ``name``."""
+    if getattr(kernel, "name", None) is not None:
+        yield kernel
+    for sub in getattr(kernel, "kernels", []):  # Sum/Product kernels
+        yield from _iter_named_kernels(sub)
+    inner = getattr(kernel, "kernel", None)  # Slice/Power kernels
+    if inner is not None:
+        yield from _iter_named_kernels(inner)
+
+
+def load_haiku_params(gp: "PerformanceGP", params: dict) -> "PerformanceGP":
+    """Load a legacy Haiku ``params.yaml`` dict into an nnx :class:`PerformanceGP`, in place.
+
+    The old format is a flat dict keyed by kernel ``name`` (``{name: {log_var, log_scale, ...}}``)
+    plus a ``'~'`` root holding ``Boat Type`` (boat-class log-variance) and ``log_noise``. The
+    kernels were created with matching ``name=`` arguments, so we walk the model's kernels and
+    copy each stored (log-space) value onto the corresponding learnable Hyper. Hypers that were
+    fixed at construction (e.g. a pinned ``scale``) are skipped, as are param keys with no match.
+    """
+
+    def set_param(hyper, value):
+        if hyper is not None and hyper.param is not None:
+            hyper.param = nnx.Param(jnp.asarray(value, dtype=jnp.float64))
+
+    for kernel in (gp.athlete_kernel, gp.race_kernel, gp.lane_kernel):
+        if kernel is None:
+            continue
+        for k in _iter_named_kernels(kernel):
+            entry = params.get(k.name, {})
+            for hk_key, attr in _HAIKU_KEY_TO_HYPER.items():
+                if hk_key in entry:
+                    set_param(getattr(k, attr, None), entry[hk_key])
+
+    root = params.get("~", {})
+    if fields.BoatType in root:
+        set_param(gp.boatclass_var, root[fields.BoatType])
+    if "log_noise" in root:
+        gp.log_noise = nnx.Param(jnp.asarray(root["log_noise"], dtype=jnp.float64))
+
+    return gp
 
 
 class CompetitionModel(NamedTuple):
@@ -519,84 +623,6 @@ def filter_results(
     )
 
     return {"athletes": sel_athletes, "results": sel_results, "seats": sel_seats, "competitions": senior_data["competitions"]}
-
-
-def get_full_kernel(self):
-    kernels = self.get_kernels()
-    return sum(kernels)
-
-
-def get_jitter_kernel(self):
-    K = self.get_full_kernel()
-    race_var = jnp.exp(hk.get_parameter("log_noise", [], init=jnp.zeros, dtype=jnp.float64))
-    K_noise = jnp.eye(len(K)) * race_var
-    return K + K_noise
-
-
-def gp_system(self):
-    K = self.get_jitter_kernel()
-    y = self.y
-    return gp_utils.GPSystem.from_gram(K, y)
-
-
-def loss(self):
-    return self.gp_system().loss()
-
-
-def predict_athletes_scores(model, times, params, athletes_index=None, system=None):
-    if system is None:
-        system = gp_utils.transform(model.gp_system).apply(params)
-
-    K_athlete_pred = gp_utils.transform(
-        lambda times: model.athlete_model.athlete_kernel().K(times, model.athlete_model.years)
-    ).apply(params, times)
-
-    return pd.DataFrame(
-        jnp.einsum("ij,jk,j->ki", K_athlete_pred, model.athlete_model.W_athlete, system.a), index=athletes_index, columns=times
-    )
-
-
-def predict_athletes_score(model, start, params, system=None):
-    if system is None:
-        system = gp_utils.transform(model.gp_system).apply(params)
-
-    k_athlete_pred = gp_utils.transform(
-        lambda times: model.athlete_model.athlete_kernel().K(times, model.athlete_model.years)
-    ).apply(params, np.r_[start])[0]
-    k00_athlete_pred = gp_utils.transform(
-        lambda start: model.athlete_model.athlete_kernel().K(np.r_[start], np.r_[start])
-    ).apply(params, start)
-
-    y_ath = jnp.einsum("j,jk,j->k", k_athlete_pred, model.athlete_model.W_athlete, system.a)
-    Cov_ath = k00_athlete_pred * np.eye(model.athlete_model.W_athlete.shape[1]) - jnp.einsum(
-        "j,ji,jk,kl,k->il",
-        k_athlete_pred,
-        model.athlete_model.W_athlete,
-        system.inv_K(),
-        model.athlete_model.W_athlete,
-        k_athlete_pred,
-    )
-    return y_ath, Cov_ath
-
-
-def predict_boat_scores(y_ath, cov_ath, athletes, athlete_ids, noise=1e-4):
-
-    boat_ids = pd.Index(athletes.boatId.unique()).sort_values()
-
-    boat_athlete_W = np.zeros((boat_ids.size, athlete_ids.size))
-    boat_athlete_W[
-        boat_ids.get_indexer_for(athletes[athletes.athletePosition != "c"].boatId),
-        athlete_ids.get_indexer_for(athletes[athletes.athletePosition != "c"].personId),
-    ] = 1
-    w1 = boat_athlete_W.sum(1, keepdims=True)
-    boat_athlete_W /= np.where(w1 > 0, w1, 1)
-
-    y_boat = pd.Series(boat_athlete_W @ y_ath, index=boat_ids)
-    cov_boat = pd.DataFrame(
-        boat_athlete_W @ cov_ath @ boat_athlete_W.T + np.eye(len(boat_ids)) * noise, index=boat_ids, columns=boat_ids
-    )
-
-    return y_boat, cov_boat
 
 
 # class CompetitionModel(NamedTuple):

@@ -43,6 +43,9 @@ class Hyper(nnx.Module, pytree=False):
 
 
 class AbstractKernel(nnx.Module, pytree=False):
+    # Optional identifier, used to map legacy Haiku params onto this kernel's Hypers.
+    name = None
+
     def k(self, X0, X1=None) -> numpy.ndarray:
         raise NotImplementedError
 
@@ -85,6 +88,7 @@ class AbstractKernel(nnx.Module, pytree=False):
 
 class DotProduct(AbstractKernel):
     def __init__(self, offset=None, variance=None, name=None, shape=()):
+        self.name = name
         self.offset = Hyper(offset, shape=shape, transform=_identity)
         self.variance = Hyper(variance, shape=shape)
 
@@ -174,6 +178,7 @@ class ArcCosine(AbstractKernel):
 
 class Bias(AbstractKernel):
     def __init__(self, variance=None, name=None):
+        self.name = name
         self.variance = Hyper(variance)
 
     def k(self, X0, X1=None):
@@ -220,6 +225,7 @@ class SumKernel(AbstractKernel):
     aggregate = staticmethod(sum)
 
     def __init__(self, *kernels: AbstractKernel, name=None):
+        self.name = name
         self.kernels = nnx.data(list(kernels))
 
     def k(self, X0, X1=None):
@@ -235,6 +241,7 @@ class ProductKernel(SumKernel):
 
 class WhiteNoise(AbstractKernel):
     def __init__(self, variance=None, *, name=None):
+        self.name = name
         self.variance = Hyper(variance)
 
     def k(self, X0, X1=None):
@@ -244,6 +251,7 @@ class WhiteNoise(AbstractKernel):
 
 class SEKernel(AbstractKernel):
     def __init__(self, scale=None, variance=None, *, name=None, shape=()):
+        self.name = name
         self.variance = Hyper(variance)
         self.scale = Hyper(scale, shape=shape)
 
@@ -265,6 +273,7 @@ class Matern(AbstractKernel):
     matern: Callable[[jax.Array], jax.Array]
 
     def __init__(self, scale=None, variance=None, *, name=None, shape=()):
+        self.name = name
         self.variance = Hyper(variance)
         self.scale = Hyper(scale, shape=shape)
 
@@ -306,6 +315,7 @@ class Matern52(Matern):
 
 class IntSEKernel(AbstractKernel):
     def __init__(self, t0=0.0, scale=None, variance=None, *, name=None, active_dim=0):
+        self.name = name
         self.active_dim = active_dim
         self.t0 = Hyper(t0 or None, init=jnp.zeros, transform=_identity)
         self.variance = Hyper(variance)
@@ -332,7 +342,9 @@ class IntegralSEKernel(AbstractKernel):
         k = (
             self.variance.value
             * self.scale.value**2
-            * jnp.clip(1 + self.bias.value - jnp.exp(-jnp.square(d12) / 2) - SQPI2 * d12 * jsp.special.erf(d12 * ISQ2), 0, None)
+            * jnp.clip(
+                1 + self.bias.value - jnp.exp(-jnp.square(d12) / 2) - SQPI2 * d12 * jsp.special.erf(d12 * ISQ2), 0, None
+            )
         )
         return k
 
@@ -402,6 +414,7 @@ def se_periodic_kernel(X1, X2, period=1.0, l=1.0, axis=-1):  # noqa: E741
 
 class SEPeriodicKernel(AbstractKernel):
     def __init__(self, period=None, scale=None, variance=None, *, name=None, shape=()):
+        self.name = name
         self.variance = Hyper(variance)
         self.period = Hyper(period, shape=shape)
         self.scale = Hyper(scale, shape=shape)

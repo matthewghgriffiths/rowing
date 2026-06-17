@@ -3,6 +3,7 @@ from functools import partial
 from math import prod
 from typing import NamedTuple
 
+import flax.nnx as nnx
 import haiku as hk
 import jax
 import jax.numpy as jnp
@@ -183,6 +184,47 @@ class GPSystem(NamedTuple):
 
     def rmse(self):
         return jnp.sqrt(self.mse())
+
+
+def fit_module(module, *, loss_fn=None, method="L-BFGS-B", callback=None, **min_kws):
+    """Fit a flax.nnx module's ``nnx.Param``s in place by minimising its loss.
+
+    The learnable params are extracted with ``nnx.split(module, nnx.Param)``, flattened to a
+    single vector, and optimised with ``scipy.optimize.minimize`` (L-BFGS-B by default) using
+    JAX value-and-gradient. ``loss_fn`` defaults to ``module.loss()``; pass a callable taking a
+    rebuilt module and returning a scalar to optimise something else. Returns the scipy result
+    (with ``module`` updated to the optimum).
+    """
+    from scipy import optimize
+
+    if loss_fn is None:
+
+        def loss_fn(m):
+            # PerformanceGP exposes loss(); a plain GP exposes log_likelihood().
+            return m.loss() if hasattr(m, "loss") else -m.log_likelihood()
+
+    # Split learnable params from the (static) data arrays so only the params are optimised.
+    graphdef, params, rest = nnx.split(module, nnx.Param, ...)
+    x0, unravel = ravel_pytree(params)
+
+    @jax.jit
+    def value_and_grad(x):
+        return jax.value_and_grad(lambda z: loss_fn(nnx.merge(graphdef, unravel(z), rest)))(x)
+
+    history = []
+
+    def fun(x):
+        value, grad = value_and_grad(jnp.asarray(x))
+        value = float(value)
+        history.append(value)
+        if callback is not None:
+            callback(value)
+        return value, np.asarray(grad, dtype=float)
+
+    res = optimize.minimize(fun, np.asarray(x0, dtype=float), jac=True, method=method, **min_kws)
+    nnx.update(module, unravel(jnp.asarray(res.x)))
+    res["loss_history"] = history
+    return res
 
 
 class OptModel:
