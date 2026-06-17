@@ -1,9 +1,7 @@
-import dis
 import io
 import logging
 import warnings
 
-# import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -11,7 +9,6 @@ import streamlit as st
 
 from rowing import utils
 from rowing.analysis import app, garmin, splits, strava
-from rowing.world_rowing.fields import is_timedelta64_dtype
 
 DEFAULT_FACETS = [
     "velocity_smooth",
@@ -120,7 +117,6 @@ def main(state=None):
             {file.name.rsplit(".", 1)[0]: file for file in uploaded_fits},
             singleton=True,
         )
-        print(fit_data)
         gpx_data.update(fit_data)
 
         if garmin_client:
@@ -247,7 +243,6 @@ def analyse_gps_data(gpx_data):
     if not gpx_data:
         st.write("No data uploaded")
         st.stop()
-        raise st.runtime.scriptrunner.StopException()
 
     # with st.expander("Show map"):
     #     app.draw_gps_data(gpx_data, locations)
@@ -486,7 +481,6 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_informa
 @st.fragment()
 def excel_export_fragment(crossing_times, location_timings, best_times, piece_information):
     if not any([crossing_times, location_timings, best_times]):
-        print("no sheets")
         return
 
     xldata = io.BytesIO()

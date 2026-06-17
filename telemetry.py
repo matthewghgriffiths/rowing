@@ -1,25 +1,16 @@
 import io
-import json
 import logging
 from functools import partial
 
-import numpy as np
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import plotly.io as pio
 import streamlit as st
 import yaml
-from tqdm import tqdm
 
 from rowing import utils
 from rowing.analysis import app, telemetry
 
 logger = logging.getLogger("telemetry")
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format='%(asctime)s:%(name)s:%(levelname)s:%(message)s',
-# )
 
 
 def main(state=None):
@@ -187,7 +178,6 @@ def main(state=None):
     if not telemetry_data:
         st.write("No data uploaded")
         st.stop()
-        raise st.runtime.scriptrunner.StopException()
 
     logger.info("Show map")
     with st.expander("Show map"):
@@ -337,7 +327,6 @@ def main(state=None):
                 )
                 if template:
                     template_data = yaml.safe_load(template)
-                    # print(json.dumps(template_data, indent=4))
 
                     for k0, vs in template_data.items():
                         for k1, v in vs.items():
@@ -540,10 +529,6 @@ def main(state=None):
     with st.expander("Plot Stroke Profiles"):
         st.subheader("Plot Stroke Profiles")
         if st.toggle("Make profile plots", key="Make profile plots") and piece_information:
-            # for p, profile in piece_information['crew_profiles'].items():
-            #     print(p)
-            #     print(profile)
-
             tabs = st.tabs(["Rower Profiles", "Boat Profile", "Grouped Profiles"])
             with tabs[0]:
                 figures, tables = app.plot_rower_profiles(piece_information, default_height=default_height)
