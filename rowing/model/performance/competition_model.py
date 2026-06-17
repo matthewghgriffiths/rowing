@@ -280,6 +280,46 @@ class PerformanceGP(nnx.Module, pytree=False):
     optimise by ``nnx.split(gp, nnx.Param)`` and updating the param state.
     """
 
+    @classmethod
+    def from_inputs(
+        cls,
+        mi,
+        *,
+        athlete_kernel=get_athlete_kernel,
+        race_kernel=get_race_kernel,
+        lane_kernel=None,
+        params=None,
+    ):
+        """Build a PerformanceGP from a :class:`rowing.model.data.ModelInputs` atomic pytree.
+
+        Re-expresses :meth:`PerformanceModel.from_data` over the atomic arrays: categorical Grams
+        are equality-outer-products of integer codes, ``W_athlete`` is a seat-weight scatter, and
+        ``year``/``hour`` are carried through. Optionally loads a legacy Haiku ``params`` dict.
+        """
+        athlete_model = AthleteModel(
+            years=mi.year,
+            year0=mi.year0,
+            W_athlete=mi.W_athlete(),
+            gram_athlete=mi.gram_athlete(),
+            athlete_kernel=athlete_kernel,
+        )
+        race_model = RaceModel(
+            hours=mi.hour,
+            W_venue=mi.one_hot("venue"),
+            W_boatclass=mi.one_hot("class"),
+            W_lane=mi.W_lane,
+            gram_venue=mi.categorical_gram("venue"),
+            gram_boatclass=mi.categorical_gram("class"),
+            gram_lane=mi.gram_lane(),
+            race_kernel=race_kernel,
+            lane_kernel=lane_kernel,
+        )
+        model = PerformanceModel(athlete_model=athlete_model, race_model=race_model, y=mi.y)
+        gp = cls(model)
+        if params is not None:
+            load_haiku_params(gp, params)
+        return gp
+
     def __init__(self, model: "PerformanceModel"):
         am, rm = model.athlete_model, model.race_model
         self.athlete_kernel = am.athlete_kernel()
