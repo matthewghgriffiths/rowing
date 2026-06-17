@@ -3,6 +3,7 @@ import io
 import logging
 import zipfile
 from itertools import count, cycle
+from typing import Optional, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,43 @@ from rowing.analysis import files, geodesy, peach, splits, static, telemetry
 from rowing.app import inputs, threads
 
 logger = logging.getLogger(__name__)
+
+
+class PieceInformation(TypedDict, total=False):
+    """Schema of the ``piece_information`` bundle threaded through the apps.
+
+    It is built up in stages, so every key is optional and which keys are
+    present depends on how far the pipeline has run:
+
+    1. ``select_pieces()`` creates it with the piece selection.
+    2. The gps/telemetry page scripts attach the source data.
+    3. ``make_stroke_profiles()`` adds the stroke profiles.
+    4. ``setup_plot_data()`` adds the derived plotting data.
+    """
+
+    # 1. piece selection (select_pieces)
+    piece_data: dict[str, pd.DataFrame]
+    start_landmark: str
+    finish_landmark: str
+    intervals: Optional[int]
+
+    # 2. source data (attached by the gps/telemetry page scripts)
+    gps_data: dict[str, pd.DataFrame]
+    telemetry_data: dict[str, dict]
+    piece_rowers: pd.MultiIndex
+
+    # 3. stroke profiles (make_stroke_profiles)
+    profiles: dict[tuple, pd.DataFrame]
+    boat_profiles: dict[tuple, pd.DataFrame]
+    crew_profiles: dict[tuple, pd.DataFrame]
+    crew_profile: pd.DataFrame
+
+    # 4. derived plotting data (setup_plot_data)
+    show_rowers: pd.Index
+    n_legs: pd.Series
+    compare_power: pd.DataFrame
+    landmark_distances: pd.Series
+    piece_data_filter: dict[str, pd.DataFrame]
 
 color_discrete_sequence = [
     "#636efa",
@@ -359,7 +397,7 @@ def get_fastest_times(gpx_data):
     return best_times
 
 
-def select_pieces(all_crossing_times):
+def select_pieces(all_crossing_times) -> Optional[PieceInformation]:
     if all_crossing_times.empty:
         return
 
@@ -1402,7 +1440,7 @@ def setup_plots(piece_rowers, state, default_height=600, key="", toggle=True, nv
     return window, show_rowers, all_plots, height
 
 
-def setup_plot_data(piece_information, window, show_rowers=None):
+def setup_plot_data(piece_information: PieceInformation, window, show_rowers=None) -> PieceInformation:
     piece_information["show_rowers"] = show_rowers
 
     piece_data = piece_information["piece_data"]
