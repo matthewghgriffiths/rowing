@@ -1,49 +1,63 @@
-import haiku as hk
+import flax.nnx as nnx
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy
 
-from .kernels import IntSEKernel, SEKernel
-from .utils import solve_triangular, to_2d, transform
+from .kernels import Hyper, IntSEKernel, SEKernel, _identity
+from .utils import solve_triangular, to_2d
 
 
-class GaussianProcessRegression(hk.Module):
+class GaussianProcessRegression(nnx.Module, pytree=False):
     def __init__(self, X, y, *, kernel=None, mean=None, obs_var=None, name=None, kernel_kws=None):
-        super().__init__(name=name)
         self.X = to_2d(X)
         self.y = jnp.asarray(y)
-        self._init()
 
-        self._set_mean(mean)
-        self._set_kernel(kernel, **(kernel_kws or {}))
-
-        if obs_var is None:
-            obs_var = jnp.eye(self.n_obs) * jnp.exp(hk.get_parameter("obs_var", shape=(), dtype="f", init=jnp.zeros))
-
-        self.obs_var = obs_var
-
-    def _init(self):
         self.n_obs = len(self.X)
         self.obs_shape = self.y.shape
         self.dims = self.obs_shape[1:]
         self.n_dims = self.dims[0] if self.dims else 1
         self.size = self.y.size
 
+        self._set_mean(mean)
+        self._set_kernel(kernel, **(kernel_kws or {}))
+
+        if obs_var is None:
+            self._obs_var_h = Hyper(None, init=jnp.zeros, transform=jnp.exp)
+            self._obs_var_fixed = None
+        else:
+            self._obs_var_h = None
+            self._obs_var_fixed = obs_var
+
+    @property
+    def obs_var(self):
+        if self._obs_var_fixed is not None:
+            return self._obs_var_fixed
+        return jnp.eye(self.n_obs) * self._obs_var_h.value
+
     def _set_kernel(self, kernel, **kwargs):
-        self.kernel = kernel or SEKernel(**kwargs)
+        self.kernel = kernel if kernel is not None else SEKernel(**kwargs)
 
     def _set_mean(self, mean):
+        self._mean_fn = None
+        self._mean_const = None
+        self.gp_mean = None
         if isinstance(mean, numpy.ndarray):
-            self.mean_val = jnp.reshape(mean, (1,) + self.dims)
+            self._mean_const = jnp.reshape(mean, (1,) + self.dims)
         elif jnp.isscalar(mean):
-            self.mean_val = jnp.full((1,) + self.dims, mean)
+            self._mean_const = jnp.full((1,) + self.dims, mean)
         elif mean:
-            self.mean = mean
+            self._mean_fn = mean
         else:
-            self.mean_val = hk.get_parameter("gp_mean", shape=self.dims, dtype="f", init=jnp.zeros).reshape((1,) + self.dims)
+            self.gp_mean = Hyper(None, shape=self.dims, init=jnp.zeros, transform=_identity)
 
     def mean(self, t):
-        return jnp.repeat(self.mean_val, len(t), axis=0)
+        if self._mean_fn is not None:
+            return self._mean_fn(t)
+        if self.gp_mean is not None:
+            mean_val = self.gp_mean.value.reshape((1,) + self.dims)
+        else:
+            mean_val = self._mean_const
+        return jnp.repeat(mean_val, len(t), axis=0)
 
     def _gp_init(self):
         K = self.K() + self.obs_var
@@ -97,9 +111,17 @@ class LinearGPCorrelatedRegression(GaussianProcessRegression):
         self.n_coef = self.W.shape[1]
 
         if coef_cov is None:
-            coef_cov = jnp.diag(jnp.exp(hk.get_parameter("coef_var", shape=(self.n_coef,), dtype="f", init=jnp.zeros)))
+            self._coef_cov_h = Hyper(None, shape=(self.n_coef,), transform=jnp.exp)
+            self._coef_cov_fixed = None
+        else:
+            self._coef_cov_h = None
+            self._coef_cov_fixed = coef_cov
 
-        self.coef_cov = coef_cov
+    @property
+    def coef_cov(self):
+        if self._coef_cov_fixed is not None:
+            return self._coef_cov_fixed
+        return jnp.diag(self._coef_cov_h.value)
 
     def mean(self, t):
         return jnp.zeros((len(t), self.n_coef), "f")
@@ -153,12 +175,3 @@ def get_gpr(times, observations, **kwargs):
     if "kernel" not in kwargs:
         kwargs["kernel"] = IntSEKernel(times[0])
     return GaussianProcessRegression(times, observations, **kwargs)
-
-
-make_gpr = transform(get_gpr)
-
-
-@transform
-def gpr_likelihood(times, observations, **kwargs):
-    gp = get_gpr(times, observations, **kwargs)
-    return gp.log_likelihood()
