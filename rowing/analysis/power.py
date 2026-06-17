@@ -125,8 +125,8 @@ def piece_averages(data, **kwargs):
     piece_avg[('Duration', 's')] = durations.groupby(piece).sum()
     piece_avg[('Max Rating', '/min')] = data.Rating.Boat.groupby(piece).max()
     piece_avg[('Min Rating', '/min')] = data.Rating.Boat.groupby(piece).min()
-    piece_avg[('AvgBoatSpeed', 'm/s')] = piece_avg[('Length', 'm')
-                                                   ] / piece_avg[('Duration', 's')]
+    piece_avg[('AvgBoatSpeed', 'm/s')] = (
+        piece_avg[('Length', 'm')] / piece_avg[('Duration', 's')])
     boat_col_order = [
         'Timestamp', 'Length', 'Duration', 'Rating', 'Average Power', 'AvgBoatSpeed',
         'Min Rating', 'Max Rating',
@@ -140,3 +140,24 @@ def piece_averages(data, **kwargs):
         piece_avg[boat_col_order].round(2),
         piece_avg[rower_col_order].round(1),
     ], axis=1).drop(index=0)
+
+
+def fit_stroke_coefs(force, speed, accel, grouper, rcond=0):
+    grouper, data = grouper.align(
+        pd.concat({
+            'drag': -speed,
+            'force': force.sum(axis=1),
+        }, axis=1).dropna(),
+        join='inner'
+    )
+    s, y = grouper.align(accel, join='left')
+    s, X, y = s.values, data.values, y.values
+
+    ns = s.max() + 1
+    d = X.shape[-1]
+    XTX = np.zeros((ns, d, d)) + np.eye(d) * rcond
+    np.add.at(XTX, s, X[..., None] * X[:, None, :])
+    XTy = np.zeros((ns, d))
+    np.add.at(XTy, s, X * y[:, None])
+    coefs = np.einsum("ijk,ik->ij", np.linalg.inv(XTX), XTy)
+    return pd.DataFrame(coefs, columns=data.columns)
