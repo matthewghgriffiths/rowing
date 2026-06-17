@@ -1011,9 +1011,13 @@ def merge_competition_results(
         left_on=fields.event_boatClassId, right_on=fields.boatClass_id,
         suffixes=('', '_1'),
     )
+    if competition_races.empty:
+        return competition_races
+
     race_wbts = pd.merge(
         competition_races, event_wbts,
-        left_on=fields.race_eventId, right_on=fields.event_id,
+        left_on=fields.race_eventId,
+        right_on=fields.event_id,
         suffixes=('', '_1'),
     )
     race_id = 'raceId'
@@ -1094,6 +1098,8 @@ def get_competition_results(competition_id=None, with_intermediates=True):
         competition_id=competition_id,
         with_intermediates=with_intermediates
     )
+    if race_data.empty:
+        return race_data
     if with_intermediates:
         race_summaries = race_data.set_index(
             ['Boat Class', 'Event', 'Race', 'Phase', 'distance', 'Rank']
