@@ -25,7 +25,7 @@ dependencies = [
 
 [project.optional-dependencies]
 worldrowing = [
-    "streamlit==1.54.0",
+    "streamlit>=1.54",
     "plotly>=5.0",
     "seaborn>=0.13.2",
     "streamlit-plotly-mapbox-events>=0.1.2",
