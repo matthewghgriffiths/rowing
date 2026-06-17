@@ -57,6 +57,16 @@ def prompt_mfa(container=None):
     return get_mfa
 
 
+def _oauth1_token(client):
+    """Return the client's cached oauth1 token, or None.
+
+    Tolerates garminconnect versions where the ``Garmin`` object has no
+    ``garth`` sub-client (or it is unset before login).
+    """
+    garth_client = getattr(client, "garth", None)
+    return getattr(garth_client, "oauth1_token", None)
+
+
 def login(user_container=None, pw_container=None, mfa_container=None):
     try:
         import garth
@@ -70,14 +80,14 @@ def login(user_container=None, pw_container=None, mfa_container=None):
         password = st.text_input("Enter password: ", type="password")
 
     client = _client(username)
-    if client.garth.oauth1_token:
+    if _oauth1_token(client):
         logger.info("already logged in")
         return client
 
     if username and password:
         try:
             client = _client(username)
-            if client.garth.oauth1_token:
+            if _oauth1_token(client):
                 logger.info("already logged in")
                 return client
             client.password = password
