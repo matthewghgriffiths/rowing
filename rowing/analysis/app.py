@@ -238,6 +238,42 @@ def download_csv(file_name, df, label=":inbox_tray: Download data as csv", csv_k
     )
 
 
+def show_crossing_times(crossings, *, time_format="HH:mm:ss.SS", reset_index=False, download_name=None):
+    """Render a crossing-times table (date + time columns) and an optional CSV download.
+
+    ``crossings`` is a datetime Series; the rendered frame splits it into a
+    ``date`` and ``time`` column. Returns that display frame.
+    """
+    display = pd.concat({"date": crossings.dt.normalize(), "time": crossings}, axis=1)
+    st.dataframe(
+        display.reset_index() if reset_index else display,
+        hide_index=reset_index,
+        column_config={
+            "date": st.column_config.DateColumn("Date"),
+            "time": st.column_config.TimeColumn("Time", format=time_format),
+        },
+    )
+    if download_name:
+        download_csv(download_name, display)
+    return display
+
+
+def format_export_columns(df, *, hours=False, naive_datetimes=False):
+    """Return a copy of ``df`` with timedelta columns formatted as strings.
+
+    Timedelta columns become ``utils.format_timedelta`` strings; when
+    ``naive_datetimes`` is set, timezone-aware datetime columns are made naive
+    (Excel cannot store tz-aware datetimes). Used to prepare frames for export.
+    """
+    out = df.copy()
+    for col_name, col in df.items():
+        if naive_datetimes and pd.api.types.is_datetime64_any_dtype(col.dtype):
+            out[col_name] = col.dt.tz_localize(None)
+        elif pd.api.types.is_timedelta64_dtype(col.dtype):
+            out[col_name] = col.map(lambda v: utils.format_timedelta(v, hours=hours))
+    return out
+
+
 @st.cache_data
 def parse_telemetry_text(uploaded_files, use_names=True, sep="\t", with_timings=True):
     uploaded_data = {file.name.rsplit(".", 1)[0]: file.read().decode("utf-8") for file in uploaded_files}

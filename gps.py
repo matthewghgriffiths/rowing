@@ -400,42 +400,16 @@ def timings_fragment(all_crossing_times, crossing_times, gpx_data, piece_informa
     tab_all, *name_tabs = st.tabs(["All Crossing Times"] + names + data_names)
     tabs, data_tabs = name_tabs[: len(names)], name_tabs[len(names) :]
     with tab_all:
-        show_times = pd.concat(
-            {
-                "date": all_crossing_times.dt.normalize(),
-                "time": all_crossing_times,
-            },
-            axis=1,
+        app.show_crossing_times(
+            all_crossing_times, time_format="HH:mm:ss.S", reset_index=True, download_name="all-crossings.csv"
         )
-        st.dataframe(
-            show_times.reset_index(),
-            hide_index=True,
-            column_config={
-                "date": st.column_config.DateColumn("Date"),
-                "time": st.column_config.TimeColumn("Time", format="HH:mm:ss.S"),
-            },
-        )
-        app.download_csv("all-crossings.csv", show_times)
 
     for tab, (name, crossings) in zip(tabs, crossing_times.items()):
         with tab:
-            show_crossings = pd.concat(
-                {
-                    "date": crossings.dt.normalize(),
-                    "time": crossings,
-                },
-                axis=1,
-            )
             st.subheader("Crossing times")
-            st.dataframe(
-                show_crossings.reset_index(),
-                hide_index=True,
-                column_config={
-                    "date": st.column_config.DateColumn("Date"),
-                    "time": st.column_config.TimeColumn("Time", format="HH:mm:ss.S"),
-                },
+            app.show_crossing_times(
+                crossings, time_format="HH:mm:ss.S", reset_index=True, download_name=f"{name}-crossings.csv"
             )
-            app.download_csv(f"{name}-crossings.csv", show_crossings)
 
     for tab, (name, timings) in zip(tabs, location_timings.items()):
         with tab:
@@ -509,12 +483,7 @@ def excel_export_fragment(crossing_times, location_timings, best_times, piece_in
             )
 
         for key, data in piece_information["piece_data"].items():
-            data = data.copy()
-            for c, col in data.items():
-                if pd.api.types.is_timedelta64_dtype(col.dtype):
-                    data[c] = col.map(utils.format_timedelta)
-
-            data.to_excel(xlf, sheet_name=key)
+            app.format_export_columns(data).to_excel(xlf, sheet_name=key)
 
     xldata.seek(0)
     st.download_button(

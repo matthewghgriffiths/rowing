@@ -1,13 +1,11 @@
 import io
 import logging
-from functools import partial
 
 import pandas as pd
 import plotly.io as pio
 import streamlit as st
 import yaml
 
-from rowing import utils
 from rowing.analysis import app, telemetry
 
 logger = logging.getLogger("telemetry")
@@ -219,20 +217,7 @@ def main(state=None):
 
     with st.expander("Crossing times"):
         st.subheader("Crossing Times")
-        show_times = pd.concat(
-            {
-                "date": all_crossing_times.dt.normalize(),
-                "time": all_crossing_times,
-            },
-            axis=1,
-        )
-        st.dataframe(
-            show_times,
-            column_config={
-                "date": st.column_config.DateColumn("Date"),
-                "time": st.column_config.TimeColumn("Time", format="hh:mm:ss.SS"),
-            },
-        )
+        show_times = app.show_crossing_times(all_crossing_times, time_format="hh:mm:ss.SS")
 
         landmark_times = all_crossing_times.droplevel(["location", "distance"]).unstack("landmark")
         landmark_times = landmark_times.loc[
@@ -245,21 +230,7 @@ def main(state=None):
         tabs = st.tabs(list(crossing_times))
         for tab, (name, crossings) in zip(tabs, crossing_times.items()):
             with tab:
-                show_crossings = pd.concat(
-                    {
-                        "date": crossings.dt.normalize(),
-                        "time": crossings,
-                    },
-                    axis=1,
-                )
-                st.dataframe(
-                    show_crossings,
-                    column_config={
-                        "date": st.column_config.DateColumn("Date"),
-                        "time": st.column_config.TimeColumn("Time", format="hh:mm:ss.SS"),
-                    },
-                )
-                app.download_csv(f"{name}-crossings.csv", show_crossings)
+                app.show_crossing_times(crossings, time_format="hh:mm:ss.SS", download_name=f"{name}-crossings.csv")
 
     logger.info("Select piece start end")
     with st.expander("Select Piece start/end", True):
@@ -360,11 +331,7 @@ def main(state=None):
                 report_outputs[-1, "Summary"] = outputs = {}
                 for t, table in initial.items():
                     st.subheader(t)
-                    table = table.copy()
-                    for c, col in table.items():
-                        if pd.api.types.is_timedelta64_dtype(col.dtype):
-                            table[c] = col.map(utils.format_timedelta)
-
+                    table = app.format_export_columns(table)
                     st.dataframe(table, height=(len(table) + 1) * 35 + 3, width="stretch")
                     outputs[-1, "table", "Piece profile", t] = table
 
@@ -564,13 +531,7 @@ def main(state=None):
                 xldata = io.BytesIO()
                 with pd.ExcelWriter(xldata) as xlf:
                     for name, data in piece_information["piece_data"].items():
-                        save_data = data.copy()
-                        for c, vals in data.items():
-                            if pd.api.types.is_datetime64_any_dtype(vals.dtype):
-                                save_data[c] = vals.dt.tz_localize(None)
-                            elif pd.api.types.is_timedelta64_dtype(vals.dtype):
-                                save_data[c] = vals.map(partial(utils.format_timedelta, hours=True))
-
+                        save_data = app.format_export_columns(data, hours=True, naive_datetimes=True)
                         save_data.to_excel(xlf, sheet_name=name.replace("/", " per "))
 
                 xldata.seek(0)
