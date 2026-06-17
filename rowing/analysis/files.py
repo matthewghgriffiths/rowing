@@ -162,12 +162,12 @@ def activity_data_to_excel(
         )
 
     with pd.ExcelWriter(xlpath) as xlf:
-        activity_info.to_excel(xlf, "activities")
+        activity_info.to_excel(xlf, sheet_name="activities")
         best_times.loc[:, ["time", "split"]] = best_times[["time", "split"]].map(utils.strfsplit)
-        best_times.to_excel(xlf, "best_times")
+        best_times.to_excel(xlf, sheet_name="best_times")
         for actid, timings in location_timings.items():
             if not timings.empty:
-                timings.map(utils.strfsplit).to_excel(xlf, sheet_names.loc[actid])
+                timings.map(utils.strfsplit).to_excel(xlf, sheet_name=sheet_names.loc[actid])
 
     return best_times, location_timings
 

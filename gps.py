@@ -479,7 +479,7 @@ def excel_export_fragment(crossing_times, location_timings, best_times, piece_in
 
         for name, times in best_times.items():
             times.map(utils.format_timedelta, hours=True).replace("00:00:00.00", "").to_excel(
-                xlf, f"{utils.safe_name(name)}-fastest"
+                xlf, sheet_name=f"{utils.safe_name(name)}-fastest"
             )
 
         for key, data in piece_information["piece_data"].items():

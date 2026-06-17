@@ -819,13 +819,13 @@ def run(args):
             logger.info("saving results to %s", options.excel_file)
             with pd.ExcelWriter(options.excel_file) as xlf:
                 if isinstance(athlete_data, pd.Dataframe):
-                    athlete_data.to_excel(xlf, "morning_monitoring")
+                    athlete_data.to_excel(xlf, sheet_name="morning_monitoring")
 
                 if isinstance(best_times, pd.Dataframe):
-                    best_times.to_excel(xlf, "best_times")
+                    best_times.to_excel(xlf, sheet_name="best_times")
 
                 if isinstance(crossings, pd.Dataframe):
-                    crossings.to_excel(xlf, "crossings")
+                    crossings.to_excel(xlf, sheet_name="crossings")
 
         if options.gspread:
             spread = options.gspread
