@@ -47,6 +47,32 @@ def test_safe_name_and_initials():
     assert utils.initials("Great Britain Eight") == "GBE"
 
 
+def test_make_http_session_has_timeout_and_retries():
+    from requests.adapters import HTTPAdapter
+
+    session = utils.make_http_session(retries=5, backoff_factor=0.5, timeout=12)
+    for scheme in ("https://example.com", "http://example.com"):
+        adapter = session.get_adapter(scheme)
+        assert isinstance(adapter, HTTPAdapter)
+        assert adapter.max_retries.total == 5
+        assert adapter.max_retries.backoff_factor == 0.5
+
+    # The adapter injects the default timeout when a request omits it.
+    adapter = session.get_adapter("https://example.com")
+    captured = {}
+
+    class _Resp:
+        status_code = 200
+
+    monkeypatched = HTTPAdapter.send
+    HTTPAdapter.send = lambda self, request, **kw: captured.update(kw) or _Resp()
+    try:
+        adapter.send(request=object())
+    finally:
+        HTTPAdapter.send = monkeypatched
+    assert captured["timeout"] == 12
+
+
 def test_map_concurrent_returns_results():
     inputs = {i: (i,) for i in range(5)}
     output, errors = utils.map_concurrent(lambda x: x * 2, inputs, progress_bar=None)

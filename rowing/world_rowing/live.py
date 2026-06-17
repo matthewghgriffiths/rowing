@@ -11,6 +11,24 @@ from rowing.world_rowing import api, fields, utils
 
 logger = logging.getLogger("world_rowing.livetracker")
 
+
+def _parse_cache_max_age(headers, default=0):
+    """Extract max-age (seconds) from a Cache-Control header, robustly.
+
+    Returns ``default`` if the header is missing or has no parseable max-age,
+    rather than raising on the previous ``header["Cache-Control"].split("=")[1]``.
+    """
+    cache_control = headers.get("Cache-Control", "")
+    for part in cache_control.split(","):
+        part = part.strip()
+        if part.startswith("max-age="):
+            try:
+                return int(part[len("max-age=") :])
+            except ValueError:
+                break
+    return default
+
+
 RESULTS_FIELDS = {
     "id": ("id",),
     "boatId": ("boatId",),
@@ -288,7 +306,7 @@ class RealTimeLivetracker:
         curr_time = time.time()
         logger.debug("RealTimeLivetracker.get_livetracker")
         self.r = r = api.request_worldrowing("livetracker", self.race_id)
-        max_age = int(r.headers["Cache-Control"].split("=")[1])
+        max_age = _parse_cache_max_age(r.headers)
         age = int(r.headers.get("Age", 0))
         logger.info("livetracker max-age=%d age=%d", max_age, age)
         self.livetracker_age = curr_time - age

@@ -38,10 +38,23 @@ session_fields = [
 
 
 @lru_cache
+def _http_session():
+    return utils.make_http_session()
+
+
+def _search_or_raise(pattern, text, what):
+    match = re.search(pattern, text)
+    if match is None:
+        raise RuntimeError(f"Could not locate {what} on the Ludum site; its format may have changed")
+    return match.group(1)
+
+
+@lru_cache
 def get_script():
-    r = requests.get("https://app.ludum.com/")
+    session = _http_session()
+    r = session.get("https://app.ludum.com/")
     r.raise_for_status()
-    script_endpt = re.search(rb"<script src=(\/js\/app\.[^>]+)>", r.content).group(1).decode()
+    script_endpt = _search_or_raise(rb"<script src=(\/js\/app\.[^>]+)>", r.content, "the Ludum app script URL").decode()
     headers = {
         "Referer": "https://app.ludum.com/login",
         "sec-ch-ua": '" Not A;Brand";v="99", "Chromium";v="101", "Google Chrome";v="101"',
@@ -50,7 +63,7 @@ def get_script():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.67 Safari/537.36",
     }
-    r = requests.get(
+    r = session.get(
         "https://app.ludum.com" + script_endpt,
         headers=headers,
     )
@@ -59,13 +72,11 @@ def get_script():
 
 
 def get_client_secret():
-    load_script = get_script()
-    return re.search(r'client_secret:"([^"]+)"', load_script).group(1)
+    return _search_or_raise(r'client_secret:"([^"]+)"', get_script(), "the Ludum client secret")
 
 
 def get_client_id():
-    load_script = get_script()
-    return re.search(r'client_id:"([^"]+)"', load_script).group(1)
+    return _search_or_raise(r'client_id:"([^"]+)"', get_script(), "the Ludum client id")
 
 
 class LudumClient(utils.CachedClient):
@@ -210,7 +221,7 @@ class LudumClient(utils.CachedClient):
         return self.post_json(endpt, **kwargs)
 
     def download_json(self, url, **kwargs):
-        with requests.get(url, **kwargs) as r:
+        with _http_session().get(url, **kwargs) as r:
             self.n_requests += 1
             r.raise_for_status()
             try:
@@ -867,7 +878,9 @@ if __name__ == "__main__":
 
 
 def download_fit(url):
-    return files.parse_fit_data(requests.get(url, stream=True).raw.read())
+    with _http_session().get(url, stream=True) as r:
+        r.raise_for_status()
+        return files.parse_fit_data(r.raw.read())
 
 
 def download_ludum_data(row, path="ludum_data", overwrite=False, file_cols=None):
@@ -886,7 +899,8 @@ def download_ludum_data(row, path="ludum_data", overwrite=False, file_cols=None)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         paths.append(out_path)
         if overwrite or not out_path.exists():
-            with requests.get(url, stream=True) as r, open(out_path, "wb") as f:
+            with _http_session().get(url, stream=True) as r, open(out_path, "wb") as f:
+                r.raise_for_status()
                 shutil.copyfileobj(r.raw, f)
 
     return paths

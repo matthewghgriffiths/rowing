@@ -8,9 +8,10 @@ import os
 import sys
 from pathlib import Path
 
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
-import requests
 
 from rowing.analysis import splits, utils
 
@@ -19,6 +20,11 @@ TIME_STR = "%H:%M:%S"
 DAY_STR = "%Y-%m-%d"
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache
+def _http_session():
+    return utils.make_http_session()
 
 
 def load_json(path):
@@ -93,7 +99,7 @@ class WeatherClient(utils.CachedClient):
 
     def get_hourly_weather(self, latitude, longitude, start_time, end_time, request_kws=None, **params):
         params = self._hourly_weather_params(latitude, longitude, start_time, end_time, **params)
-        return requests.get(self.history_url, params=params, **(request_kws or {}))
+        return _http_session().get(self.history_url, params=params, **(request_kws or {}))
 
     def _minutes_weather_params(self, latitude, longitude, start_time, end_time, minutes, **params):
         start = pd.Timestamp(start_time)

@@ -8,9 +8,10 @@ import os
 import sys
 from pathlib import Path
 
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
-import requests
 
 from rowing.analysis import splits, utils
 
@@ -18,6 +19,11 @@ TIME_STR = "%Y-%m-%d %H%M%S"
 DAY_STR = "%Y-%m-%d"
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache
+def _http_session():
+    return utils.make_http_session()
 
 
 def loc_time_key(latitude, longitude, time):
@@ -146,7 +152,7 @@ class WeatherClient(utils.CachedClient):
         timestamp = utils.to_timestamp(time, unit="1s")
         params = {"lat": latitude, "lon": longitude, "dt": timestamp, "appid": self.password}
         logger.debug("downloading data at %.4f, %.4f for %s", latitude, longitude, time)
-        r = requests.get(self.history_url, params=params)
+        r = _http_session().get(self.history_url, params=params)
         r.raise_for_status()
         return r.json()
 
@@ -172,7 +178,7 @@ class WeatherClient(utils.CachedClient):
         date = pd.to_datetime(date).strftime("%Y-%m-%d")
         params = {"lat": latitude, "lon": longitude, "date": date, "appid": self.password}
         logger.debug("downloading data at %.4f, %.4f for %s", latitude, longitude, date)
-        r = requests.get(self.day_summary_url, params=params)
+        r = _http_session().get(self.day_summary_url, params=params)
         r.raise_for_status()
         return r.json()
 

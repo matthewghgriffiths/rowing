@@ -295,6 +295,49 @@ A = TypeVar("A")
 V = TypeVar("V")
 
 
+DEFAULT_HTTP_TIMEOUT = 30
+
+
+def make_http_session(
+    retries=3,
+    backoff_factor=0.3,
+    timeout=DEFAULT_HTTP_TIMEOUT,
+    status_forcelist=(429, 500, 502, 503, 504),
+):
+    """Return a ``requests.Session`` with a default timeout and retry/backoff.
+
+    Every request issued through the session gets ``timeout`` seconds (unless
+    overridden per call) and idempotent requests are retried with exponential
+    backoff on connection errors and the given HTTP status codes.
+
+    ``requests``/``urllib3`` are imported lazily so this module stays importable
+    in environments (e.g. pyodide) where they are unavailable.
+    """
+    import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
+    class _TimeoutHTTPAdapter(HTTPAdapter):
+        def send(self, request, **kwargs):
+            kwargs.setdefault("timeout", timeout)
+            return super().send(request, **kwargs)
+
+    retry = Retry(
+        total=retries,
+        connect=retries,
+        read=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+        allowed_methods=frozenset({"GET", "HEAD", "OPTIONS"}),
+        raise_on_status=False,
+    )
+    adapter = _TimeoutHTTPAdapter(max_retries=retry)
+    session = requests.Session()
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
 def map_concurrent(
     func: Callable[..., V],
     inputs: dict[K, tuple],
