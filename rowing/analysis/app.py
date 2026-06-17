@@ -13,8 +13,8 @@ import plotly.io as pio
 import streamlit as st
 
 from rowing import utils
-from rowing.analysis import files, geodesy, peach, splits, static, telemetry
-from rowing.app import inputs, threads
+from rowing.analysis import geodesy, loaders, splits, static, telemetry
+from rowing.app import inputs
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +225,7 @@ def scatter(data, x, y, fig=None, **kwargs):
 
 @st.cache_data
 def parse_gpx(file):
-    return files.parse_gpx_data(files.gpxpy.parse(file))
+    return loaders.parse_gpx(file)
 
 
 def download_csv(file_name, df, label=":inbox_tray: Download data as csv", csv_kws=None, **kwargs):
@@ -274,122 +274,50 @@ def format_export_columns(df, *, hours=False, naive_datetimes=False):
     return out
 
 
+# Thin @st.cache_data wrappers around the pure loaders in rowing.analysis.loaders.
 @st.cache_data
 def parse_telemetry_text(uploaded_files, use_names=True, sep="\t", with_timings=True):
-    uploaded_data = {file.name.rsplit(".", 1)[0]: file.read().decode("utf-8") for file in uploaded_files}
-    data, errs = utils.map_concurrent(
-        telemetry.parse_powerline_text_data,
-        uploaded_data,
-        singleton=True,
-        use_names=use_names,
-        with_timings=with_timings,
-        sep=sep,
-    )
-    if errs:
-        for k, err in errs.items():
-            raise err
-        logging.error(errs)
-
-    return data
+    return loaders.parse_telemetry_text(uploaded_files, use_names=use_names, sep=sep, with_timings=with_timings)
 
 
 @st.cache_data
 def parse_telemetry_files(uploaded_files, use_names=True, with_timings=False):
-    uploaded_data = {file.name.rsplit(".", 1)[0]: file for file in uploaded_files}
-    data, errs = utils.map_concurrent(
-        parse_file, uploaded_data, singleton=True, use_names=use_names, with_timings=with_timings
-    )
-    if errs:
-        for k, err in errs.items():
-            raise err
-        logging.error(errs)
-
-    return data
+    return loaders.parse_telemetry_files(uploaded_files, use_names=use_names, with_timings=with_timings)
 
 
 @st.cache_data
 def parse_file(file, use_names=True, with_timings=True):
-    filename, *endings = file.name.rsplit(".", 1)
-    (ending,) = endings or ("",)
-    ending = ending.lower()
-    if ending == "csv":
-        return parse_text_data(file, use_names=use_names, sep=",", with_timings=with_timings)
-    elif ending in {"xlsx", "xls"}:
-        return parse_excel(file, use_names=use_names, with_timings=with_timings)
-    elif ending == "zip":
-        return telemetry.load_zipfile(file)
-    return parse_text_data(file, use_names=use_names, sep="\t", with_timings=with_timings)
+    return loaders.parse_file(file, use_names=use_names, with_timings=with_timings)
 
 
 @st.cache_data
 def parse_text_data(file, use_names=True, sep="\t", with_timings=True):
-    return telemetry.parse_powerline_text_data(
-        file.read().decode("utf-8"), use_names=use_names, sep=sep, with_timings=with_timings
-    )
+    return loaders.parse_text_data(file, use_names=use_names, sep=sep, with_timings=with_timings)
 
 
 @st.cache_data
 def parse_excel(file, use_names=True, with_timings=True):
-    data = pd.read_excel(file, header=None)
-    return telemetry.parse_powerline_excel(data, use_names=use_names, with_timings=with_timings)
+    return loaders.parse_excel(file, use_names=use_names, with_timings=with_timings)
 
 
 @st.cache_data
 def parse_telemetry_excel(uploaded_files, use_names=True, with_timings=True):
-    uploaded_data = {
-        file.name.rsplit(".", 1)[0]: file
-        # file.read().decode()
-        for file in uploaded_files
-    }
-    data, errs = utils.map_concurrent(
-        parse_excel,
-        uploaded_data,
-        singleton=True,
-        use_names=use_names,
-        with_timings=with_timings,
-    )
-    if errs:
-        logging.error(errs)
-
-    return data
+    return loaders.parse_telemetry_excel(uploaded_files, use_names=use_names, with_timings=with_timings)
 
 
 @st.cache_data
 def parse_telemetry_zip(uploaded_files):
-    telem_data = {}
-    for file in uploaded_files:
-        telem_data.update(telemetry.load_zipfile(file))
-
-    return telem_data
+    return loaders.parse_telemetry_zip(uploaded_files)
 
 
 @st.cache_data
 def parse_peach_data(file, index_file=None, use_names=True, with_timings=True):
-    index_bytes = index_file.read() if index_file else None
-    data = peach.PeachData.from_bytes(file.read(), index_bytes, file.name)
-    return data.app_data(use_names, with_timings)
+    return loaders.parse_peach_data(file, index_file=index_file, use_names=use_names, with_timings=with_timings)
 
 
 @st.cache_data
 def parse_peach_data_files(uploaded_files, use_names=True, with_timings=True):
-    uploaded = {
-        tuple(file.name.rsplit(".", 1)): file
-        # file.read().decode()
-        for file in uploaded_files
-    }
-    uploaded_filenames = set(k for k, end in uploaded if end.lower() == "peach-data")
-    uploaded_data = {k: (uploaded[k, "peach-data"], uploaded.get((k, "peach-data-index"))) for k in uploaded_filenames}
-    data, errs = utils.map_concurrent(
-        parse_peach_data,
-        uploaded_data,
-        # singleton=True,
-        use_names=use_names,
-        with_timings=with_timings,
-    )
-    if errs:
-        logging.error(errs)
-
-    return data
+    return loaders.parse_peach_data_files(uploaded_files, use_names=use_names, with_timings=with_timings)
 
 
 @st.cache_data
