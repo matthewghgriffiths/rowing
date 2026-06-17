@@ -5,7 +5,6 @@ import time
 
 import numpy as np
 import pandas as pd
-from tqdm.auto import tqdm
 
 from rowing.world_rowing import api, fields, utils
 

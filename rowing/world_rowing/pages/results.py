@@ -1,10 +1,5 @@
 import logging
-import os
-import sys
-from pathlib import Path
 
-import pandas as pd
-import plotly.express as px
 import streamlit as st
 
 # st.set_page_config(
@@ -13,11 +8,11 @@ import streamlit as st
 # )
 
 try:
-    import about
+    import about  # noqa: F401  (optional local hook)
 except ModuleNotFoundError:
     pass
 finally:
-    from rowing.app import inputs, plots, select, state
+    from rowing.app import inputs, select, state
     from rowing.world_rowing import fields
 
 

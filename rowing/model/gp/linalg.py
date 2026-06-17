@@ -1,5 +1,5 @@
 from functools import partial
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 import haiku as hk
 import jax

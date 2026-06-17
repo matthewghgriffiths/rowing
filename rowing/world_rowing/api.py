@@ -1,7 +1,6 @@
 import datetime
 from collections.abc import Mapping
 import logging
-from functools import partial
 
 import pandas as pd
 
@@ -21,13 +20,11 @@ from . import fields
 
 if _pyodide:
     use_requests = False
-    import pyodide
     from js import XMLHttpRequest
     import json
     from urllib import parse
 else:
     use_requests = True
-    import requests
 
 logger = logging.getLogger("world_rowing.api")
 

@@ -1,32 +1,22 @@
-import datetime
-import json
 from functools import cached_property, partial
-from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import jax
-import matplotlib.pyplot as plt
 
 # from dataclasses import dataclass
 import numpy as np
 import pandas as pd
-import plotly.express as px
-import seaborn as sns
 from flax.struct import dataclass
 from jax import numpy as jnp
 from jax import scipy as jsp
 from jax import tree_map
-from jax.scipy import linalg
 from jax.scipy.linalg import solve_triangular
 
 # from scipy import sparse
-from scipy import sparse, stats
-from sklearn import metrics
-from tqdm.autonotebook import tqdm
+from scipy import sparse
 
-from rowing.model.gp import kernels
 from rowing.model.gp import utils as gp_utils
-from rowing.model.performance.competition_model import GetKernel, RaceModel, get_athlete_kernel, get_race_kernel, year_to_date
-from rowing.world_rowing import api, fields, utils
+from rowing.model.performance.competition_model import GetKernel, RaceModel, get_athlete_kernel, year_to_date
+from rowing.world_rowing import fields
 
 Message = tuple[jax.Array, jax.Array]
 Messages = list[dict[str, Message]]

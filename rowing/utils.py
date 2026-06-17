@@ -8,10 +8,10 @@ from collections.abc import Callable
 from concurrent.futures import ALL_COMPLETED, FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from contextlib import nullcontext
 from datetime import timedelta
-from functools import cached_property, lru_cache, wraps
+from functools import cached_property, lru_cache, wraps  # noqa: F401  (cached_property re-exported)
 from multiprocessing import Process, Queue
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, TypeVar
+from typing import Any, Optional, TypeVar
 
 try:
     from concurrent.futures import ProcessPoolExecutor

@@ -20,13 +20,10 @@ Data directory defaults to /mnt/user-data/uploads if not specified.
 """
 
 import os
-import re
 import sys
 import traceback
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 
 from rowing.analysis import peach as peach
 

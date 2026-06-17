@@ -1,19 +1,12 @@
-import argparse
-import collections
-import datetime
-import itertools
 import json
 import logging
-import os
-import sys
-from pathlib import Path
 
 from functools import lru_cache
 
 import numpy as np
 import pandas as pd
 
-from rowing.analysis import splits, utils
+from rowing.analysis import utils
 
 DATETIME_STR = "%Y-%m-%dT%H:%M:%S"
 TIME_STR = "%H:%M:%S"

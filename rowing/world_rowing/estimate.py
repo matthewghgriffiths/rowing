@@ -1,7 +1,6 @@
 from functools import partial
 
 import jax
-import pandas as pd
 from jax import lax
 from jax import numpy as jnp
 

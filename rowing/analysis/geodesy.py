@@ -7,8 +7,7 @@ based off https://www.movable-type.co.uk/scripts/latlong-vectors.html
 from typing import NamedTuple
 
 import numpy as np
-import pandas as pd
-from numpy import arctan2, cos, isscalar, pi, radians, sin, sqrt
+from numpy import arctan2, cos, pi, radians, sin, sqrt
 
 from rowing import utils
 

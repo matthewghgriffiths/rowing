@@ -8,7 +8,6 @@ import fitparse
 import gpxpy
 import numpy as np
 import pandas as pd
-from altair import Longitude
 
 from rowing.analysis import geodesy, splits, utils
 

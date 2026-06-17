@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 
 from .gpr import GaussianProcessRegression
-from .kernels import AbstractKernel, Bias, IntSEKernel, SEKernel
+from .kernels import AbstractKernel, IntSEKernel, SEKernel
 from .multi_kernel import AbstractMultiKernel, CovMultiKernel, DiagMultiKernel
 from .utils import MatrixProduct, solve_triangular, transform
 

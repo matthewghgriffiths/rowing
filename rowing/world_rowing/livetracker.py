@@ -11,20 +11,14 @@ from . import api, utils
 from .api import (
     INTERMEDIATE_FIELDS,
     find_world_best_time,
-    get_events,
     get_live_race,
-    get_most_recent_competition,
     get_race_results,
-    get_races,
-    get_world_best_times,
     get_worldrowing_data,
     get_worldrowing_record,
 )
 from .utils import (
     cached_property,
     extract_fields,
-    format_timedelta,
-    format_totalseconds,
     format_yaxis_splits,
     make_flag_box,
     read_times,

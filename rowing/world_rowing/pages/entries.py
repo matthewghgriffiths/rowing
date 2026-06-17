@@ -1,10 +1,7 @@
 import logging
-import os
-import sys
 from pathlib import Path
 
 import pandas as pd
-import plotly.express as px
 import streamlit as st
 
 # st.set_page_config(
@@ -16,12 +13,11 @@ DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)
 
 try:
-    import about
+    import about  # noqa: F401  (optional local hook)
 except ModuleNotFoundError:
     pass
 finally:
-    from rowing.app import inputs, plots, select, state
-    from rowing.world_rowing import api, fields
+    from rowing.app import inputs, select, state
 
 
 logger = logging.getLogger(__name__)

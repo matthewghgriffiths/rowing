@@ -1,5 +1,5 @@
 from functools import partial, singledispatchmethod
-from typing import NamedTuple, Optional, Union
+from typing import NamedTuple, Union
 
 import jax
 import numpy as np

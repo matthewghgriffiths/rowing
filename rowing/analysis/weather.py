@@ -13,7 +13,7 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from rowing.analysis import splits, utils
+from rowing.analysis import utils
 
 TIME_STR = "%Y-%m-%d %H%M%S"
 DAY_STR = "%Y-%m-%d"

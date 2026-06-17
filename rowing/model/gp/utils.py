@@ -1,18 +1,17 @@
 from collections.abc import Generator
 from functools import partial
 from math import prod
-from typing import Dict, List, NamedTuple, Optional, Tuple
+from typing import NamedTuple
 
 import haiku as hk
 import jax
 import jax.numpy as jnp
-import jax.scipy as jsp
 import numpy as np
 import yaml
 from jax._src.flatten_util import ravel_pytree
 
 from ...utils import map_concurrent
-from .linalg import get_pos_def, solve_triangular, vdot
+from .linalg import get_pos_def, solve_triangular, vdot  # noqa: F401  (get_pos_def/vdot re-exported)
 
 
 def norm_jax(x):

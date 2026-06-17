@@ -9,7 +9,7 @@ import streamlit as st
 logger = logging.getLogger(__name__)
 
 try:
-    import about
+    import about  # noqa: F401  (optional local hook)
 except ModuleNotFoundError:
     pass
 finally:

@@ -1,7 +1,7 @@
 import streamlit as st
 
 try:
-    import about
+    import about  # noqa: F401  (optional local hook)
 except ModuleNotFoundError:
     pass
 finally:

@@ -1,31 +1,17 @@
-import datetime
-import json
 from collections.abc import Callable
-from functools import partial
-from typing import Dict, NamedTuple, Optional
+from typing import NamedTuple
 
 import haiku as hk
 import jax
-import jaxopt
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import plotly.express as px
-import seaborn as sns
 from jax import numpy as jnp
-from jax import tree_map
-from jax.experimental import sparse
-from jax.scipy import linalg
-from jax.scipy.linalg import solve_triangular
 
 # from scipy import sparse
-from scipy import stats
-from sklearn import metrics
-from tqdm.autonotebook import tqdm
 
 from rowing.model.gp import kernels
 from rowing.model.gp import utils as gp_utils
-from rowing.world_rowing import api, fields, utils
+from rowing.world_rowing import fields
 
 
 def year_to_date(year):

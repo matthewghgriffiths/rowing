@@ -1,7 +1,7 @@
 import pytest
 
 from rowing.utils import timeout
-from rowing.world_rowing import api, fields
+from rowing.world_rowing import api
 
 TIMEOUT = 30
 

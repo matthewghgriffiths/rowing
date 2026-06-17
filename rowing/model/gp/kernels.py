@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from math import prod
-from typing import Optional
 
 import haiku as hk
 import jax

@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import lru_cache, wraps
 from pathlib import Path
 
@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 from scipy.special import erf
 
-from ..utils import (
+# Re-exported for backwards compatibility (rowing.world_rowing.utils.<name>).
+from ..utils import (  # noqa: F401
     ThreadPoolExecutor,
     WorkQueue,
     cached_property,

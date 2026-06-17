@@ -1,13 +1,12 @@
 import logging
 import re
 import string
-from datetime import timedelta
-from typing import Optional
 
 import numpy as np
 
-from .. import utils
-from ..utils import (
+# Re-exported for backwards compatibility (rowing.analysis.utils.<name>).
+from .. import utils  # noqa: F401
+from ..utils import (  # noqa: F401
     CachedClient,
     _to_merge_index,
     cached_map_concurrent,

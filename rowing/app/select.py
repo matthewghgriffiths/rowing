@@ -6,7 +6,7 @@ from functools import partial, wraps
 import pandas as pd
 import streamlit as st
 
-from rowing.app import inputs, state, threads
+from rowing.app import inputs, state
 from rowing.world_rowing import api, fields, live, utils
 
 logger = logging.getLogger(__name__)

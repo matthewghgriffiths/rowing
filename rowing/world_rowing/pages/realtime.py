@@ -2,14 +2,13 @@ import logging
 import time
 
 import streamlit as st
-from matplotlib import use
 from tqdm.autonotebook import tqdm
 
 # st.set_page_config(
 # page_title="World Rowing Realtime Livetracker", layout='wide')
 
 try:
-    import about
+    import about  # noqa: F401  (optional local hook)
 except ModuleNotFoundError:
     pass
 finally:

@@ -4,7 +4,6 @@ import jax
 import numpy as np
 from jax import numpy as jnp
 from jax import scipy as jsp
-from scipy import linalg
 
 from rowing.model import banded
 from rowing.model.banded import BandedMatrix, bands
