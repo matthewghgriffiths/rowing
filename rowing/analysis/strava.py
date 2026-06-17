@@ -1,5 +1,6 @@
 import base64
 import io
+import logging
 import os
 import time
 from pathlib import Path
@@ -10,6 +11,8 @@ import streamlit as st
 from rowing import utils
 from rowing.analysis import files
 from rowing.app import inputs
+
+logger = logging.getLogger(__name__)
 
 _file_path = Path(os.path.abspath(__file__))
 _module_path = _file_path.parent
@@ -47,7 +50,7 @@ def connect_client():
         client = get_client(code)
         try:
             if client.access_token is None:
-                print("Exchanging code for token")
+                logger.info("Exchanging code for token")
                 response = client.exchange_code_for_token(
                     client_id=st.secrets.strava["client_id"], client_secret=st.secrets.strava["secret"], code=code
                 )
@@ -56,7 +59,7 @@ def connect_client():
                 client.expires_at = response["expires_at"]
 
             if time.time() > int(client.expires_at or 0):
-                print("Token has expired, will refresh")
+                logger.info("Token has expired, will refresh")
                 response = client.refresh_access_token(
                     client_id=st.secrets.strava["client_id"],
                     client_secret=st.secrets.strava["secret"],
@@ -68,9 +71,9 @@ def connect_client():
 
             athlete = client.get_athlete()
             name = f"{athlete.firstname} {athlete.lastname}"
-            print(f"Hello, {name}")
-        except Exception as e:
-            print(e)
+            logger.info("Hello, %s", name)
+        except Exception:
+            logger.exception("Strava authentication failed; resetting auth flow")
             st.query_params.pop("code")
             st.query_params["strava"] = 1
             st.rerun()

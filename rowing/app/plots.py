@@ -357,7 +357,7 @@ def show_lane_intermediates(lane_info, intermediates):
                 def to_int_str(val):
                     try:
                         return str(int(val))
-                    except:
+                    except (ValueError, TypeError):
                         return ""
 
                 st.dataframe(intermediates[fields.intermediates_Rank].map(to_int_str), use_container_width=True)

@@ -1,5 +1,6 @@
 import functools
 import io
+import logging
 
 import pandas as pd
 import streamlit as st
@@ -7,6 +8,8 @@ import streamlit as st
 from rowing import utils
 from rowing.analysis import files
 from rowing.app import inputs
+
+logger = logging.getLogger(__name__)
 
 GARMIN_EPOCH = pd.Timestamp("1989-12-31 00:00:00")
 UNIX_EPOCH = pd.Timestamp(0)
@@ -58,7 +61,7 @@ def login(user_container=None, pw_container=None, mfa_container=None):
     try:
         import garth
     except ImportError as e:
-        print(e)
+        logger.warning("garth is not installed: %s", e)
         return
 
     with user_container or st.container():
@@ -68,14 +71,14 @@ def login(user_container=None, pw_container=None, mfa_container=None):
 
     client = _client(username)
     if client.garth.oauth1_token:
-        print("already logged in")
+        logger.info("already logged in")
         return client
 
     if username and password:
         try:
             client = _client(username)
             if client.garth.oauth1_token:
-                print("already ")
+                logger.info("already logged in")
                 return client
             client.password = password
             client.prompt_mfa = prompt_mfa(mfa_container)
@@ -84,7 +87,7 @@ def login(user_container=None, pw_container=None, mfa_container=None):
             else:
                 st.write(f"Could not log in {username}")
         except garth.exc.GarthHTTPError as e:
-            print(e)
+            logger.error("Garmin login failed: %s", e)
 
 
 def get_activities(client, limit, *args):
@@ -153,9 +156,8 @@ get_garmin_activity_hr = cache_client(get_activity_hr)
 def get_activities_hr(client, activity_ids, max_workers=10):
     hrz, errors = utils.map_concurrent(get_activity_hr, {i: (client, i) for i in activity_ids}, max_workers=max_workers)
     if errors:
-        for k, e in errors:
-            print(k)
-            print(e)
+        for k, e in errors.items():
+            logger.error("failed to load HR for activity %s: %r", k, e)
 
     return pd.concat(hrz).droplevel(0)
 
@@ -166,9 +168,8 @@ def get_garmin_activities_hr(username, activity_ids, max_workers=10):
         get_garmin_activity_hr, {i: (username, i) for i in activity_ids}, max_workers=max_workers
     )
     if errors:
-        for k, e in errors:
-            print(k)
-            print(e)
+        for k, e in errors.items():
+            logger.error("failed to load HR for activity %s: %r", k, e)
 
     return pd.concat(hrz).droplevel(0)
 
@@ -218,7 +219,7 @@ def get_garmin_sleep_stats(username, start, end):
         {d: (username, d) for d in pd.date_range(start, end)},
     )
     if errors:
-        print(errors)
+        logger.error("errors fetching sleep stats: %r", errors)
 
     sleep_stats = pd.concat(stats, names=["day"]).droplevel(1)
 
@@ -267,7 +268,7 @@ def time_config():
 
 
 def garmin_activities_app(garmin_client, cols=None):
-    print(f"Hello {garmin_client.full_name}")
+    logger.info("Hello %s", garmin_client.full_name)
     cols = cols or st.columns((1, 3, 3, 3))
     with cols[0]:
         st.image(garmin_client.garth.profile["profileImageUrlMedium"])
