@@ -380,10 +380,13 @@ class PerformanceGP(nnx.Module, pytree=False):
         base = float(np.exp(np.asarray(self.log_noise[...])))
         n = len(y)
         w = np.ones(n)
+        eye = np.eye(n)
         for _ in range(n_iter):
-            L = sla.cho_factor(K + np.diag(base / w))
-            a = sla.cho_solve(L, y)
-            iKii = np.diag(sla.cho_solve(L, np.eye(n)))
+            L = np.linalg.cholesky(K + np.diag(base / w))
+            a = sla.cho_solve((L, True), y)
+            # diag(K^-1) = column sum of (L^-1)^2 -- one triangular solve, no full inverse
+            Linv = sla.solve_triangular(L, eye, lower=True)
+            iKii = np.einsum("ij,ij->j", Linv, Linv)
             z2 = a**2 / iKii  # studentised leave-one-out residual, squared
             w = (nu + 1.0) / (nu + z2)
         self.obs_weight = jnp.asarray(w)
