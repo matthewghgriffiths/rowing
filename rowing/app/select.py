@@ -345,14 +345,14 @@ def select_race(races):
     return race.iloc[0]
 
 
-def wait_for_next_race(n=5):
+def wait_for_next_race(n=5, value=True):
     next_races = api.get_next_races(n)
     if not next_races.empty:
         st.write("next races:")
         st.dataframe(fields.to_streamlit_dataframe(next_races))
 
         cols = st.columns(2)
-        if cols[0].checkbox("refresh until next race"):
+        if cols[0].checkbox("refresh until next race", value=value):
             with cols[1]:
                 countdown = st.empty()
                 for t in range(10, -1, -1):
