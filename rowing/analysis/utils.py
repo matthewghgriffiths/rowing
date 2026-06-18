@@ -1,71 +1,65 @@
-
 import logging
-import string
-from datetime import timedelta
 import re
-import numpy as np
-from typing import Optional
+import string
 
-from ..utils import (
-    cached_property, map_concurrent, format_totalseconds,
-    format_timedelta, format_timedelta_hours,
-    format_yaxis_splits, format_xaxis_splits, format_axis_splits,
-    _to_merge_index, load_gsheet, to_gspread, cached_map_concurrent,
-    json_cache, parquet_cache, format_series_timedelta, format_gsheet,
-    CachedClient, to_timestamp, from_timestamp
+import numpy as np
+
+# Re-exported for backwards compatibility (rowing.analysis.utils.<name>).
+from .. import utils  # noqa: F401
+from ..utils import (  # noqa: F401
+    CachedClient,
+    _to_merge_index,
+    cached_map_concurrent,
+    cached_property,
+    format_axis_splits,
+    format_gsheet,
+    format_series_timedelta,
+    format_timedelta,
+    format_timedelta_hours,
+    format_totalseconds,
+    format_xaxis_splits,
+    format_yaxis_splits,
+    from_timestamp,
+    json_cache,
+    load_gsheet,
+    map_concurrent,
+    parquet_cache,
+    to_gspread,
+    to_timestamp,
 )
-from .. import utils
 
 _YMD = "%Y-%m-%d"
 
 _LOGGING_LEVELS = {
-    'critical': logging.CRITICAL,
-    'error': logging.ERROR,
-    'warn': logging.WARNING,
-    'warning': logging.WARNING,
-    'info': logging.INFO,
-    'debug': logging.DEBUG,
+    "critical": logging.CRITICAL,
+    "error": logging.ERROR,
+    "warn": logging.WARNING,
+    "warning": logging.WARNING,
+    "info": logging.INFO,
+    "debug": logging.DEBUG,
 }
 
 
 def add_logging_argument(parser):
     parser.add_argument(
-        "-l"
-        "-log",
+        "-l-log",
         "--log",
-        '--logging',
+        "--logging",
         default="warning",
-        help=(
-            "Provide logging level. "
-            "Example --log debug', default='warning'"
-        ),
+        help=("Provide logging level. Example --log debug', default='warning'"),
     )
 
 
 def add_credentials_arguments(parser):
+    parser.add_argument("-u", "--user", "--email", type=str, nargs="?", help="Email address to use")
+    parser.add_argument("-p", "--password", type=str, nargs="?", help="Password")
     parser.add_argument(
-        '-u', '--user', '--email',
-        type=str, nargs='?',
-        help='Email address to use'
-    )
-    parser.add_argument(
-        '-p', '--password',
-        type=str, nargs='?',
-        help='Password'
-    )
-    parser.add_argument(
-        '-c', '--credentials',
-        type=str, nargs='?',
-        help='path to json file containing credentials (email and password)'
+        "-c", "--credentials", type=str, nargs="?", help="path to json file containing credentials (email and password)"
     )
 
 
 def add_gspread_arguments(parser):
-    parser.add_argument(
-        '--gspread',
-        type=str, nargs='?',
-        help='name, url, or id of the spreadsheet'
-    )
+    parser.add_argument("--gspread", type=str, nargs="?", help="name, url, or id of the spreadsheet")
 
 
 def load_gspread(options):
@@ -76,16 +70,14 @@ def load_gspread(options):
 def set_logging(options):
     level = _LOGGING_LEVELS.get(options.log.lower())
     if level is None:
-        raise ValueError(
-            f"log level given: {options.log}"
-            f" -- must be one of: {' | '.join(_LOGGING_LEVELS.keys())}")
+        raise ValueError(f"log level given: {options.log} -- must be one of: {' | '.join(_LOGGING_LEVELS.keys())}")
 
     logging.basicConfig(level=level)
 
 
 def random_alphanumeric(size, p=None):
     alphanumeric = string.ascii_letters + string.digits
-    return ''.join(np.random.choice(list(alphanumeric), size=40))
+    return "".join(np.random.choice(list(alphanumeric), size=40))
 
 
 _MSH_STR_FORMAT = "{minutes:d}:{seconds:02d}.{hundredths:02d}"
@@ -94,7 +86,7 @@ _HMSH_STR_FORMAT = "{hours}:{minutes:02d}:{seconds:02d}.{hundredths:02d}"
 
 def strfsplit(tdelta, hours=False):
     components = tdelta.components._asdict()
-    components['hundredths'] = tdelta.components.milliseconds // 10
+    components["hundredths"] = tdelta.components.milliseconds // 10
     if tdelta.components.hours or hours:
         return _HMSH_STR_FORMAT.format(**components)
     else:
@@ -130,13 +122,12 @@ def is_pareto_efficient(costs, return_mask=True):
     n_points = costs.shape[0]
     next_point_index = 0  # Next index in the is_efficient array to search for
     while next_point_index < len(costs):
-        nondominated_point_mask = np.any(
-            costs < costs[next_point_index], axis=1)
+        nondominated_point_mask = np.any(costs < costs[next_point_index], axis=1)
         nondominated_point_mask[next_point_index] = True
         # Remove dominated points
         is_efficient = is_efficient[nondominated_point_mask]
         costs = costs[nondominated_point_mask]
-        next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1
+        next_point_index = np.sum(nondominated_point_mask[:next_point_index]) + 1
 
     if return_mask:
         is_efficient_mask = np.zeros(n_points, dtype=bool)
@@ -146,13 +137,13 @@ def is_pareto_efficient(costs, return_mask=True):
         return is_efficient
 
 
-def flatten_json(obj, key=''):
+def flatten_json(obj, key=""):
     if isinstance(obj, dict):
-        key = key + '_' if key else ''
+        key = key + "_" if key else ""
         for k, val in obj.items():
             yield from flatten_json(val, key + k)
     elif isinstance(obj, list):
-        key = key + '_' if key else ''
+        key = key + "_" if key else ""
         for i, val in enumerate(obj):
             yield from flatten_json(val, key + str(i))
     else:

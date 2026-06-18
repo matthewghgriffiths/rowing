@@ -1,0 +1,12 @@
+# Normalize line endings: store text as LF and check out LF everywhere, so
+# Windows core.autocrlf does not create CRLF/LF churn. Binary assets are
+# marked explicitly so they are never line-ending-normalized.
+* text=auto eol=lf
+
+*.png binary
+*.svg binary
+*.pdf binary
+*.gz binary
+*.xlsx binary
+*.peach-data binary
+*.peach-data-index binary

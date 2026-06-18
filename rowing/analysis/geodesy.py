@@ -3,12 +3,12 @@ Routines for performing geodesy
 
 based off https://www.movable-type.co.uk/scripts/latlong-vectors.html
 """
+
 from typing import NamedTuple
 
 import numpy as np
-from numpy import isscalar, sin, cos, arctan2, sqrt, pi, radians
+from numpy import arctan2, cos, pi, radians, sin, sqrt
 
-import pandas as pd
 from rowing import utils
 
 _AVG_EARTH_RADIUS_KM = 6371.0088
@@ -25,7 +25,7 @@ def haversine_km(pos1, pos2):
 
 def bearing(pos1, pos2):
     rad = rad_bearing(pos1, pos2)
-    return (rad*180/pi + 360) % 360
+    return (rad * 180 / pi + 360) % 360
 
 
 class LatLon(NamedTuple):
@@ -164,7 +164,7 @@ def to_axis(pos):
     sint = sin(theta)
     cost = cos(theta)
     x = sinl * cost - sinp * cosl * sint
-    y = - cosl * cost - sinp * sinl * sint
+    y = -cosl * cost - sinp * sinl * sint
     z = cosp * sint
     return Vector(x, y, z)
 
@@ -172,19 +172,16 @@ def to_axis(pos):
 def _haversine(rad1, rad2):
     phi1, lam1 = rad1
     phi2, lam2 = rad2
-    sindphi = sin((phi2 - phi1)/2)**2
-    sindlam = sin((lam2 - lam1)/2)**2
+    sindphi = sin((phi2 - phi1) / 2) ** 2
+    sindlam = sin((lam2 - lam1) / 2) ** 2
     a = sindphi + cos(phi1) * cos(phi2) * sindlam
     return 2 * arctan2(sqrt(a), sqrt(1 - a))
 
 
 def cdist_haversine(pos1, pos2):
     from scipy.spatial.distance import cdist
-    return cdist(
-        np.array(get_rad_coords(pos1)).T,
-        np.array(get_rad_coords(pos2)).T,
-        metric=_haversine
-    )
+
+    return cdist(np.array(get_rad_coords(pos1)).T, np.array(get_rad_coords(pos2)).T, metric=_haversine)
 
 
 def cdist_haversine_km(pos1, pos2):
@@ -202,7 +199,7 @@ def rad_bearing(pos1, pos2):
 
 def estimate_bearing(positions, pos, tol=0.01):
     dist = haversine_km(positions, pos)
-    weights = np.exp(- np.square(dist / tol)/2)
+    weights = np.exp(-np.square(dist / tol) / 2)
     if weights.sum() == 0:
         return np.nan
     else:
@@ -219,62 +216,36 @@ def path_intersections(pos1, pos2):
 def follow_bearing(pos1, d):
     phi, lam, theta = get_rad_bearing(pos1)
     d /= _AVG_EARTH_RADIUS_KM
-    phi2 = np.arcsin(
-        np.sin(phi)*np.cos(d) + np.cos(phi)*np.sin(d)*np.cos(theta))
-    lam2 = lam + np.arctan2(
-        np.sin(theta)*np.sin(d)*np.cos(phi),
-        np.cos(d)-np.sin(phi)*np.sin(phi2)
-    )
+    phi2 = np.arcsin(np.sin(phi) * np.cos(d) + np.cos(phi) * np.sin(d) * np.cos(theta))
+    lam2 = lam + np.arctan2(np.sin(theta) * np.sin(d) * np.cos(phi), np.cos(d) - np.sin(phi) * np.sin(phi2))
     return RadBearing(phi2, lam2, theta)
 
 
 def make_arrow(pos, arrowlength=0.3, arrowhead=0.1, arrowangle=20):
     start = get_rad_bearing(pos).to_latlon()
     tip = follow_bearing(start, arrowlength).to_latlon()
-    p2 = follow_bearing(
-        tip.set_bearing(start.bearing + 180 + arrowangle),
-        arrowhead
-    ).to_latlon()
-    p3 = follow_bearing(
-        tip.set_bearing(start.bearing + 180 - arrowangle),
-        arrowhead
-    ).to_latlon()
+    p2 = follow_bearing(tip.set_bearing(start.bearing + 180 + arrowangle), arrowhead).to_latlon()
+    p3 = follow_bearing(tip.set_bearing(start.bearing + 180 - arrowangle), arrowhead).to_latlon()
     # points = [tip, start, tip, p2, p3, tip]
     points = [p2, tip, start, tip, p3, p2]
-    return LatLon(
-        np.array([p.latitude for p in points]),
-        np.array([p.longitude for p in points])
-    )
+    return LatLon(np.array([p.latitude for p in points]), np.array([p.longitude for p in points]))
 
 
 def make_arrow_base(pos, arrowlength=0.3, arrowhead=0.1, arrowangle=20, base_width=0.15):
     start = get_rad_bearing(pos).to_latlon()
     tip = follow_bearing(start, arrowlength).to_latlon()
-    p2 = follow_bearing(
-        tip.set_bearing(start.bearing + 180 + arrowangle),
-        arrowhead
-    ).to_latlon()
-    p3 = follow_bearing(
-        tip.set_bearing(start.bearing + 180 - arrowangle),
-        arrowhead
-    ).to_latlon()
-    b1 = follow_bearing(
-        start.set_bearing(start.bearing + 90), base_width
-    ).to_latlon()
-    b2 = follow_bearing(
-        start.set_bearing(start.bearing - 90), base_width
-    ).to_latlon()
+    p2 = follow_bearing(tip.set_bearing(start.bearing + 180 + arrowangle), arrowhead).to_latlon()
+    p3 = follow_bearing(tip.set_bearing(start.bearing + 180 - arrowangle), arrowhead).to_latlon()
+    b1 = follow_bearing(start.set_bearing(start.bearing + 90), base_width).to_latlon()
+    b2 = follow_bearing(start.set_bearing(start.bearing - 90), base_width).to_latlon()
     # points = [tip, start, tip, p2, p3, tip]
     points = [p2, tip, start, b1, b2, start, tip, p3, p2]
-    return LatLon(
-        np.array([p.latitude for p in points]),
-        np.array([p.longitude for p in points])
-    )
+    return LatLon(np.array([p.latitude for p in points]), np.array([p.longitude for p in points]))
 
 
 def interp_dataframe(data, dists, n_iter=10):
     data = data.copy()
-    data['distance'] = haversine_km(data, data.shift()).fillna(0).cumsum()
+    data["distance"] = haversine_km(data, data.shift()).fillna(0).cumsum()
 
     if np.isscalar(dists):
         dists = np.arange(data.distance.min(), data.distance.max(), dists)
@@ -282,15 +253,10 @@ def interp_dataframe(data, dists, n_iter=10):
     x = dists = np.asarray(dists)
 
     for _ in range(n_iter):
-        data_interp = data.set_index('distance').apply(
-            utils.interpolate_series,
-            index=x
-        )
-        d = haversine_km(
-            data_interp, data_interp.shift()
-        ).squeeze().fillna(0).cumsum()
-        x = (dists + x - d)
+        data_interp = data.set_index("distance").apply(utils.interpolate_series, index=x)
+        d = haversine_km(data_interp, data_interp.shift()).squeeze().fillna(0).cumsum()
+        x = dists + x - d
 
     data_interp.index = d
-    data_interp.index.name = 'distance'
-    return data_interp.loc[~ d.duplicated().values]
+    data_interp.index.name = "distance"
+    return data_interp.loc[~d.duplicated().values]

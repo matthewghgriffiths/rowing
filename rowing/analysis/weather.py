@@ -1,24 +1,29 @@
-
 import argparse
-import sys
-import json
-import os
-import datetime
-from pathlib import Path
-import logging
 import collections
+import datetime
 import itertools
+import json
+import logging
+import os
+import sys
+from pathlib import Path
+
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
-import requests
 
-from rowing.analysis import splits, utils
+from rowing.analysis import utils
 
 TIME_STR = "%Y-%m-%d %H%M%S"
 DAY_STR = "%Y-%m-%d"
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache
+def _http_session():
+    return utils.make_http_session()
 
 
 def loc_time_key(latitude, longitude, time):
@@ -61,26 +66,23 @@ class WeatherClient(utils.CachedClient):
     reverse_url = "http://api.openweathermap.org/geo/1.0/reverse"
 
     def __init__(
-            self, api_key=None, path="weather-data", map_kws=None,
+        self,
+        api_key=None,
+        path="weather-data",
+        map_kws=None,
     ):
-        super().__init__(
-            username=None,
-            password=api_key,
-            path=path,
-            local_cache=utils.json_cache,
-            map_kws=map_kws
-        )
+        super().__init__(username=None, password=api_key, path=path, local_cache=utils.json_cache, map_kws=map_kws)
 
     @classmethod
     def from_credentials(cls, credentials, **kwargs):
-        with open(credentials, "r") as f:
+        with open(credentials) as f:
             data = json.load(f)
             data.update(kwargs)
 
         return cls(**data)
 
     def read_path(self, path):
-        with open(path, "r") as f:
+        with open(path) as f:
             return json.load(f)
 
     def all_weather_history(self):
@@ -118,16 +120,13 @@ class WeatherClient(utils.CachedClient):
 
     def download_missing(self, n=10, **kwargs):
         history = [
-            self.load_weather_history(*parse_history_path(path), **kwargs)
-            for i, path in zip(range(n), self.missing_history())
+            self.load_weather_history(*parse_history_path(path), **kwargs) for i, path in zip(range(n), self.missing_history())
         ]
         return pd.json_normalize(history)
 
     def load_weather_history(self, latitude, longitude, time, **kwargs):
         key = ("history",) + loc_time_key(latitude, longitude, time)
-        data = self.cached(
-            key, self.download_weather_history, latitude, longitude, time, **kwargs
-        )
+        data = self.cached(key, self.download_weather_history, latitude, longitude, time, **kwargs)
         data.update(data.pop("data", [{}])[0])
         data.update(data.pop("weather", [{}])[0])
         return data
@@ -151,15 +150,9 @@ class WeatherClient(utils.CachedClient):
 
     def download_weather_history(self, latitude, longitude, time, **params):
         timestamp = utils.to_timestamp(time, unit="1s")
-        params = {
-            "lat": latitude,
-            "lon": longitude,
-            "dt": timestamp,
-            "appid": self.password
-        }
-        logger.debug(
-            "downloading data at %.4f, %.4f for %s", latitude, longitude, time)
-        r = requests.get(self.history_url, params=params)
+        params = {"lat": latitude, "lon": longitude, "dt": timestamp, "appid": self.password}
+        logger.debug("downloading data at %.4f, %.4f for %s", latitude, longitude, time)
+        r = _http_session().get(self.history_url, params=params)
         r.raise_for_status()
         return r.json()
 
@@ -178,104 +171,65 @@ class WeatherClient(utils.CachedClient):
 
     def load_day_weather(self, latitude, longitude, date, **kwargs):
         key = ("daily",) + loc_date_key(latitude, longitude, date)
-        data = self.cached(
-            key, self.download_day_weather, latitude, longitude, date, **kwargs
-        )
+        data = self.cached(key, self.download_day_weather, latitude, longitude, date, **kwargs)
         return data
 
     def download_day_weather(self, latitude, longitude, date, **params):
         date = pd.to_datetime(date).strftime("%Y-%m-%d")
-        params = {
-            "lat": latitude,
-            "lon": longitude,
-            "date": date,
-            "appid": self.password
-        }
-        logger.debug(
-            "downloading data at %.4f, %.4f for %s", latitude, longitude, date)
-        r = requests.get(self.day_summary_url, params=params)
+        params = {"lat": latitude, "lon": longitude, "date": date, "appid": self.password}
+        logger.debug("downloading data at %.4f, %.4f for %s", latitude, longitude, date)
+        r = _http_session().get(self.day_summary_url, params=params)
         r.raise_for_status()
         return r.json()
 
     def get_weather_histories(self, points=None):
-        points = (
-            map(parse_history_path, self.weather_history())
-        )
-        weather_data, errors = self.map_concurrent(
-            self.get_weather_history,
-            list(points)
-        )
+        points = map(parse_history_path, self.weather_history())
+        weather_data, errors = self.map_concurrent(self.get_weather_history, list(points))
         return pd.json_normalize([data for data in weather_data if data])
 
     def get_day_histories(self, points=None):
-        points = (
-            map(parse_day_path, self.day_history())
-        )
-        weather_data, errors = self.map_concurrent(
-            self.get_day_weather, list(points)
-        )
+        points = map(parse_day_path, self.day_history())
+        weather_data, errors = self.map_concurrent(self.get_day_weather, list(points))
         return pd.json_normalize([data for data in weather_data if data])
 
 
 def load_dtg_data():
     dtg_cols = [
-        'Timestamp (GMT)',
-        'Temperature (Celcius * 10)',
-        'Humidity (%)',
-        'Dew Point (Celcius * 10)',
-        'Pressure (mBar)',
-        'Mean wind speed (knots * 10)',
-        'Average wind bearing (degrees)',
-        'Sunshine (hours * 100)',
-        'Rainfall (mm * 1000)',
-        'Max wind speed (knots * 10)'
+        "Timestamp (GMT)",
+        "Temperature (Celcius * 10)",
+        "Humidity (%)",
+        "Dew Point (Celcius * 10)",
+        "Pressure (mBar)",
+        "Mean wind speed (knots * 10)",
+        "Average wind bearing (degrees)",
+        "Sunshine (hours * 100)",
+        "Rainfall (mm * 1000)",
+        "Max wind speed (knots * 10)",
     ]
-    dtg_data = pd.read_csv(
-        "https://www.cl.cam.ac.uk/research/dtg/weather/weather-raw.csv",
-        names=dtg_cols
-    )
-    dtg_data['datetime'] = \
-        pd.to_datetime(dtg_data['Timestamp (GMT)'])
-    dtg_data['timestamp'] = dtg_data.datetime.astype(int) // 1e9
-    dtg_data['temperature'] = dtg_data['Temperature (Celcius * 10)'] / 10
-    dtg_data['wind_speed'] = dtg_data['Mean wind speed (knots * 10)'] * \
-        1852 / 3600
-    dtg_data['bearing'] = dtg_data['Average wind bearing (degrees)']
+    dtg_data = pd.read_csv("https://www.cl.cam.ac.uk/research/dtg/weather/weather-raw.csv", names=dtg_cols)
+    dtg_data["datetime"] = pd.to_datetime(dtg_data["Timestamp (GMT)"])
+    dtg_data["timestamp"] = dtg_data.datetime.astype(int) // 1e9
+    dtg_data["temperature"] = dtg_data["Temperature (Celcius * 10)"] / 10
+    dtg_data["wind_speed"] = dtg_data["Mean wind speed (knots * 10)"] * 1852 / 3600
+    dtg_data["bearing"] = dtg_data["Average wind bearing (degrees)"]
 
-    dtg_filtered = dtg_data[
-        ~ dtg_data['Temperature (Celcius * 10)'].isin(
-            [-400, -300, 400]
-        )
-    ].set_index("datetime")
+    dtg_filtered = dtg_data[~dtg_data["Temperature (Celcius * 10)"].isin([-400, -300, 400])].set_index("datetime")
     return dtg_filtered
 
 
 def get_parser():
-    parser = argparse.ArgumentParser(
-        description='Download weather data'
-    )
+    parser = argparse.ArgumentParser(description="Download weather data")
+    parser.add_argument("--api-key", type=str, nargs="?", help="api key")
     parser.add_argument(
-        '--api-key',
-        type=str, nargs='?',
-        help='api key'
-    )
-    parser.add_argument(
-        '-c', '--credentials',
+        "-c",
+        "--credentials",
         type=str,
         default="weather_credentials.json",
-        nargs='?',
-        help='path to json file containing credentials (api-key)'
+        nargs="?",
+        help="path to json file containing credentials (api-key)",
     )
-    parser.add_argument(
-        '--path',
-        type=str, default="weather-data", nargs='?',
-        help='folder path to download weather to'
-    )
-    parser.add_argument(
-        'n',
-        type=int, default=1, nargs='?',
-        help='number of downloads'
-    )
+    parser.add_argument("--path", type=str, default="weather-data", nargs="?", help="folder path to download weather to")
+    parser.add_argument("n", type=int, default=1, nargs="?", help="number of downloads")
     utils.add_logging_argument(parser)
     return parser
 
@@ -286,9 +240,7 @@ def run(args):
     utils.set_logging(options)
 
     if options.credentials:
-        weather_api = WeatherClient.from_credentials(
-            options.credentials, path=options.path
-        )
+        weather_api = WeatherClient.from_credentials(options.credentials, path=options.path)
     elif options.api_key:
         weather_api = WeatherClient(options.api_key, path=options.path)
     else:
@@ -296,7 +248,7 @@ def run(args):
 
     history = weather_api.download_missing(options.n, reload=True)
 
-    with pd.option_context('display.max_rows', None):
+    with pd.option_context("display.max_rows", None):
         print(history)
 
     n_missing = weather_api.n_missing_history()

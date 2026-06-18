@@ -1,13 +1,8 @@
-import streamlit as st
-
-import sys
-import os
+import logging
 from pathlib import Path
 
-import logging
-
-import plotly.express as px
 import pandas as pd
+import streamlit as st
 
 # st.set_page_config(
 #     page_title="Entries",
@@ -18,12 +13,11 @@ DIRPATH = Path(__file__).resolve().parent
 LIBPATH = str(DIRPATH.parent.parent)
 
 try:
-    import about
+    import about  # noqa: F401  (optional local hook)
 except ModuleNotFoundError:
     pass
 finally:
-    from rowing.app import state, inputs, select, plots
-    from rowing.world_rowing import fields, api
+    from rowing.app import inputs, select, state
 
 
 logger = logging.getLogger(__name__)
@@ -41,12 +35,7 @@ def main(params=None):
     )
 
     with st.sidebar:
-        height = int(st.number_input(
-            "Table Height",
-            min_value=100,
-            value=1000,
-            step=100
-        ))
+        height = int(st.number_input("Table Height", min_value=100, value=1000, step=100))
         inputs.clear_cache()
 
     with st.expander("Select Competition"):
@@ -58,64 +47,45 @@ def main(params=None):
         competition_id = competition.competition_id
         competition_type = competition.WBTCompetitionType
         state.set("CompetitionId", competition_id)
-        st.write(
-            f"loading Results for {competition.competition}, type: {competition_type}"
-        )
+        st.write(f"loading Results for {competition.competition}, type: {competition_type}")
 
     with st.spinner("Downloading entries"):
         comp_boat_athletes = select.get_entries(competition_id)
 
     if comp_boat_athletes is None:
-        st.write(
-            f"No events could be loaded for {competition.competition}")
+        st.write(f"No events could be loaded for {competition.competition}")
         st.stop()
 
-    comp_boat_athletes = comp_boat_athletes.dropna(
-        subset=['Event', "Boat", "Position", 'Athlete']
-    )
+    comp_boat_athletes = comp_boat_athletes.dropna(subset=["Event", "Boat", "Position", "Athlete"])
 
-    event_entries = comp_boat_athletes.groupby('Event').apply(
-        lambda data: data.Boat.drop_duplicates().reset_index(drop=True)
-    ).unstack(fill_value='')
+    event_entries = (
+        comp_boat_athletes.groupby("Event")
+        .apply(lambda data: data.Boat.drop_duplicates().reset_index(drop=True))
+        .unstack(fill_value="")
+    )
     event_entries.columns += 1
 
     st.subheader("Entries Summary")
-    st.dataframe(
-        event_entries
-    )
+    st.dataframe(event_entries)
 
     if not st.toggle("Entries By Event"):
         print(comp_boat_athletes)
 
-        boat_athlete_pos = comp_boat_athletes.set_index(
-            ['Event', "Boat", "Position"]
-        ).Athlete.unstack(fill_value='')
+        boat_athlete_pos = comp_boat_athletes.set_index(["Event", "Boat", "Position"]).Athlete.unstack(fill_value="")
 
         st.dataframe(
             boat_athlete_pos,
-            column_config={
-                p: st.column_config.TextColumn(
-                    width='medium'
-                )
-                for p in boat_athlete_pos.columns
-            },
-            height=height
+            column_config={p: st.column_config.TextColumn(width="medium") for p in boat_athlete_pos.columns},
+            height=height,
         )
     else:
-        for event, event_boats in comp_boat_athletes.groupby('Event'):
+        for event, event_boats in comp_boat_athletes.groupby("Event"):
             with st.expander(event, False):
-                boat_athlete_pos = event_boats.set_index(
-                    ["Boat", "Position"]
-                ).Athlete.unstack(fill_value='')
+                boat_athlete_pos = event_boats.set_index(["Boat", "Position"]).Athlete.unstack(fill_value="")
                 st.dataframe(
                     boat_athlete_pos,
-                    use_container_width=True,
-                    column_config={
-                        p: st.column_config.TextColumn(
-                            width='small'
-                        )
-                        for p in boat_athlete_pos.columns
-                    }
+                    width="stretch",
+                    column_config={p: st.column_config.TextColumn(width="small") for p in boat_athlete_pos.columns},
                 )
 
 

@@ -1,12 +1,10 @@
-
+import copy
+import datetime
 import json
 import logging
-import datetime
-import copy
-
-import streamlit as st
 
 import numpy as np
+import streamlit as st
 from pandas.api.types import is_datetime64_any_dtype
 
 logger = logging.getLogger(__name__)
@@ -27,7 +25,7 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return str(obj)
 
-        return super(NumpyEncoder, self).default(obj)
+        return super().default(obj)
 
 
 def as_json(val):
@@ -37,10 +35,7 @@ def as_json(val):
         return None
 
 
-STATE = {
-    k: v[0] if isinstance(v, list) else v
-    for k, v in st.query_params.items()
-}
+STATE = {k: v[0] if isinstance(v, list) else v for k, v in st.query_params.items()}
 
 get = STATE.get
 items = STATE.items
@@ -65,7 +60,7 @@ def get_state():
     return copy.deepcopy(STATE)
 
 
-def reset_button(label='reset'):
+def reset_button(label="reset"):
     if st.button(label):
         st.session_state.clear()
         st.cache_resource.clear()

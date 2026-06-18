@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 
 from rowing.world_rowing import pages
@@ -64,14 +62,15 @@ def main():
 
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="World Rowing", layout='wide')
-    pg = st.navigation([
-        st.Page(main, title='World Rowing'),
-        st.Page(pages.pgmts.main, title='PGMTs', url_path='pgmts'),
-        st.Page(pages.livetracker.main, title='Livetracker',
-                url_path='livetracker'),
-        st.Page(pages.realtime.main, title='Realtime', url_path='realtime'),
-        st.Page(pages.results.main, title='Results', url_path='results'),
-        st.Page(pages.entries.main, title='Entries', url_path='entries'),
-    ])
+    st.set_page_config(page_title="World Rowing", layout="wide")
+    pg = st.navigation(
+        [
+            st.Page(main, title="World Rowing"),
+            st.Page(pages.pgmts.main, title="PGMTs", url_path="pgmts"),
+            st.Page(pages.livetracker.main, title="Livetracker", url_path="livetracker"),
+            st.Page(pages.realtime.main, title="Realtime", url_path="realtime"),
+            st.Page(pages.results.main, title="Results", url_path="results"),
+            st.Page(pages.entries.main, title="Entries", url_path="entries"),
+        ]
+    )
     pg.run()
