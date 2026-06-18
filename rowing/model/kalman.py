@@ -1,12 +1,6 @@
-
-import numpy as np
 from functools import cached_property
 
-from filterpy.kalman import (
-    UnscentedKalmanFilter as UKF,
-    MerweScaledSigmaPoints as MSSP,
-    JulierSigmaPoints as JSP,
-)
+import numpy as np
 
 
 def weight_mean(points, weights):
@@ -81,9 +75,7 @@ class Kalman:
         self.noise = noise
 
     def apply_to_points(self, points, *args, **kwargs):
-        return points.from_points(np.array([
-            self.transfer(p, *args, **kwargs) for p in points
-        ]))
+        return points.from_points(np.array([self.transfer(p, *args, **kwargs) for p in points]))
 
     def add_noise(self, cov, *args, **kwargs):
         if self.noise_fun:
@@ -92,7 +84,7 @@ class Kalman:
             noise = self.noise
 
         if np.ndim(noise) < 2:
-            cov.flat[::cov.shape[0] + 1] += noise
+            cov.flat[:: cov.shape[0] + 1] += noise
         else:
             cov += noise
 
@@ -120,7 +112,6 @@ class UnscentedKalmanObserve(Kalman):
         kalman_gain = np.linalg.solve(innovation_cov, cov_pred_points)
 
         new_mean = points.mean + innovation.dot(kalman_gain)
-        new_cov = points.cov + \
-            kalman_gain.T.dot(innovation_cov.dot(kalman_gain))
+        new_cov = points.cov + kalman_gain.T.dot(innovation_cov.dot(kalman_gain))
 
         return points.from_mean_cov(new_mean, new_cov)

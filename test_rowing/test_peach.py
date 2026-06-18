@@ -19,14 +19,11 @@ Run with:
 Data directory defaults to /mnt/user-data/uploads if not specified.
 """
 
-import sys
 import os
-import re
+import sys
 import traceback
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 
 from rowing.analysis import peach as peach
 
@@ -41,9 +38,9 @@ def discover_files(data_dir):
         return pairs
 
     for fname in sorted(os.listdir(data_dir)):
-        if fname.endswith('.peach-data'):
-            stem = fname[:-len('.peach-data')]
-            ref = os.path.join(data_dir, stem + '.txt')
+        if fname.endswith(".peach-data"):
+            stem = fname[: -len(".peach-data")]
+            ref = os.path.join(data_dir, stem + ".txt")
             if os.path.exists(ref):
                 pairs.append((os.path.join(data_dir, fname), ref))
     return pairs
@@ -51,30 +48,28 @@ def discover_files(data_dir):
 
 # ── Individual checks ─────────────────────────────────────────────────────────
 
+
 def check_alignment(data, ref_data):
     cals, missing = data.check_alignment(ref_data)
     errors = []
     n_missing = len(missing)
 
-    st = data.metadata['sensors info']
+    st = data.metadata["sensors info"]
     if st[~st.is_boat].invalid.any():
-        print('WARNING invalid seat sensors')
+        print("WARNING invalid seat sensors")
         return []
 
     if n_missing:
-        cnts = missing[['data', 'channel']].value_counts().to_frame()
-        errors.append(
-            f"Missing {n_missing} columns:\n{cnts}"
-        )
+        cnts = missing[["data", "channel"]].value_counts().to_frame()
+        errors.append(f"Missing {n_missing} columns:\n{cnts}")
 
     for d, cal in cals.items():
         bad_cal = cal[cal.rmse > 1e-6]
         if len(bad_cal):
-            errors.append(
-                f"{d} bad alignment:\n{bad_cal}"
-            )
+            errors.append(f"{d} bad alignment:\n{bad_cal}")
 
     return errors
+
 
 # ── Runner ────────────────────────────────────────────────────────────────────
 
@@ -120,21 +115,17 @@ def run_tests(data_dir):
             total_passed += 1
 
     print("═" * 65)
-    print(f"Results: {total_passed} passed, {total_failed} failed "
-          f"out of {len(pairs)} files")
+    print(f"Results: {total_passed} passed, {total_failed} failed out of {len(pairs)} files")
     return errors
 
 
 def test_alignment():
     errors = run_tests(DEFAULT_DATA_DIR)
     if errors:
-        raise ValueError(
-            f"Experienced {len(errors)} errors",
-            *errors
-        )
+        raise ValueError(f"Experienced {len(errors)} errors", *errors)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     DATA_DIR = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_DATA_DIR
     errors = run_tests(DATA_DIR)
     sys.exit(0 if errors else 1)

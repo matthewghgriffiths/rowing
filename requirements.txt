@@ -1,23 +1,4 @@
-dm-haiku>=0.0
-fitparse>=1.2
-flax>=0.9
-gpxpy>=1.6
-garminconnect>=0.2
-garth>=0.4
-gspread_pandas>=3.3.0
-jax>=0.4
-jaxlib>=0.4
-matplotlib>=3.0
-numpy>=2.0
-openpyxl>=3.1
-pandas>=2.0
-plotly>=5.0
-pyarrow>=17.0.0
-pydantic>=2.9
-requests>=2.0
-seaborn>=0.13.2
-scipy>=1.14
-stravalib>=2.0
-streamlit==1.54.0
-streamlit-plotly-mapbox-events>=0.1.2
-tqdm>=4.0
+# Dependencies are declared in pyproject.toml (single source of truth).
+# This installs the project in editable mode with every optional extra plus
+# the dev tooling, which is what the dev container and CI expect.
+-e .[all,dev]

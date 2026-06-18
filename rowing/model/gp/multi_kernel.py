@@ -1,8 +1,7 @@
-
 from abc import ABC, abstractmethod
 
-import jax.numpy as jnp
 import haiku as hk
+import jax.numpy as jnp
 
 from .utils import MatrixProduct, get_pos_def, to_2d
 
@@ -24,9 +23,7 @@ class CovMultiKernel(AbstractMultiKernel):
         self.kernel = kernel
 
         if coef_cov is None:
-            coef_cov = get_pos_def(
-                self.n_output, dof=dof, name="cov_kernel"
-            )
+            coef_cov = get_pos_def(self.n_output, dof=dof, name="cov_kernel")
         self.coef_cov = coef_cov
 
     def k(self, X0, X1=None):

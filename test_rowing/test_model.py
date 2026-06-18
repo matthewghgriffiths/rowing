@@ -1,21 +1,33 @@
-
-
 # import pytest
 
+import jax
 import numpy as np
+import pytest
 from scipy import stats
 
-import jax
+# rowing.model.gp pulls in haiku/flax; skip cleanly when they are absent.
+pytest.importorskip("haiku")
 
 from rowing.model.gp import linalg
+
+
+def test_performance_models_import():
+    """Guard against jax/dependency API drift breaking the crew-speed models.
+
+    These modules (and gp.utils) previously broke when jax removed
+    ``jax.tree_map``; importing them here catches such regressions in CI.
+    """
+    import rowing.model.gp.utils  # noqa: F401
+    import rowing.model.performance.competition_model  # noqa: F401
+    import rowing.model.performance.joint_model  # noqa: F401
 
 
 def make_tridiagonal(nblock, blocksize):
     n = blocksize * nblock
     W = stats.wishart(blocksize, np.eye(blocksize))
 
-    A = np.zeros((n,)*2)
-    W = stats.wishart(blocksize ** 2, np.eye(blocksize * 2))
+    A = np.zeros((n,) * 2)
+    W = stats.wishart(blocksize**2, np.eye(blocksize * 2))
     for i in range(nblock - 1):
         i0 = blocksize * i
         i1 = i0 + blocksize * 2
@@ -44,16 +56,14 @@ def test_block_tridiagonal():
     y = np.random.randn(n)
     x = linalg.solve_block_triangular_bidiagonal(DL, DL1, y, lower=True)
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
-    x = linalg.solve_block_triangular_bidiagonal(
-        DL, DL1, y, lower=True, trans=1)
+    x = linalg.solve_block_triangular_bidiagonal(DL, DL1, y, lower=True, trans=1)
     assert np.allclose(np.linalg.solve(L.T, y), x, rtol=1e-10, atol=1e-6)
 
     DU = DL.swapaxes(1, 2)
     DU1 = linalg.block_transpose(DL1)
     x = linalg.solve_block_triangular_bidiagonal(DU, DU1, y, lower=False)
     assert np.allclose(np.linalg.solve(L.T, y), x, rtol=1e-10, atol=1e-6)
-    x = linalg.solve_block_triangular_bidiagonal(
-        DU, DU1, y, lower=False, trans=1)
+    x = linalg.solve_block_triangular_bidiagonal(DU, DU1, y, lower=False, trans=1)
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
 
 
@@ -61,15 +71,15 @@ def make_pentadiagonal(nblock, blocksize):
     D = np.zeros((nblock, blocksize, blocksize))
     D1 = np.zeros((nblock - 1, blocksize, blocksize))
     D2 = np.zeros((nblock - 2, blocksize, blocksize))
-    W = stats.wishart(blocksize ** 2 * 3, np.eye(blocksize * 3))
+    W = stats.wishart(blocksize**2 * 3, np.eye(blocksize * 3))
     for i in range(nblock - 2):
         A = W.rvs()
         D[i] += A[:blocksize, :blocksize]
-        D[i + 1] += A[blocksize:2 * blocksize, blocksize:2 * blocksize]
-        D[i + 2] += A[2*blocksize:, 2*blocksize:]
-        D1[i] = A[blocksize:2*blocksize, :blocksize].T
-        D1[i + 1] = A[2 * blocksize:, blocksize:2 * blocksize].T
-        D2[i] = A[blocksize:2*blocksize, 2 * blocksize:].T
+        D[i + 1] += A[blocksize : 2 * blocksize, blocksize : 2 * blocksize]
+        D[i + 2] += A[2 * blocksize :, 2 * blocksize :]
+        D1[i] = A[blocksize : 2 * blocksize, :blocksize].T
+        D1[i + 1] = A[2 * blocksize :, blocksize : 2 * blocksize].T
+        D2[i] = A[blocksize : 2 * blocksize, 2 * blocksize :].T
 
     # D[:, np.arange(blocksize), np.arange(blocksize)] += 0#nblock
     A = linalg.block_diag(D)
@@ -97,15 +107,13 @@ def test_block_pentadiagonal():
     y = np.random.randn(nblock * blocksize)
     x = linalg.solve_block_triangular_tridiagonal(DL, DL1, DL2, y, lower=True)
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
-    x = linalg.solve_block_triangular_tridiagonal(
-        DL, DL1, DL2, y, lower=True, trans=1)
+    x = linalg.solve_block_triangular_tridiagonal(DL, DL1, DL2, y, lower=True, trans=1)
     assert np.allclose(np.linalg.solve(L.T, y), x, rtol=1e-10, atol=1e-6)
 
     U_Ds = tuple(map(linalg.block_transpose, L_Ds))
     x = linalg.solve_block_triangular_tridiagonal(*U_Ds, y, lower=False)
     assert np.allclose(np.linalg.solve(L.T, y), x, rtol=1e-10, atol=1e-6)
-    x = linalg.solve_block_triangular_tridiagonal(
-        *U_Ds, y, lower=False, trans=1)
+    x = linalg.solve_block_triangular_tridiagonal(*U_Ds, y, lower=False, trans=1)
     assert np.allclose(np.linalg.solve(L, y), x, rtol=1e-10, atol=1e-6)
 
 
@@ -114,29 +122,15 @@ def test_block_banded():
     ak0, ak1 = -2, 1
     bk0, bk1 = -1, 2
 
-    A = linalg.BlockBanded.from_flat(
-        np.random.randn(linalg._tot_blocks(nblocks, ak0, ak1), 3, 2),
-        nblocks, ak0, ak1
-    )
-    B = linalg.BlockBanded.from_flat(
-        np.random.randn(linalg._tot_blocks(nblocks, bk0, bk1), 2, 2),
-        nblocks, bk0, bk1
-    )
+    A = linalg.BlockBanded.from_flat(np.random.randn(linalg._tot_blocks(nblocks, ak0, ak1), 3, 2), nblocks, ak0, ak1)
+    B = linalg.BlockBanded.from_flat(np.random.randn(linalg._tot_blocks(nblocks, bk0, bk1), 2, 2), nblocks, bk0, bk1)
     C = A @ B
     assert np.allclose(A.dense() @ B.dense(), C.dense())
-    assert np.allclose(
-        jax.jit(lambda x, y: (x @ y).dense())(A, B), C.dense()
-    )
-    assert np.allclose(
-        jax.jit(lambda x, y: (x @ y).dense())(A, B), C.dense()
-    )
+    assert np.allclose(jax.jit(lambda x, y: (x @ y).dense())(A, B), C.dense())
+    assert np.allclose(jax.jit(lambda x, y: (x @ y).dense())(A, B), C.dense())
 
     for M in [A, B, C]:
-        assert np.allclose(
-            linalg.BlockBanded.from_dense(
-                M.dense(), M.blockshape, M.k0, M.k1).dense(),
-            M.dense()
-        )
+        assert np.allclose(linalg.BlockBanded.from_dense(M.dense(), M.blockshape, M.k0, M.k1).dense(), M.dense())
 
         assert np.allclose(M.T.T.dense(), M.dense())
 

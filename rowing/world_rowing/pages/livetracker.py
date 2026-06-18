@@ -1,12 +1,11 @@
-
 import streamlit as st
 
 try:
-    import about
+    import about  # noqa: F401  (optional local hook)
 except ModuleNotFoundError:
     pass
 finally:
-    from rowing.app import select, inputs, state, plots
+    from rowing.app import inputs, plots, select, state
     from rowing.world_rowing import fields
 
 
@@ -45,11 +44,7 @@ def main(params=None):
         with st.expander("Settings"):
             fig_params = plots.select_figure_params()
 
-            threads = st.number_input(
-                "number of threads to use", min_value=1, max_value=20,
-                value=4,
-                step=1
-            )
+            threads = st.number_input("number of threads to use", min_value=1, max_value=20, value=4, step=1)
             threads = int(threads)
             inputs.clear_cache()
 
@@ -66,14 +61,16 @@ def main(params=None):
             for example, Event, Phase, Day or Boat Class. 
             """
         )
-        select_competition, filter_races, select_gmts, filter_live = st.tabs([
-            "Select Competition", "Filter Races", "Select GMTS", "Filter livetracker data"
-        ])
+        select_competition, filter_races, select_gmts, filter_live = st.tabs(
+            ["Select Competition", "Filter Races", "Select GMTS", "Filter livetracker data"]
+        )
 
     races = select.select_races(
         competition_container=select_competition,
         races_container=filter_races,
-        filters=True, select_all=False, select_first=True,
+        filters=True,
+        select_all=False,
+        select_first=True,
         default=[
             # fields.Phase,
             # fields.Gender,
@@ -82,7 +79,7 @@ def main(params=None):
         **{
             #     fields.Phase: ['Final A'],
             fields.race_raceStatus: ["Official", "Unofficial"],
-        }
+        },
     ).reset_index(drop=True)
 
     if races.empty:
@@ -98,18 +95,15 @@ def main(params=None):
 
     with select_gmts:
         gmts = select.set_competition_gmts(competition_id)
-        races = races.set_index("race_id").join(
-            gmts.rename(fields.GMT), on=fields.boatClass)
+        races = races.set_index("race_id").join(gmts.rename(fields.GMT), on=fields.boatClass)
 
     if not download:
         st.caption(f"Selected {len(races)} races")
-        st.caption(
-            "Checkbox 'load livetracker data' in sidebar to view race data")
+        st.caption("Checkbox 'load livetracker data' in sidebar to view race data")
         st.stop()
 
     with st.spinner("Downloading livetracker data"), st.empty():
-        live_data, intermediates, lane_info = select.get_races_livedata(
-            races, max_workers=threads)
+        live_data, intermediates, lane_info = select.get_races_livedata(races, max_workers=threads)
 
     if live_data.empty:
         return state.get_state()
@@ -141,14 +135,12 @@ def show_livetracker(live_data, fig_params, filter_container=None):
     ]
 
     with st.spinner("Generating livetracker plot"):
-        plot_data, facet_axes, facet_format = plots.melt_livetracker_times(
-            live_data, 100)
-        facet_axes[col]['range'] = facet_axes[col]['range'][::-1]
+        plot_data, facet_axes, facet_format = plots.melt_livetracker_times(live_data, 100)
+        facet_axes[col]["range"] = facet_axes[col]["range"][::-1]
         facet_format[col] = facet_format[fields.distance_from_paceboat]
-        fig = plots.make_livetracker_plot(
-            facets, plot_data, facet_axes, facet_format)
+        fig = plots.make_livetracker_plot(facets, plot_data, facet_axes, facet_format)
         fig = plots.update_figure(fig, **fig_params)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     state.reset_button()
     return state.get_state()
