@@ -54,6 +54,27 @@ def time_window_masks(years, width, step=None):
     return masks
 
 
+def random_block_masks(n_boats, n_blocks, *, seed=0):
+    """A random *time-preserving* partition of the boats into ``n_blocks`` disjoint masks.
+
+    Unlike :func:`time_window_masks` (used by the EP *scheduler*, where the blocks must be time
+    windows so cross-window athletes carry the messages), the LOO *hyperparameter* objective
+    (:func:`block_loo_loss`) is a composite likelihood for a **stationary** kernel: each block should
+    keep the full time-spread so the long-timescale (SE) scale stays identifiable. Slicing by time
+    instead hides the cross-window trend within every block and drives the SE scale to a degenerate
+    value -- which is exactly what made the time-windowed block-LOO fit *worse* than the defaults.
+    A uniform random partition gives every block the whole year range.
+    """
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(n_boats)
+    masks = []
+    for chunk in np.array_split(perm, n_blocks):
+        m = np.zeros(n_boats, bool)
+        m[chunk] = True
+        masks.append(m)
+    return masks
+
+
 def athlete_windows(mi, masks):
     """For each global athlete code, the indices of the windows it races in.
 

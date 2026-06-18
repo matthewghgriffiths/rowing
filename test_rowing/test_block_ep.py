@@ -60,6 +60,14 @@ def test_time_window_masks_cover_all_boats():
     assert any(m.sum() < len(years) for m in masks)  # windows actually partition
 
 
+def test_random_block_masks_disjoint_partition():
+    masks = block_ep.random_block_masks(20, n_blocks=4, seed=1)
+    assert len(masks) == 4
+    stack = np.stack(masks)
+    assert (stack.sum(0) == 1).all()  # every boat in exactly one block (disjoint cover)
+    assert all(2 <= m.sum() <= 7 for m in masks)  # roughly balanced
+
+
 def test_athlete_windows_finds_shared():
     mi = _synthetic_mi()
     masks = block_ep.time_window_masks(np.asarray(mi.year), width=1.0, step=1.0)  # one window per year
