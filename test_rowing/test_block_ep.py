@@ -36,8 +36,8 @@ def _synthetic_mi():
         year=jnp.asarray(years, f64),
         hour=jnp.asarray(np.zeros(8), f64),
         boat_venue=jnp.asarray(comp % 2, i32),
-        boat_class=jnp.asarray(np.zeros(8), i32),
-        boat_type=jnp.asarray(np.zeros(8), i32),
+        boat_class=jnp.asarray(comp % 2, i32),  # two boat classes, present across all windows
+        boat_type=jnp.asarray(comp % 2, i32),
         boat_lane=jnp.asarray(rng.standard_normal(8), f64),
         boat_comp=jnp.asarray(comp, i32),
         seat_boat=jnp.asarray(seat_boat, i32),
@@ -46,8 +46,8 @@ def _synthetic_mi():
         year0=jnp.asarray(2018.0, f64),
         n_athletes=4,
         n_venues=2,
-        n_classes=1,
-        n_types=1,
+        n_classes=2,
+        n_types=2,
         n_comps=4,
     )
 
@@ -98,11 +98,19 @@ def test_run_ep_one_window_equals_exact():
     mi = _synthetic_mi()
     t_ref = 2023.0
     full_mask = np.ones(mi.n_boats, bool)
-    mean, var, shared, history = block_ep.run_ep(mi, [full_mask], t_ref, n_iter=3, damping=1.0)
+    res = block_ep.run_ep(mi, [full_mask], t_ref, n_iter=3, damping=1.0)
+
     gp = PerformanceGP.from_inputs(mi)
     y_ath, cov_ath = gp.predict_athletes_score(t_ref)
-    assert np.allclose(mean, np.asarray(y_ath), atol=1e-7)
-    assert np.allclose(var, np.asarray(cov_ath).diagonal(), atol=1e-7)
+    assert np.allclose(res.athlete_mean, np.asarray(y_ath), atol=1e-7)
+    assert np.allclose(res.athlete_var, np.asarray(cov_ath).diagonal(), atol=1e-7)
+
+    # boat-class baseline: exact = boatclass_var * (W_bc^T @ system.a)
+    system = gp.gp_system()
+    boatclass_var = float(np.asarray(gp.boatclass_var.value).reshape(()))
+    W_bc = np.asarray(mi.one_hot("class"))
+    bc_exact = boatclass_var * (W_bc.T @ np.asarray(system.a))
+    assert np.allclose(res.class_mean, bc_exact, atol=1e-7)
 
 
 def test_run_ep_converges_and_beats_poe():
@@ -114,13 +122,13 @@ def test_run_ep_converges_and_beats_poe():
     exact = np.asarray(gp.predict_athletes_score(t_ref)[0])
 
     poe_mean, _, shared = block_ep.block_athlete_scores(mi, masks, t_ref)
-    ep_mean, ep_var, _, history = block_ep.run_ep(mi, masks, t_ref, n_iter=20, damping=0.5)
+    res = block_ep.run_ep(mi, masks, t_ref, n_iter=25, damping=0.5)
 
     idx = np.array(sorted(shared))
     poe_err = np.abs(poe_mean[idx] - exact[idx]).max()
-    ep_err = np.abs(ep_mean[idx] - exact[idx]).max()
-    print(f"\nPoE max err {poe_err:.4g} | EP max err {ep_err:.4g} | EP converged to {history[-1]:.2e}")
+    ep_err = np.abs(res.athlete_mean[idx] - exact[idx]).max()
+    print(f"\nPoE max err {poe_err:.4g} | EP max err {ep_err:.4g} | EP converged to {res.history[-1]:.2e}")
 
-    assert np.isfinite(ep_mean).all() and (ep_var > 0).all()
-    assert history[-1] < 1e-3  # converged
+    assert np.isfinite(res.athlete_mean).all() and (res.athlete_var > 0).all()
+    assert res.history[-1] < 1e-3  # converged
     assert ep_err <= poe_err + 1e-9  # EP at least as accurate as naive product-of-experts

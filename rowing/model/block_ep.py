@@ -9,10 +9,13 @@ The shared variable is each athlete's latent score at a reference time ``t_ref``
 ``PerformanceGP.predict_athletes_score`` computes -- so a single window covering all boats reduces
 to the exact GP (the anchor for verification).
 
-Stage 1 here: the time-window partition, the per-window athlete-score *message*, and a
-product-of-experts fusion of windows. The damped EP scheduler (re-conditioning each window on the
-cavity, iterating) builds on this in :func:`run_ep`.
+:func:`run_ep` is the damped EP scheduler: it reconciles, across windows, both the cross-window
+athletes (score at ``t_ref``) and the *global* boat-class baselines (moved out of each window's
+kernel into a shared latent, its cavity folded into the boat covariance like the competition
+factor). :func:`block_athlete_scores` is a simpler one-pass product-of-experts baseline.
 """
+
+from typing import NamedTuple
 
 import numpy as np
 from scipy import linalg as sla
@@ -125,62 +128,95 @@ def block_athlete_scores(mi, masks, t_ref, *, params=None, **kernels):
     return mean, var, shared
 
 
-def window_conditioned_scores(gp, t_ref, shared_codes, cav_mean, cav_var, jitter=1e-9):
-    """Posterior mean/var of every athlete's ``t_ref`` score for this window's GP, optionally
-    conditioned on a cavity Gaussian over ``shared_codes`` (cross-window athletes).
+class EPResult(NamedTuple):
+    athlete_mean: np.ndarray  # per global athlete code, score at t_ref
+    athlete_var: np.ndarray
+    class_mean: np.ndarray  # per boat-class code, global baseline
+    class_var: np.ndarray
+    shared: set  # cross-window athletes
+    history: list  # max |Delta posterior mean| per sweep
 
-    The cavity is incorporated as pseudo-observations of the athlete-score functionals: we augment
-    the boat GP with extra "observations" ``s_a = cav_mean_a (+/- cav_var_a)`` whose cross-covariance
-    to boat ``i`` is ``k(t_ref, year_i) * W[i, a]`` and whose prior (co)variance is ``k00`` (the
-    athlete kernel at t_ref). With ``shared_codes`` empty this reduces to predict_athletes_score.
+
+def window_factor(gp, mi_window, t_ref, cond_ath, cav_ath_mean, cav_ath_var, cav_cls_mean, cav_cls_var, jitter=1e-9):
+    """Posterior over a window's athlete scores (at t_ref) and boat-class baselines.
+
+    Boat-class is a *global* latent removed from the window kernel: its cavity is folded into the
+    boat covariance (``K_eff = K_block + W_bc diag(cav) W_bc^T``, ``y_eff = y - W_bc cav_mean``),
+    matching the competition-factor pattern, so one window reduces to the exact GP. Cross-window
+    athletes (``cond_ath``) are conditioned via score pseudo-observations on top.
     """
-    K = np.asarray(gp.get_jitter_kernel())
+    K_ath, K_race, K_bc = gp.get_kernels()
+    noise = float(np.exp(np.asarray(gp.log_noise[...])))
     y = np.asarray(gp.y)
-    W = np.asarray(gp.W_athlete)
+    nb = len(y)
+    K_block = np.asarray(K_ath) + np.asarray(K_race) + noise * np.eye(nb)
+
+    W_ath = np.asarray(gp.W_athlete)
+    na = W_ath.shape[1]
     k_pred = np.asarray(gp.athlete_kernel.K(np.r_[t_ref], gp.years))[0]
     k00 = float(np.asarray(gp.athlete_kernel.K(np.r_[t_ref], np.r_[t_ref])).reshape(()))
-    C = k_pred[:, None] * W  # (n_boats, n_athletes): cross-cov boat <-> athlete score
-    nb, na = W.shape
-    shared_codes = np.asarray(shared_codes, dtype=int)
+    C_ath = k_pred[:, None] * W_ath  # cross-cov boat <-> athlete score
 
-    if shared_codes.size:
-        Cs = C[:, shared_codes]  # (nb, |S|)
-        Kaug = np.block([[K, Cs], [Cs.T, k00 * np.eye(shared_codes.size) + np.diag(np.asarray(cav_var))]])
+    W_bc = np.asarray(mi_window.one_hot("class"))  # (nb, n_classes), global codes
+    nc = W_bc.shape[1]
+    cav_cls_mean = np.asarray(cav_cls_mean)
+    cav_cls_var = np.asarray(cav_cls_var)
+
+    # fold the boat-class cavity into the boat covariance / mean
+    K_eff = K_block + (W_bc * cav_cls_var) @ W_bc.T
+    y_eff = y - W_bc @ cav_cls_mean
+
+    cond_ath = np.asarray(cond_ath, int)
+    if cond_ath.size:
+        Cs = C_ath[:, cond_ath]
+        Kaug = np.block([[K_eff, Cs], [Cs.T, k00 * np.eye(cond_ath.size) + np.diag(np.asarray(cav_ath_var))]])
         Kaug[np.diag_indices_from(Kaug)] += jitter
-        yaug = np.concatenate([y, np.asarray(cav_mean)])
         L = np.linalg.cholesky(Kaug)
-        a = sla.cho_solve((L, True), yaug)
-        cross = np.zeros((na, nb + shared_codes.size))
-        cross[:, :nb] = C.T
-        cross[shared_codes, nb + np.arange(shared_codes.size)] = k00  # athlete's score <-> its own pseudo-obs
+        a = sla.cho_solve((L, True), np.concatenate([y_eff, np.asarray(cav_ath_mean)]))
+        m = cond_ath.size
     else:
-        Kaug = K + jitter * np.eye(nb)
-        L = np.linalg.cholesky(Kaug)
-        a = sla.cho_solve((L, True), y)
-        cross = C.T
+        L = np.linalg.cholesky(K_eff + jitter * np.eye(nb))
+        a = sla.cho_solve((L, True), y_eff)
+        m = 0
 
-    mean = cross @ a
-    Lc = sla.solve_triangular(L, cross.T, lower=True)
-    var = k00 - np.square(Lc).sum(0)
-    return mean, var
+    # athlete posteriors (all athletes)
+    cross_ath = np.zeros((na, nb + m))
+    cross_ath[:, :nb] = C_ath.T
+    if m:
+        cross_ath[cond_ath, nb + np.arange(m)] = k00
+    ath_mean = cross_ath @ a
+    Lx = sla.solve_triangular(L, cross_ath.T, lower=True)
+    ath_var = k00 - np.square(Lx).sum(0)
+
+    # boat-class posteriors: prior mean + cov W_bc^T (K_eff-solve), cov diag minus the data reduction
+    cross_bc = np.zeros((nc, nb + m))
+    cross_bc[:, :nb] = cav_cls_var[:, None] * W_bc.T
+    cls_mean = cav_cls_mean + cross_bc @ a
+    Lb = sla.solve_triangular(L, cross_bc.T, lower=True)
+    cls_var = cav_cls_var - np.square(Lb).sum(0)
+    return ath_mean, ath_var, cls_mean, cls_var
 
 
-def run_ep(mi, masks, t_ref, *, n_iter=15, damping=0.5, params=None, **kernels):
-    """Damped expectation propagation over time-window blocks.
+def run_ep(mi, masks, t_ref, *, n_iter=20, damping=0.5, params=None, **kernels):
+    """Damped expectation propagation over overlapping time-window blocks.
 
-    Sweeps the windows, re-conditioning each on the cavity (the other windows' messages) about its
-    cross-window athletes, until the per-athlete posterior stops moving. Returns (mean, var) per
-    global athlete code, the shared-athlete set, and the convergence history (max |Δmean| per sweep).
+    Reconciles, across windows, both the cross-window athletes (score at ``t_ref``) and the
+    *global* boat-class baselines. Returns an :class:`EPResult`. One window covering all boats
+    reproduces the exact ``PerformanceGP`` posteriors (athletes and boat-class).
     """
-    gps = [PerformanceGP.from_inputs(mi.subset(np.asarray(m)), params=params, **kernels) for m in masks]
+    mi_w = [mi.subset(np.asarray(m)) for m in masks]
+    gps = [PerformanceGP.from_inputs(w, params=params, **kernels) for w in mi_w]
     aw, shared = athlete_windows(mi, masks)
-    window_ath = [np.array(sorted(a for a, ws in aw.items() if w in ws), dtype=int) for w in range(len(masks))]
-    prior_var = athlete_prior_var(t_ref, params=params, **kernels)
-    na = mi.n_athletes
+    window_ath = [np.array(sorted(a for a, ws in aw.items() if w in ws), int) for w in range(len(masks))]
+    window_cls = [np.unique(np.asarray(w.boat_class)) for w in mi_w]
+    na, nc = mi.n_athletes, mi.n_classes
+    k00 = athlete_prior_var(t_ref, params=params, **kernels)
+    boatclass_var = float(np.asarray(gps[0].boatclass_var.value).reshape(()))
 
-    # site messages per window, in natural params (precision, precision*mean), zero outside its athletes
-    msg_prec = [np.zeros(na) for _ in masks]
-    msg_pm = [np.zeros(na) for _ in masks]
+    # combined latent space: [0:na) athlete scores, [na:na+nc) boat-class baselines
+    prior_var = np.concatenate([np.full(na, k00), np.full(nc, boatclass_var)])
+    msg_prec = [np.zeros(na + nc) for _ in masks]
+    msg_pm = [np.zeros(na + nc) for _ in masks]
 
     def posterior():
         prec = 1.0 / prior_var + sum(msg_prec)
@@ -188,31 +224,38 @@ def run_ep(mi, masks, t_ref, *, n_iter=15, damping=0.5, params=None, **kernels):
         return pm / prec, 1.0 / prec
 
     history = []
-    prev_mean, _ = posterior()
+    prev, _ = posterior()
     for _ in range(n_iter):
         for w, gp in enumerate(gps):
-            ath = window_ath[w]
-            if ath.size == 0:
+            ath, cls = window_ath[w], window_cls[w]
+            idx = np.concatenate([ath, na + cls])
+            if idx.size == 0:
                 continue
             qm, qv = posterior()
-            # cavity = posterior / this window's message (natural subtract), guarded positive
-            cav_prec = np.maximum(1.0 / qv[ath] - msg_prec[w][ath], 1e-8)
-            cav_pm = qm[ath] / qv[ath] - msg_pm[w][ath]
+            cav_prec = np.maximum(1.0 / qv[idx] - msg_prec[w][idx], 1e-8)
+            cav_pm = qm[idx] / qv[idx] - msg_pm[w][idx]
             cav_var = 1.0 / cav_prec
             cav_mean = cav_pm * cav_var
+            ca_m, ca_v = cav_mean[: ath.size], cav_var[: ath.size]  # athlete cavities
+            cc_m, cc_v = cav_mean[ath.size :], cav_var[ath.size :]  # class cavities (this window)
 
-            sh = np.isin(ath, list(shared))
-            mean_all, var_all = window_conditioned_scores(gp, t_ref, ath[sh], cav_mean[sh], cav_var[sh])
+            # full boat-class cavity vectors over all nc (non-window classes -> harmless prior)
+            cls_m_full = np.zeros(nc)
+            cls_v_full = np.full(nc, boatclass_var)
+            cls_m_full[cls] = cc_m
+            cls_v_full[cls] = cc_v
 
-            # new site message = window posterior / cavity, damped in natural params
-            new_prec = 1.0 / var_all[ath] - cav_prec
-            new_pm = mean_all[ath] / var_all[ath] - cav_pm
-            msg_prec[w][ath] = (1 - damping) * msg_prec[w][ath] + damping * new_prec
-            msg_pm[w][ath] = (1 - damping) * msg_pm[w][ath] + damping * new_pm
+            sh = np.isin(ath, list(shared))  # only cross-window athletes are conditioned
+            am, av, cm, cv = window_factor(gp, mi_w[w], t_ref, ath[sh], ca_m[sh], ca_v[sh], cls_m_full, cls_v_full)
+
+            post_prec = np.concatenate([1.0 / av[ath], 1.0 / cv[cls]])
+            post_pm = np.concatenate([am[ath] / av[ath], cm[cls] / cv[cls]])
+            msg_prec[w][idx] = (1 - damping) * msg_prec[w][idx] + damping * (post_prec - cav_prec)
+            msg_pm[w][idx] = (1 - damping) * msg_pm[w][idx] + damping * (post_pm - cav_pm)
 
         mean, _ = posterior()
-        history.append(float(np.nanmax(np.abs(mean - prev_mean))))
-        prev_mean = mean
+        history.append(float(np.nanmax(np.abs(mean - prev))))
+        prev = mean
 
     mean, var = posterior()
-    return mean, var, shared, history
+    return EPResult(mean[:na], var[:na], mean[na:], var[na:], shared, history)
