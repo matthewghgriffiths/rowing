@@ -514,6 +514,33 @@ def load_haiku_params(gp: "PerformanceGP", params: dict) -> "PerformanceGP":
     return gp
 
 
+def dump_haiku_params(gp: "PerformanceGP") -> dict:
+    """Extract a PerformanceGP's learnable hyperparameters into the legacy ``params.yaml`` dict.
+
+    Inverse of :func:`load_haiku_params`: walks the named kernels and reads each learnable Hyper's
+    (log-space) param, plus the ``'~'`` root (boat-class log-variance, ``log_noise``). Round-trips
+    with the loader, so an optimised model can be saved and reused per competition.
+    """
+    hyper_to_key = {attr: key for key, attr in _HAIKU_KEY_TO_HYPER.items()}
+    out: dict = {}
+    for kernel in (gp.athlete_kernel, gp.race_kernel, gp.lane_kernel):
+        if kernel is None:
+            continue
+        for k in _iter_named_kernels(kernel):
+            entry = {}
+            for attr, key in hyper_to_key.items():
+                hyper = getattr(k, attr, None)
+                if hyper is not None and hyper.param is not None:
+                    entry[key] = float(np.asarray(hyper.param[...]))
+            if entry:
+                out[k.name] = entry
+    out["~"] = {
+        fields.BoatType: float(np.asarray(gp.boatclass_var.param[...])),
+        "log_noise": float(np.asarray(gp.log_noise[...])),
+    }
+    return out
+
+
 class CompetitionModel(NamedTuple):
     hours: np.ndarray
     years: np.ndarray

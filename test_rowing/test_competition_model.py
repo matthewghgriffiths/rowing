@@ -186,6 +186,24 @@ def test_load_haiku_params_maps_names_onto_hypers():
     assert float(gp.log_noise[...]) == pytest.approx(params["~"]["log_noise"])
 
 
+def test_dump_load_round_trips():
+    yaml = pytest.importorskip("yaml")
+    params_path = EXAMPLES_DIR / "params.yaml"
+    if not params_path.exists():
+        pytest.skip("examples/params.yaml not present")
+    params = yaml.safe_load(params_path.read_text())
+
+    gp = cm.PerformanceGP(_canonical_model())
+    cm.load_haiku_params(gp, params)
+    dumped = cm.dump_haiku_params(gp)
+
+    # reload the dumped params into a fresh model -> identical GP
+    gp2 = cm.PerformanceGP(_canonical_model())
+    cm.load_haiku_params(gp2, dumped)
+    assert float(gp.loss()) == pytest.approx(float(gp2.loss()), rel=1e-12)
+    assert np.allclose(gp.gp_system().a, gp2.gp_system().a, atol=1e-12)
+
+
 def test_fit_robust_downweights_outlier():
     model = _synthetic_model()
     # inject a gross outlier into one boat's target
