@@ -51,6 +51,8 @@ def main(params=None):
             if clear:
                 st.cache_data.clear()
 
+    live_container = st.container()
+
     with st.expander("Last Races"):
         n_races = st.number_input(
             "Load how many races?", 0, value=0, step=1)
@@ -111,26 +113,27 @@ def main(params=None):
 
     state.reset_button()
 
-    st.subheader("Livetracker")
+    with live_container:
+        st.subheader("Livetracker")
 
-    live_race = select.get_live_race_data(
-        race.race_id,
-        realtime_sleep=realtime_sleep,
-        replay=replay,
-        replay_step=replay_step,
-        replay_start=replay_start,
-    )
-    show_intermediates = st.empty()
-    completed = st.progress(0., "Distance completed")
+        live_race = select.get_live_race_data(
+            race.race_id,
+            realtime_sleep=realtime_sleep,
+            replay=replay,
+            replay_step=replay_step,
+            replay_start=replay_start,
+        )
+        show_intermediates = st.empty()
+        completed = st.progress(0., "Distance completed")
 
-    if "distance_completed" in st.session_state:
-        last_dist = st.session_state["distance_completed"]
-        last_time = st.session_state["last_time_update"]
-    else:
-        last_dist = st.session_state["distance_completed"] = 0
-        last_time = st.session_state["last_time_update"] = time.time()
+        if "distance_completed" in st.session_state:
+            last_dist = st.session_state["distance_completed"]
+            last_time = st.session_state["last_time_update"]
+        else:
+            last_dist = st.session_state["distance_completed"] = 0
+            last_time = st.session_state["last_time_update"] = time.time()
 
-    fig_plot = st.empty()
+        fig_plot = st.empty()
 
     pbar = tqdm(live_race.gen_data(
         live_race.update,
