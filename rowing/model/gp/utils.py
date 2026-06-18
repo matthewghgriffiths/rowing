@@ -162,7 +162,9 @@ class GPSystem(NamedTuple):
         Maximise for predictive generalisation -- a better hyperparameter objective than the
         marginal likelihood, which can overfit. Differentiable, so usable as a fit_module loss.
         """
-        iKii = self.inv_K().diagonal()
+        # diag(K^-1) = column sums of (L^-1)^2 -- one triangular solve, not the full inverse
+        Linv = solve_triangular(self.L, jnp.eye(self.y.shape[0]), lower=True, trans=0)
+        iKii = jnp.square(Linv).sum(0)
         return -0.5 * jnp.sum(jnp.log(2 * jnp.pi) - jnp.log(iKii) + jnp.square(self.a) / iKii)
 
     def predict(self, K):
