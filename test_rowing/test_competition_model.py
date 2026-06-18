@@ -186,6 +186,24 @@ def test_load_haiku_params_maps_names_onto_hypers():
     assert float(gp.log_noise[...]) == pytest.approx(params["~"]["log_noise"])
 
 
+def test_fit_robust_downweights_outlier():
+    model = _synthetic_model()
+    # inject a gross outlier into one boat's target
+    y = np.asarray(model.y).copy()
+    y[0] += 10.0
+    model = model._replace(y=jnp.asarray(y))
+
+    gp = cm.PerformanceGP(model)
+    w = gp.fit_robust(nu=4.0, n_iter=10)
+
+    assert w.shape == (len(y),)
+    assert np.all(w > 0)
+    assert w.argmin() == 0  # the injected outlier is the most down-weighted row
+    assert w[0] < 0.5 * np.median(w)  # ... and strongly so
+    # obs_weight feeds the jitter kernel -> larger effective noise on the outlier row
+    assert float(gp.obs_weight[0]) == pytest.approx(w[0])
+
+
 def test_fit_performance_gp_reduces_loss():
     """The nnx fit flow should reduce the PerformanceGP loss."""
     from rowing.model.gp.utils import fit_module

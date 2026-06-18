@@ -338,6 +338,8 @@ class PerformanceGP(nnx.Module, pytree=False):
         self.gram_lane = rm.gram_lane
         self.gram_boatclass = rm.gram_boatclass
         self.y = model.y
+        # per-result observation weight (1 = homoscedastic); fit_robust shrinks it for outliers
+        self.obs_weight = jnp.ones(jnp.shape(self.y))
 
     def get_kernels(self):
         years = self.years - self.year0
@@ -360,7 +362,32 @@ class PerformanceGP(nnx.Module, pytree=False):
 
     def get_jitter_kernel(self):
         K = self.get_full_kernel()
-        return K + jnp.eye(len(K)) * jnp.exp(self.log_noise[...])
+        # heteroscedastic observation noise: sigma^2 / obs_weight per result (down-weights outliers)
+        return K + jnp.diag(jnp.exp(self.log_noise[...]) / self.obs_weight)
+
+    def fit_robust(self, nu=4.0, n_iter=8):
+        """Estimate per-result observation weights under a Student-t likelihood (IRLS), in place.
+
+        Iterates: fit the GP with the current per-result noise sigma^2 / w, form the studentised
+        leave-one-out residual z_i^2 = a_i^2 / (K^-1)_ii, and set w_i = (nu+1)/(nu + z_i^2). Large
+        residuals (bad/anomalous races) get small w_i -> inflated noise -> down-weighted. Returns w.
+        """
+        import numpy as np
+        from scipy import linalg as sla
+
+        y = np.asarray(self.y)
+        K = np.asarray(self.get_full_kernel())
+        base = float(np.exp(np.asarray(self.log_noise[...])))
+        n = len(y)
+        w = np.ones(n)
+        for _ in range(n_iter):
+            L = sla.cho_factor(K + np.diag(base / w))
+            a = sla.cho_solve(L, y)
+            iKii = np.diag(sla.cho_solve(L, np.eye(n)))
+            z2 = a**2 / iKii  # studentised leave-one-out residual, squared
+            w = (nu + 1.0) / (nu + z2)
+        self.obs_weight = jnp.asarray(w)
+        return w
 
     def gp_system(self):
         return GPSystem.from_gram(self.get_jitter_kernel(), self.y)
