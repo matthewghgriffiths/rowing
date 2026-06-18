@@ -155,6 +155,16 @@ class GPSystem(NamedTuple):
 
         return y_pred
 
+    def loo_log_density(self):
+        """Sum of leave-one-out log predictive densities (Rasmussen & Williams 5.4.2).
+
+        Closed form from a single solve: LOO residual_i = a_i / (K^-1)_ii, LOO var_i = 1/(K^-1)_ii.
+        Maximise for predictive generalisation -- a better hyperparameter objective than the
+        marginal likelihood, which can overfit. Differentiable, so usable as a fit_module loss.
+        """
+        iKii = self.inv_K().diagonal()
+        return -0.5 * jnp.sum(jnp.log(2 * jnp.pi) - jnp.log(iKii) + jnp.square(self.a) / iKii)
+
     def predict(self, K):
         return K @ self.a
 

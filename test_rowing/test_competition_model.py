@@ -222,6 +222,22 @@ def test_fit_robust_downweights_outlier():
     assert float(gp.obs_weight[0]) == pytest.approx(w[0])
 
 
+def test_loo_log_density_and_optimisation():
+    from rowing.model.gp.utils import fit_module
+
+    gp = cm.PerformanceGP(_synthetic_model())
+    sys0 = gp.gp_system()
+    loo0 = float(sys0.loo_log_density())
+    assert np.isfinite(loo0)
+    # closed-form LOO residual relation: a_i/(K^-1)_ii == y_i - y_loo_i
+    iKii = np.asarray(sys0.inv_K()).diagonal()
+    assert np.allclose(np.asarray(sys0.a) / iKii, np.asarray(sys0.y) - np.asarray(sys0.leave_one_out()))
+
+    # the LOO predictive density is a valid (differentiable) fit objective
+    fit_module(gp, loss_fn=lambda m: -m.gp_system().loo_log_density(), options={"maxiter": 50})
+    assert float(gp.gp_system().loo_log_density()) >= loo0 - 1e-6
+
+
 def test_fit_performance_gp_reduces_loss():
     """The nnx fit flow should reduce the PerformanceGP loss."""
     from rowing.model.gp.utils import fit_module
