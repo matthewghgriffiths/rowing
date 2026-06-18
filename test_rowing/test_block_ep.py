@@ -92,3 +92,35 @@ def test_multi_window_runs_and_is_finite():
     mean, var, shared = block_ep.block_athlete_scores(mi, masks, t_ref)
     assert len(shared) > 0
     assert np.isfinite(mean).all() and (var > 0).all()
+
+
+def test_run_ep_one_window_equals_exact():
+    mi = _synthetic_mi()
+    t_ref = 2023.0
+    full_mask = np.ones(mi.n_boats, bool)
+    mean, var, shared, history = block_ep.run_ep(mi, [full_mask], t_ref, n_iter=3, damping=1.0)
+    gp = PerformanceGP.from_inputs(mi)
+    y_ath, cov_ath = gp.predict_athletes_score(t_ref)
+    assert np.allclose(mean, np.asarray(y_ath), atol=1e-7)
+    assert np.allclose(var, np.asarray(cov_ath).diagonal(), atol=1e-7)
+
+
+def test_run_ep_converges_and_beats_poe():
+    mi = _synthetic_mi()
+    t_ref = 2023.0
+    masks = block_ep.time_window_masks(np.asarray(mi.year), width=2.0, step=1.0)
+
+    gp = PerformanceGP.from_inputs(mi)
+    exact = np.asarray(gp.predict_athletes_score(t_ref)[0])
+
+    poe_mean, _, shared = block_ep.block_athlete_scores(mi, masks, t_ref)
+    ep_mean, ep_var, _, history = block_ep.run_ep(mi, masks, t_ref, n_iter=20, damping=0.5)
+
+    idx = np.array(sorted(shared))
+    poe_err = np.abs(poe_mean[idx] - exact[idx]).max()
+    ep_err = np.abs(ep_mean[idx] - exact[idx]).max()
+    print(f"\nPoE max err {poe_err:.4g} | EP max err {ep_err:.4g} | EP converged to {history[-1]:.2e}")
+
+    assert np.isfinite(ep_mean).all() and (ep_var > 0).all()
+    assert history[-1] < 1e-3  # converged
+    assert ep_err <= poe_err + 1e-9  # EP at least as accurate as naive product-of-experts
