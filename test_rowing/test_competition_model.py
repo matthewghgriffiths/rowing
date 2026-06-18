@@ -222,6 +222,29 @@ def test_fit_robust_downweights_outlier():
     assert float(gp.obs_weight[0]) == pytest.approx(w[0])
 
 
+def test_fit_robust_pulls_predictions_back_toward_clean():
+    # end-to-end: down-weighting a gross outlier should move the predicted athlete scores
+    # closer to the no-outlier baseline than the non-robust fit (this is the production lever).
+    base = _synthetic_model()
+    yd = np.asarray(base.y).copy()
+    yd[0] += 10.0  # gross outlier on boat 0
+    dirty = base._replace(y=jnp.asarray(yd))
+
+    def predict(model, robust):
+        gp = cm.PerformanceGP(model)
+        if robust:
+            gp.fit_robust(nu=4.0, n_iter=10)
+        return np.asarray(gp.predict_athletes_score(2024.0)[0])
+
+    clean = predict(base, robust=False)
+    naive = predict(dirty, robust=False)
+    robust = predict(dirty, robust=True)
+
+    # the outlier perturbs the naive prediction; robust recovers closer to the clean baseline
+    assert np.linalg.norm(naive - clean) > 0  # outlier actually moved things
+    assert np.linalg.norm(robust - clean) < np.linalg.norm(naive - clean)
+
+
 def test_loo_log_density_and_optimisation():
     from rowing.model.gp.utils import fit_module
 
