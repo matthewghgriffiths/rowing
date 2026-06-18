@@ -17,6 +17,7 @@ factor). :func:`block_athlete_scores` is a simpler one-pass product-of-experts b
 
 from typing import NamedTuple
 
+import jax.numpy as jnp
 import numpy as np
 from scipy import linalg as sla
 
@@ -259,6 +260,74 @@ def run_ep(mi, masks, t_ref, *, n_iter=20, damping=0.5, params=None, **kernels):
 
     mean, var = posterior()
     return EPResult(mean[:na], var[:na], mean[na:], var[na:], shared, history)
+
+
+def _window_data(mi_w):
+    """The hyperparameter-independent arrays a window needs to build its jitter kernel."""
+    return dict(
+        years=mi_w.year,
+        year0=mi_w.year0,
+        hours=mi_w.hour,
+        y=mi_w.y,
+        gram_athlete=mi_w.gram_athlete(),
+        gram_venue=mi_w.categorical_gram("venue"),
+        gram_boatclass=mi_w.categorical_gram("class"),
+        gram_lane=mi_w.gram_lane(),
+    )
+
+
+def window_jitter_kernel(gp, wd):
+    """A window's jitter kernel from shared kernels (``gp``) + the window's fixed arrays (``wd``).
+
+    Mirrors PerformanceGP.get_kernels / get_jitter_kernel exactly, so a single full-data window
+    equals PerformanceGP.from_inputs(mi).get_jitter_kernel().
+    """
+    years = wd["years"] - wd["year0"]
+    K = gp.athlete_kernel.K(years, years) * wd["gram_athlete"]
+    K = K + gp.race_kernel.K(wd["hours"], wd["hours"]) * wd["gram_venue"]
+    if gp.lane_kernel is not None:
+        gram_lane = jnp.where(jnp.isfinite(wd["gram_lane"]), wd["gram_lane"], 0)
+        K = K + jnp.where(
+            jnp.isfinite(wd["gram_lane"]),
+            gp.lane_kernel.K(wd["hours"], wd["hours"]) * wd["gram_venue"] * gram_lane,
+            0,
+        )
+    K = K + gp.boatclass_var.value * wd["gram_boatclass"]
+    return K + jnp.eye(len(K)) * jnp.exp(gp.log_noise[...])
+
+
+def block_loo_loss(gp, windows_data):
+    """Negative sum of per-window leave-one-out log predictive densities (composite objective).
+
+    Each window's LOO is an O(n_w^3) solve on a bounded block, so summing over windows scales to
+    far more data than one exact O(n^3) fit while still optimising the (global, shared) kernel
+    hyperparameters for predictive generalisation. One full-data window == the exact LOO objective.
+    """
+    from rowing.model.gp.utils import GPSystem
+
+    total = 0.0
+    for wd in windows_data:
+        total = total + GPSystem.from_gram(window_jitter_kernel(gp, wd), wd["y"]).loo_log_density()
+    return -total
+
+
+def fit_loo_blocked(mi, masks, *, params=None, **kwargs):
+    """Fit the shared kernel hyperparameters by block (per-window) LOO predictive density.
+
+    Builds a small parameter-holder PerformanceGP (cheap, on the smallest window) whose kernels are
+    optimised against ``block_loo_loss`` over all windows; the window grams are precomputed. Returns
+    (gp, scipy result); ``dump_haiku_params(gp)`` then gives the optimised params. Kernel factories
+    (athlete_kernel/race_kernel/lane_kernel) and scipy options pass through ``kwargs``.
+    """
+    from rowing.model.gp.utils import fit_module
+
+    kernel_kw = {k: kwargs.pop(k) for k in ("athlete_kernel", "race_kernel", "lane_kernel") if k in kwargs}
+    mi_w = [mi.subset(np.asarray(m)) for m in masks]
+    windows_data = [_window_data(w) for w in mi_w]
+    holder = mi_w[int(np.argmin([w.n_boats for w in mi_w]))]  # smallest window -> cheap param container
+    gp = PerformanceGP.from_inputs(holder, params=params, **kernel_kw)
+    res = fit_module(gp, loss_fn=lambda m: block_loo_loss(m, windows_data), **kwargs)
+    return gp, res
 
 
 def predict_boats(ep, comp_athletes, athlete_index, boat_class=None, noise=1e-4):

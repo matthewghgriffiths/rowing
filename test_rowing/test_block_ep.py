@@ -171,3 +171,18 @@ def test_predict_boats_matches_simple_model():
     assert np.allclose(yb_ep.values, yb_exact.values, atol=0.15)  # within the multi-window EP approximation
     # same predicted faster boat
     assert np.sign(yb_ep["A"] - yb_ep["B"]) == np.sign(yb_exact["A"] - yb_exact["B"])
+
+
+def test_block_loo_one_window_equals_exact_loo():
+    mi = _synthetic_mi()
+    gp = PerformanceGP.from_inputs(mi)
+    full_loo = float(gp.gp_system().loo_log_density())
+    blk = float(-block_ep.block_loo_loss(gp, [block_ep._window_data(mi)]))
+    assert blk == pytest.approx(full_loo, rel=1e-9)
+
+
+def test_fit_loo_blocked_improves_block_loo():
+    mi = _synthetic_mi()
+    masks = block_ep.time_window_masks(np.asarray(mi.year), width=2.0, step=1.0)
+    gp, res = block_ep.fit_loo_blocked(mi, masks, options={"maxiter": 30})
+    assert res["loss_history"][-1] <= res["loss_history"][0] + 1e-6  # block-LOO loss decreased
