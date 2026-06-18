@@ -132,3 +132,42 @@ def test_run_ep_converges_and_beats_poe():
     assert np.isfinite(res.athlete_mean).all() and (res.athlete_var > 0).all()
     assert res.history[-1] < 1e-3  # converged
     assert ep_err <= poe_err + 1e-9  # EP at least as accurate as naive product-of-experts
+
+
+def test_predict_boats_matches_simple_model():
+    import pandas as pd
+
+    from rowing.model.block_ep import EPResult
+
+    mi = _synthetic_mi()
+    t_ref = 2023.0
+    masks = block_ep.time_window_masks(np.asarray(mi.year), width=2.0, step=1.0)
+
+    # target competition: two boats drawn from the model's athletes, one per boat class
+    comp_athletes = pd.DataFrame(
+        {
+            "boatId": ["A", "A", "B", "B"],
+            "personId": [0, 1, 2, 3],
+            "athletePosition": ["b", "s", "b", "s"],
+        }
+    )
+    athlete_index = pd.Index([0, 1, 2, 3])
+    boat_class = pd.Series({"A": 0, "B": 1})
+
+    # exact simple-model posteriors -> EPResult-shaped, for the same boat-scoring path
+    gp = PerformanceGP.from_inputs(mi)
+    y_ath, cov_ath = gp.predict_athletes_score(t_ref)
+    system = gp.gp_system()
+    boatclass_var = float(np.asarray(gp.boatclass_var.value).reshape(()))
+    bc_exact = boatclass_var * (np.asarray(mi.one_hot("class")).T @ np.asarray(system.a))
+    exact = EPResult(np.asarray(y_ath), np.asarray(cov_ath).diagonal(), bc_exact, None, set(), [])
+
+    ep = block_ep.run_ep(mi, masks, t_ref)
+
+    yb_exact, _ = block_ep.predict_boats(exact, comp_athletes, athlete_index, boat_class)
+    yb_ep, _ = block_ep.predict_boats(ep, comp_athletes, athlete_index, boat_class)
+
+    assert list(yb_ep.index) == ["A", "B"]
+    assert np.allclose(yb_ep.values, yb_exact.values, atol=0.15)  # within the multi-window EP approximation
+    # same predicted faster boat
+    assert np.sign(yb_ep["A"] - yb_ep["B"]) == np.sign(yb_exact["A"] - yb_exact["B"])

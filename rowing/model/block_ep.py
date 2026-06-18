@@ -259,3 +259,24 @@ def run_ep(mi, masks, t_ref, *, n_iter=20, damping=0.5, params=None, **kernels):
 
     mean, var = posterior()
     return EPResult(mean[:na], var[:na], mean[na:], var[na:], shared, history)
+
+
+def predict_boats(ep, comp_athletes, athlete_index, boat_class=None, noise=1e-4):
+    """Boat scores for a target competition from a block-EP posterior.
+
+    Aggregates the EP athlete scores onto boats (reusing ``predict_boat_scores``) and adds the
+    global boat-class baseline. ``comp_athletes`` has boatId / personId / athletePosition columns;
+    ``athlete_index`` maps personId -> athlete code; ``boat_class`` (optional) is a Series boatId ->
+    boat-class code, used to add ``ep.class_mean[class]`` to each boat. Returns (y_boat, cov_boat).
+    """
+    import pandas as pd
+
+    from rowing.model.performance.competition_model import predict_boat_scores
+
+    y_boat, cov_boat = predict_boat_scores(
+        np.asarray(ep.athlete_mean), np.diag(np.asarray(ep.athlete_var)), comp_athletes, athlete_index, noise=noise
+    )
+    if boat_class is not None:
+        baseline = np.asarray(ep.class_mean)[boat_class.loc[y_boat.index].to_numpy()]
+        y_boat = y_boat + pd.Series(baseline, index=y_boat.index)
+    return y_boat, cov_boat
