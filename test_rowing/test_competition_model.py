@@ -238,6 +238,15 @@ def test_loo_log_density_and_optimisation():
     assert float(gp.gp_system().loo_log_density()) >= loo0 - 1e-6
 
 
+def test_fit_loo_method_improves_loo():
+    # the fit_loo convenience optimises the leave-one-out predictive density in place
+    gp = cm.PerformanceGP(_synthetic_model())
+    loo0 = float(gp.gp_system().loo_log_density())
+    res = gp.fit_loo(options={"maxiter": 60})
+    assert res.success or res.status in (0, 1, 2)
+    assert float(gp.gp_system().loo_log_density()) > loo0
+
+
 def test_fit_performance_gp_reduces_loss():
     """The nnx fit flow should reduce the PerformanceGP loss."""
     from rowing.model.gp.utils import fit_module

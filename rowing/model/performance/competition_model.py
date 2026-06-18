@@ -392,6 +392,17 @@ class PerformanceGP(nnx.Module, pytree=False):
         self.obs_weight = jnp.asarray(w)
         return w
 
+    def fit_loo(self, **min_kws):
+        """Fit hyperparameters by maximising the leave-one-out predictive density, in place.
+
+        A predictive (generalisation) objective -- preferred over the marginal likelihood, which can
+        overfit (shortening the athlete length-scale and zeroing the bias, which hurt held-out
+        ranking). Returns the scipy optimise result.
+        """
+        from rowing.model.gp.utils import fit_module
+
+        return fit_module(self, loss_fn=lambda m: -m.gp_system().loo_log_density(), **min_kws)
+
     def gp_system(self):
         return GPSystem.from_gram(self.get_jitter_kernel(), self.y)
 
