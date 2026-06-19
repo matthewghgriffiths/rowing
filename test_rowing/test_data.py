@@ -10,7 +10,6 @@ import pandas as pd
 import pytest
 
 pytest.importorskip("flax")
-pytest.importorskip("haiku")  # competition_model still imports haiku until Stage 4
 
 import jax  # noqa: E402
 

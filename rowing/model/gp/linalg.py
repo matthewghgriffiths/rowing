@@ -1,23 +1,12 @@
 from functools import partial
 from typing import NamedTuple
 
-import haiku as hk
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np
 
 vdot = jax.vmap(jnp.dot)
-
-
-def get_pos_def(n, dof=None, log_diag=0.0, name="pos_def"):
-    diag = jnp.exp(hk.get_parameter(f"{name}_diag", shape=(n,), dtype="f", init=lambda s, d: jnp.full(s, log_diag, d)))
-    P = jnp.diag(diag)
-    if dof:
-        W = hk.get_parameter(f"{name}_W", shape=(n, dof), dtype="f", init=jnp.zeros)
-        return W.dot(W.T) + P
-    else:
-        return P
 
 
 def solve_triangular(A: jax.Array, b: jax.Array, **kwargs):

@@ -35,7 +35,7 @@ worldrowing = [
 garmin = ["garminconnect>=0.2", "garth>=0.4"]
 gpx = ["gpxpy>=1.6", "fitparse>=1.2"]
 strava = ["stravalib>=2.0"]
-model = ["jax>=0.4", "jaxlib>=0.4", "flax>=0.9", "dm-haiku>=0.0"]
+model = ["jax>=0.4", "jaxlib>=0.4", "flax>=0.9"]
 sheets = ["gspread_pandas>=3.3.0"]
 io = ["openpyxl>=3.1", "pydantic>=2.9", "pyarrow>=17.0.0"]
 dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.6", "build>=1"]

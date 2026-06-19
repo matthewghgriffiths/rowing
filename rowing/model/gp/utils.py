@@ -4,7 +4,6 @@ from math import prod
 from typing import NamedTuple
 
 import flax.nnx as nnx
-import haiku as hk
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -12,7 +11,7 @@ import yaml
 from jax._src.flatten_util import ravel_pytree
 
 from ...utils import map_concurrent
-from .linalg import get_pos_def, solve_triangular, vdot  # noqa: F401  (get_pos_def/vdot re-exported)
+from .linalg import solve_triangular, vdot  # noqa: F401  (vdot re-exported)
 
 
 def norm_jax(x):
@@ -42,47 +41,11 @@ def open_params(path="params.yaml"):
         return load_params(f)
 
 
-def transform(func):
-    return hk.without_apply_rng(hk.transform(func))
-
-
-def init_apply(func, *args, **kwargs):
-    func_t = transform(func)
-    params = func_t.init(None, *args, **kwargs)
-    return func_t.apply(params, *args, **kwargs), params
-
-
-def apply(func, *args, **kwargs):
-    return init_apply(func, *args, **kwargs)[0]
-
-
 def init_full(fill_value):
     def full(shape, dtype):
         return jnp.full(shape, fill_value, dtype)
 
     return full
-
-
-def get_full_kernel(self):
-    kernels = self.get_kernels()
-    return sum(kernels)
-
-
-def get_jitter_kernel(self):
-    K = self.get_full_kernel()
-    race_var = jnp.exp(hk.get_parameter("log_noise", [], init=jnp.zeros, dtype=jnp.float64))
-    K_noise = jnp.eye(len(K)) * race_var
-    return K + K_noise
-
-
-def gp_system(self):
-    K = self.get_jitter_kernel()
-    y = self.y
-    return GPSystem.from_gram(K, y)
-
-
-def loss(self):
-    return self.gp_system().loss()
 
 
 class GPSystem(NamedTuple):
@@ -237,54 +200,6 @@ def fit_module(module, *, loss_fn=None, method="L-BFGS-B", callback=None, **min_
     nnx.update(module, unravel(jnp.asarray(res.x)))
     res["loss_history"] = history
     return res
-
-
-class OptModel:
-    def __init__(self, model, pbar=None, callback=True):
-        self.model = model
-        self.system = transform(model.gp_system)
-        self.loss = jax.jit(transform(self.model.loss).apply)
-
-        self.pbar = pbar
-        self._callback = callback
-        self.args_history = []
-        self.loss_history = []
-        self.rmse_history = []
-
-    def set_pbar(self, pbar):
-        self.pbar = pbar
-        return self
-
-    def __call__(self, params, *args, **kwargs):
-        jax.debug.callback(self.callback, params, *args, ordered=True, **kwargs)
-        return self.loss(params, *args, **kwargs)
-
-    def callback(self, *args, **kwargs):
-        if self._callback:
-            self.default_callback(*args, **kwargs)
-
-    def default_callback(self, *args, **kwargs):
-        try:
-            self.args_history.append(args)
-            system = self.system.apply(*args, **kwargs)
-
-            loss = float(system.mean_loss())
-            self.loss_history.append(loss)
-            mahalanobis = float(system.mahalanobis())
-            rmse = float(system.rmse())
-            self.rmse_history.append(rmse)
-
-            if self.pbar:
-                self.pbar.update(1)
-                self.pbar.set_postfix(
-                    loss=loss,
-                    rmse=rmse,
-                    Mahalanobis=mahalanobis,
-                )
-
-        except Exception as e:
-            if self.pbar:
-                self.pbar.set_postfix(EXCEPTION=e)
 
 
 def _2d(x):
@@ -466,11 +381,6 @@ class OptTransform:
         opt = cls(transform.apply, unravel, *args, **kwargs, _sign=_sign)
         res = opt.minimize(params, **(min_kws or {}))
         return opt, res
-
-    @classmethod
-    def transform_and_optimize(cls, func, *args, **kwargs):
-        func_t = transform(func)
-        return cls.from_transform_and_optimize(func_t, *args, **kwargs)
 
     def __call__(self, x):
         params = self.unravel(x)
