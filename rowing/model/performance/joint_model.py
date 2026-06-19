@@ -1,3 +1,11 @@
+"""Per-competition expectation-propagation joint model (legacy ``ModelData`` path).
+
+Superseded for new work by :mod:`rowing.model.block_ep`, which runs the same joint EP natively
+on the atomic :class:`~rowing.model.data.ModelInputs` pytree (time-window blocks, cross-window
+athlete messages, a shared boat-class latent, and boat-score prediction). Prefer ``block_ep`` when
+building from the unified data layer; this module is retained for the existing ``ModelData`` flow.
+"""
+
 from functools import cached_property, partial
 
 import jax
