@@ -263,10 +263,12 @@ def set_plotly_inputs(
 
     i = 0
     for col, options in col_options.items():
+        options = list(options)
         val = kwargs.get(col, options[0])
         if choose_cols[col]:
+            index = options.index(val) if val in options else 0
             with cols[i]:
-                val = st.selectbox(col_labels[col], options=options, index=list(options).index(val))
+                val = st.selectbox(col_labels[col], options=options, index=index)
             i += 1
         plotly_inputs[col] = val
 
