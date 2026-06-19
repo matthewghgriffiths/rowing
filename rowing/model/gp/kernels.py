@@ -10,6 +10,11 @@ from scipy import integrate
 
 from .utils import to_2d
 
+# ``nnx.data`` (mark a container as a pytree data node so its modules are traversed) was added in
+# newer flax; on older flax a plain list of Modules is traversed automatically. Fall back to identity
+# so SumKernel works across flax versions (the 3.10 CI runner may resolve a flax without nnx.data).
+_nnx_data = getattr(nnx, "data", lambda x: x)
+
 SQPI2 = jnp.sqrt(jnp.pi / 2)
 ISQ2 = jnp.sqrt(0.5)
 
@@ -226,7 +231,7 @@ class SumKernel(AbstractKernel):
 
     def __init__(self, *kernels: AbstractKernel, name=None):
         self.name = name
-        self.kernels = nnx.data(list(kernels))
+        self.kernels = _nnx_data(list(kernels))
 
     def k(self, X0, X1=None):
         return self.aggregate(k.k(X0, X1) for k in self.kernels)
