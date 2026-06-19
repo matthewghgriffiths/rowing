@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 from scipy import stats
 
-# rowing.model.gp pulls in haiku/flax; skip cleanly when they are absent.
-pytest.importorskip("haiku")
+# rowing.model.gp pulls in flax.nnx (Python >=3.11); skip cleanly when it is absent.
+pytest.importorskip("flax")
 
-from rowing.model.gp import linalg
+from rowing.model.gp import linalg  # noqa: E402
 
 
 def test_performance_models_import():

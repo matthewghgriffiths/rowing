@@ -3,7 +3,7 @@ from functools import partial
 from math import prod
 from typing import NamedTuple
 
-import haiku as hk
+import flax.nnx as nnx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -11,7 +11,7 @@ import yaml
 from jax._src.flatten_util import ravel_pytree
 
 from ...utils import map_concurrent
-from .linalg import get_pos_def, solve_triangular, vdot  # noqa: F401  (get_pos_def/vdot re-exported)
+from .linalg import solve_triangular, vdot  # noqa: F401  (vdot re-exported)
 
 
 def norm_jax(x):
@@ -41,47 +41,11 @@ def open_params(path="params.yaml"):
         return load_params(f)
 
 
-def transform(func):
-    return hk.without_apply_rng(hk.transform(func))
-
-
-def init_apply(func, *args, **kwargs):
-    func_t = transform(func)
-    params = func_t.init(None, *args, **kwargs)
-    return func_t.apply(params, *args, **kwargs), params
-
-
-def apply(func, *args, **kwargs):
-    return init_apply(func, *args, **kwargs)[0]
-
-
 def init_full(fill_value):
     def full(shape, dtype):
         return jnp.full(shape, fill_value, dtype)
 
     return full
-
-
-def get_full_kernel(self):
-    kernels = self.get_kernels()
-    return sum(kernels)
-
-
-def get_jitter_kernel(self):
-    K = self.get_full_kernel()
-    race_var = jnp.exp(hk.get_parameter("log_noise", [], init=jnp.zeros, dtype=jnp.float64))
-    K_noise = jnp.eye(len(K)) * race_var
-    return K + K_noise
-
-
-def gp_system(self):
-    K = self.get_jitter_kernel()
-    y = self.y
-    return GPSystem.from_gram(K, y)
-
-
-def loss(self):
-    return self.gp_system().loss()
 
 
 class GPSystem(NamedTuple):
@@ -154,6 +118,18 @@ class GPSystem(NamedTuple):
 
         return y_pred
 
+    def loo_log_density(self):
+        """Sum of leave-one-out log predictive densities (Rasmussen & Williams 5.4.2).
+
+        Closed form from a single solve: LOO residual_i = a_i / (K^-1)_ii, LOO var_i = 1/(K^-1)_ii.
+        Maximise for predictive generalisation -- a better hyperparameter objective than the
+        marginal likelihood, which can overfit. Differentiable, so usable as a fit_module loss.
+        """
+        # diag(K^-1) = column sums of (L^-1)^2 -- one triangular solve, not the full inverse
+        Linv = solve_triangular(self.L, jnp.eye(self.y.shape[0]), lower=True, trans=0)
+        iKii = jnp.square(Linv).sum(0)
+        return -0.5 * jnp.sum(jnp.log(2 * jnp.pi) - jnp.log(iKii) + jnp.square(self.a) / iKii)
+
     def predict(self, K):
         return K @ self.a
 
@@ -185,52 +161,45 @@ class GPSystem(NamedTuple):
         return jnp.sqrt(self.mse())
 
 
-class OptModel:
-    def __init__(self, model, pbar=None, callback=True):
-        self.model = model
-        self.system = transform(model.gp_system)
-        self.loss = jax.jit(transform(self.model.loss).apply)
+def fit_module(module, *, loss_fn=None, method="L-BFGS-B", callback=None, **min_kws):
+    """Fit a flax.nnx module's ``nnx.Param``s in place by minimising its loss.
 
-        self.pbar = pbar
-        self._callback = callback
-        self.args_history = []
-        self.loss_history = []
-        self.rmse_history = []
+    The learnable params are extracted with ``nnx.split(module, nnx.Param)``, flattened to a
+    single vector, and optimised with ``scipy.optimize.minimize`` (L-BFGS-B by default) using
+    JAX value-and-gradient. ``loss_fn`` defaults to ``module.loss()``; pass a callable taking a
+    rebuilt module and returning a scalar to optimise something else. Returns the scipy result
+    (with ``module`` updated to the optimum).
+    """
+    from scipy import optimize
 
-    def set_pbar(self, pbar):
-        self.pbar = pbar
-        return self
+    if loss_fn is None:
 
-    def __call__(self, params, *args, **kwargs):
-        jax.debug.callback(self.callback, params, *args, ordered=True, **kwargs)
-        return self.loss(params, *args, **kwargs)
+        def loss_fn(m):
+            # PerformanceGP exposes loss(); a plain GP exposes log_likelihood().
+            return m.loss() if hasattr(m, "loss") else -m.log_likelihood()
 
-    def callback(self, *args, **kwargs):
-        if self._callback:
-            self.default_callback(*args, **kwargs)
+    # Split learnable params from the (static) data arrays so only the params are optimised.
+    graphdef, params, rest = nnx.split(module, nnx.Param, ...)
+    x0, unravel = ravel_pytree(params)
 
-    def default_callback(self, *args, **kwargs):
-        try:
-            self.args_history.append(args)
-            system = self.system.apply(*args, **kwargs)
+    @jax.jit
+    def value_and_grad(x):
+        return jax.value_and_grad(lambda z: loss_fn(nnx.merge(graphdef, unravel(z), rest)))(x)
 
-            loss = float(system.mean_loss())
-            self.loss_history.append(loss)
-            mahalanobis = float(system.mahalanobis())
-            rmse = float(system.rmse())
-            self.rmse_history.append(rmse)
+    history = []
 
-            if self.pbar:
-                self.pbar.update(1)
-                self.pbar.set_postfix(
-                    loss=loss,
-                    rmse=rmse,
-                    Mahalanobis=mahalanobis,
-                )
+    def fun(x):
+        value, grad = value_and_grad(jnp.asarray(x))
+        value = float(value)
+        history.append(value)
+        if callback is not None:
+            callback(value)
+        return value, np.asarray(grad, dtype=float)
 
-        except Exception as e:
-            if self.pbar:
-                self.pbar.set_postfix(EXCEPTION=e)
+    res = optimize.minimize(fun, np.asarray(x0, dtype=float), jac=True, method=method, **min_kws)
+    nnx.update(module, unravel(jnp.asarray(res.x)))
+    res["loss_history"] = history
+    return res
 
 
 def _2d(x):
@@ -412,11 +381,6 @@ class OptTransform:
         opt = cls(transform.apply, unravel, *args, **kwargs, _sign=_sign)
         res = opt.minimize(params, **(min_kws or {}))
         return opt, res
-
-    @classmethod
-    def transform_and_optimize(cls, func, *args, **kwargs):
-        func_t = transform(func)
-        return cls.from_transform_and_optimize(func_t, *args, **kwargs)
 
     def __call__(self, x):
         params = self.unravel(x)

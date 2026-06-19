@@ -133,8 +133,37 @@ dmypy.json
 cubc/
 scratch/
 utrc/
-garmin-data/ 
+garmin-data/
 ludum-data/
 weather-data/
-live_tracker/ 
+live_tracker/
 *credentials.json
+
+# --- project-specific local data / environments / artefacts ---
+# Local virtualenvs and pyenv working dirs (named, so the generic env/ above misses them)
+env310/
+pyenv/
+
+# Ruff cache
+.ruff_cache/
+
+# Atomic-write temp files and editor backups (e.g. ludum.py.tmp.<pid>.<hash>, ~telemetry.py)
+*.tmp
+*.tmp.*
+~*
+
+# Windows "downloaded from the internet" sidecar files
+*Zone.Identifier
+
+# Large / regenerated telemetry + modelling data working dirs
+telem/
+world_rowing_model/
+data/peach/
+data/guessr.txt
+*.feather
+
+# Example run artefacts (the notebook + params.yaml are tracked; outputs are not)
+examples/*.xlsx
+examples/*.pdf
+examples/*.csv
+examples/*.feather
