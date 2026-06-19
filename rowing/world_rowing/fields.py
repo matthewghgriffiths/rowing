@@ -375,4 +375,6 @@ def filter_numerical_columns(data):
 def filter_categorical_columns(data, max_unique=10):
     dtypes = data.dtypes
     nunique = data.apply(lambda s: s.nunique()) <= max_unique
-    return dtypes.index[dtypes.map(is_object_dtype) | dtypes.map(is_categorical_dtype) | nunique]
+    return dtypes.index[
+        dtypes.map(is_object_dtype) | dtypes.map(is_string_dtype) | dtypes.map(is_categorical_dtype) | nunique
+    ]
