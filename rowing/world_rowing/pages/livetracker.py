@@ -123,8 +123,6 @@ def show_livetracker(live_data, fig_params, filter_container=None):
     st.subheader("Show livetracker")
 
     live_data, PGMT = select.set_livetracker_paceboat(live_data)
-    # live_data[]
-    print(live_data.columns)
     col = f"Distance from {PGMT:.1%} PGMT"
     live_data[col] = live_data[fields.distance_from_paceboat]
     facets = [
