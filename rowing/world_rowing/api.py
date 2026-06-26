@@ -305,7 +305,8 @@ def prepare_request(*endpoints, **kwargs):
 
 
 def request_worldrowing(*endpoints, request_kws=None, **kwargs):
-    return _session.get(*prepare_request(*endpoints, **kwargs), **dict(request_kws or {}))
+    url, params = prepare_request(*endpoints, **kwargs)
+    return _session.get(url, params=params, **dict(request_kws or {}))
 
 
 def request_worldrowing_json(*endpoints, request_kws=None, **kwargs):

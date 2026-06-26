@@ -34,7 +34,8 @@ def main(params=None):
     with st.sidebar:
         with st.expander("Settings"):
             realtime_sleep = st.number_input("poll", 0.0, 10.0, 3.0, step=0.5)
-            replay = st.checkbox("replay race data", st.session_state.get("replay_race", False), key="replay_race")
+            replay = st.checkbox("replay race data", st.session_state.get(
+                "replay_race", False), key="replay_race")
             replay_step = st.number_input("replay step", 1, 100, 10)
             replay_start = st.number_input("replay step", 0, 1000, 0)
 
@@ -48,11 +49,16 @@ def main(params=None):
     with st.expander("Last Races"):
         n_races = st.number_input("Load how many races?", 0, value=0, step=1)
         if n_races > 0:
-            races, race_boats, intermediates = select.last_race_results(n_races, fisa=False, cached=False)
-            race_order = races.sort_values("Race Start").Race
-            order = race_order[race_order.isin(intermediates["Race"])].drop_duplicates()
-            race_lanes = intermediates.groupby(["Race", "Lane"])["Boat"].first().sort_index()
-            race_inters = intermediates.groupby(["Race", "Distance", "Boat"])["ResultTime"].first()
+            races, race_boats, intermediates = select.last_race_results(
+                n_races, fisa=False, cached=False)
+            race_order = races.sort_values(
+                "Race Start", ascending=False).Race
+            order = race_order[race_order.isin(
+                intermediates["Race"])].drop_duplicates()
+            race_lanes = intermediates.groupby(["Race", "Lane"])[
+                "Boat"].first().sort_index()
+            race_inters = intermediates.groupby(["Race", "Distance", "Boat"])[
+                "ResultTime"].first()
             for race in order:
                 st.write(f"##### {race}")
                 lane_order = race_lanes.loc[race]
@@ -74,7 +80,9 @@ def main(params=None):
     with race_expander:
         race = select.select_live_race(replay, **kwargs)
         if st.toggle("## Race details", True):
-            st.dataframe(race, width="stretch")
+            # race is a Series of mixed-type fields; cast to str so its single object column is
+            # Arrow-serialisable (otherwise Streamlit logs a conversion warning every render).
+            st.dataframe(race.astype(str), width="stretch")
 
         if st.toggle("## Crew lists", True):
             st.dataframe(select.get_crewlist(race.race_id))
@@ -86,11 +94,14 @@ def main(params=None):
             if boat_class:
                 st.markdown("#### Details:")
                 st.dataframe(
-                    select.fields.to_streamlit_dataframe(wbts).T,
+                    # transpose makes each record an object column (str labels + numeric values);
+                    # cast to str so Arrow can serialise it (this is a display-only details table).
+                    select.fields.to_streamlit_dataframe(wbts).T.astype(str),
                     # width="stretch"
                 )
 
-            fastest_id = wbts.loc[wbts["Best Time"].idxmin(), "bestTimes_RaceId"]
+            fastest_id = wbts.loc[wbts["Best Time"].idxmin(),
+                                  "bestTimes_RaceId"]
             inters = select.get_race_intermediates(fastest_id)
             if not inters.empty:
                 st.markdown("#### Intermediates:")
@@ -99,7 +110,8 @@ def main(params=None):
     state.reset_button()
 
     with live_container:
-        st.subheader("Livetracker")
+        st.subheader(
+            f"{race.competition} - {race[select.fields.Race]} - Livetracker")
 
         live_race = select.get_live_race_data(
             race.race_id,
@@ -144,11 +156,13 @@ def main(params=None):
 
             with show_intermediates:
                 if not live_race.lane_info.empty:
-                    plots.show_lane_intermediates(live_race.lane_info, live_race.intermediates)
+                    plots.show_lane_intermediates(
+                        live_race.lane_info, live_race.intermediates)
 
             with fig_plot:
                 if fig is not None:
                     fig = plots.update_figure(fig, **fig_params)
+                    fig.update_layout(title=race[select.fields.Race])
                     st.plotly_chart(fig, width="stretch", key=time.time())
                 else:
                     st.write("no live data could be loaded")
