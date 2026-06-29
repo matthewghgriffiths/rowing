@@ -143,7 +143,14 @@ def load_livetracker(race_id, cached=True):
     return live.load_livetracker(race_id, cached=cached)
 
 
-@st.cache_data(persist=False, ttl=24 * 3600)
+# `races` carries list-valued JSON columns (Boat, raceBoats, ...) that pandas can't hash, so the
+# default cache key raises "unhashable type: 'list'" and Streamlit falls back to slow pickling and
+# logs a warning; hash the frame on a stable JSON serialisation instead.
+@st.cache_data(
+    persist=False,
+    ttl=24 * 3600,
+    hash_funcs={pd.DataFrame: lambda df: df.to_json(date_format="iso")},
+)
 def get_races_livedata(races, max_workers=10):
     logger.debug("get_races_livedata(race_ids[%d])", len(races))
     live_data, intermediates, lane_info = live.get_races_livetracks(
