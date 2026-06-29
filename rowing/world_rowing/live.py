@@ -151,6 +151,12 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
         intermediate_times = intermediates.dropna(how="all", axis=1)[fields.intermediates_ResultTime].apply(
             lambda s: s.dt.total_seconds()
         )
+        # The distance index is labels like "d500m"; extract the numeric distance so comparisons
+        # against the numeric distanceTravelled below work (pandas 2.x raises on numeric-vs-str
+        # comparisons, where older pandas silently returned all-False and skipped the correction).
+        intermediate_times.index = pd.to_numeric(
+            intermediate_times.index.astype(str).str.extract(r"(\d+)")[0], errors="coerce"
+        ).values
         intermediate_distances = intermediate_times.index.values
 
     live_data = live_boat_data.loc[live_boat_data[fields.live_trackCount].min(axis=1).sort_values().index].reset_index(drop=True)
