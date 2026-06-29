@@ -96,7 +96,8 @@ def filter_dataframe(
     model_key = f"{key}.modal"
     modification_container = modification_container or st.container()
     with modification_container:
-        modify = modal_button("Remove Filters", "Add filters", key=model_key, mode=filters)
+        modify = modal_button(
+            "Remove Filters", "Add filters", key=model_key, mode=filters)
 
     if not modify:
         st.dataframe(
@@ -111,13 +112,15 @@ def filter_dataframe(
         df = df.copy()
         column_options = options or column_order or df.columns
 
-        to_filter_columns = st.multiselect("Filter dataframe on", column_options, default, key=f"{key}.filter_columns")
+        to_filter_columns = st.multiselect(
+            "Filter dataframe on", column_options, default, key=f"{key}.filter_columns")
         for column in to_filter_columns:
             left, right = st.columns((1, 20))
             col_key = f"{key}.{column}"
             # Treat columns with < 10 unique values as categorical
             categorical = (
-                isinstance(df[column].dtype, pd.CategoricalDtype) or df[column].nunique() < 10 or column in categories
+                isinstance(df[column].dtype, pd.CategoricalDtype) or df[column].nunique(
+                ) < 10 or column in categories
             )
             if is_datetime64_any_dtype(df[column]):
                 logger.debug("filter_dataframe: %s: datetime", col_key)
@@ -127,15 +130,18 @@ def filter_dataframe(
                     key=f"{key}.{column}",
                 )
                 if len(user_date_input) == 2:
-                    user_date_input = tuple(map(pd.to_datetime, user_date_input))
+                    user_date_input = tuple(
+                        map(pd.to_datetime, user_date_input))
                     start_date, end_date = user_date_input
                     df = df.loc[df[column].between(start_date, end_date)]
             elif categorical:
                 logger.debug("filter_dataframe: %s: categorical", col_key)
                 options = df[column].unique()
                 default = set(options).intersection(kwargs.get(column, []))
-                logger.debug("filter_dataframe: %s: options=%r default=%s", col_key, default, options)
-                user_cat_input = right.multiselect(f"Values for {column}", options, default=default or None, key=col_key)
+                logger.debug(
+                    "filter_dataframe: %s: options=%r default=%s", col_key, default, options)
+                user_cat_input = right.multiselect(
+                    f"Values for {column}", options, default=default or None, key=col_key)
                 df = df[df[column].isin(user_cat_input)]
             elif is_numeric_dtype(df[column]):
                 logger.debug("filter_dataframe: %s: number", col_key)
@@ -158,28 +164,35 @@ def filter_dataframe(
                     key=col_key,
                 )
                 if user_text_input:
-                    df = df[df[column].astype(str).str.contains(user_text_input)]
+                    df = df[df[column].astype(
+                        str).str.contains(user_text_input)]
 
     if select and not df.empty:
         with modification_container:
-            df[select_col] = st.checkbox("Select all", value=select_all, key=f"{key}.select_all")
+            df[select_col] = st.checkbox(
+                "Select all", value=select_all, key=f"{key}.select_all")
 
         if select_first:
             df[select_col] = np.r_[True, df[select_col].iloc[1:]]
 
         sel_df = st.data_editor(
-            df[[select_col] + list(column_options)].set_index(select_col),
+            df[[select_col] + list(column_options)]
+            .set_index(select_col)
+            .reset_index(),
+            hide_index=True,
             column_order=column_order,
             column_config=column_config,
             num_rows=num_rows,
             width=width,
             disabled=disabled,
         )
-        df = df.copy()
-        sel_index = df.index[sel_df.index.values]
+        sel = sel_df[select_col].values
+        ind = df.index[sel]
         sel_df.index = df.index
-        df = df.loc[sel_index].copy()
-        df[list(column_options)] = sel_df.loc[sel_index, list(column_options)]
+
+        df = df.copy()
+        df = df.loc[ind].copy()
+        df[list(column_options)] = sel_df.loc[ind, list(column_options)]
 
     return df
 
@@ -232,7 +245,8 @@ def set_plotly_inputs(
 ):
     cols = st.columns(6)
     numeric_columns = fields.filter_numerical_columns(data)
-    cat_columns = fields.filter_categorical_columns(data, max_unique=max_unique)
+    cat_columns = fields.filter_categorical_columns(
+        data, max_unique=max_unique)
 
     col_options = {
         "x": numeric_columns if x_cols is None else x_cols,
@@ -268,7 +282,8 @@ def set_plotly_inputs(
         if choose_cols[col]:
             index = options.index(val) if val in options else 0
             with cols[i]:
-                val = st.selectbox(col_labels[col], options=options, index=index)
+                val = st.selectbox(
+                    col_labels[col], options=options, index=index)
             i += 1
         plotly_inputs[col] = val
 
