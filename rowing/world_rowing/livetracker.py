@@ -61,7 +61,8 @@ class RaceTracker:
         self.race_id = race_id
         self.live = live
 
-        self.gmt = gmt or find_world_best_time(race_id=race_id).ResultTime.total_seconds()
+        self.gmt = gmt or find_world_best_time(
+            race_id=race_id).ResultTime.total_seconds()
 
         self._colors = colors
 
@@ -70,7 +71,8 @@ class RaceTracker:
         self.intermediates = intermediates
         self.race_distance = race_distance
         self.completed = False
-        self.intermediate_distances = intermediate_distances or [500, 1000, 1500, 2000]
+        self.intermediate_distances = intermediate_distances or [
+            500, 1000, 1500, 2000]
 
     @classmethod
     def load_live_race(cls, fisa=True, competition=None, **kwargs):
@@ -82,7 +84,8 @@ class RaceTracker:
     @property
     def final_results(self):
         if self.results is not None:
-            final_results = self.results.set_index("DisplayName").ResultTime.dt.total_seconds().sort_values()
+            final_results = self.results.set_index(
+                "DisplayName").ResultTime.dt.total_seconds().sort_values()
             final_results.index.name = "country"
             return final_results
 
@@ -126,7 +129,8 @@ class RaceTracker:
 
     @property
     def country_colors(self):
-        colors = pd.Series(dict(zip(self.countries, self.colors)), name="color")
+        colors = pd.Series(
+            dict(zip(self.countries, self.colors)), name="color")
         colors.index.name = "country"
         return colors
 
@@ -201,8 +205,10 @@ class RaceTracker:
                 bar.set_xy((x, bottoms[cnt]))
 
     def get_bar_lims(self, bars):
-        bar_dims = [b.get_xy() + (b.get_width(), b.get_height(), b) for b in bars.values()]
-        x, y = np.hstack([[[x, x + w], [y, y + h]] for x, y, w, h, b in bar_dims])
+        bar_dims = [b.get_xy() + (b.get_width(), b.get_height(), b)
+                    for b in bars.values()]
+        x, y = np.hstack([[[x, x + w], [y, y + h]]
+                         for x, y, w, h, b in bar_dims])
         return (x.min(), x.max()), (y.min(), y.max())
 
     def plot_flags(self, *args, ax=None, zoom=0.04, box_alignment=(0.5, 0.0), **kwargs):
@@ -219,7 +225,8 @@ class RaceTracker:
         for cnt in y.index:
             xy = x[cnt], y[cnt]
             try:
-                flag = make_flag_box(cnt[:3], xy, zoom=zoom, box_alignment=box_alignment, **kwargs)
+                flag = make_flag_box(
+                    cnt[:3], xy, zoom=zoom, box_alignment=box_alignment, **kwargs)
                 ax.add_artist(flag)
                 flags[cnt] = flag
             except KeyError:
@@ -307,7 +314,8 @@ class RaceTracker:
     def plot_finish(self, pred_finish, finish_std, dy_range=None, ax=None, set_lims=True, **kwargs):
         import matplotlib.pyplot as plt
 
-        y_dens, ylim = self.calc_finish_densities(pred_finish, finish_std, dy_range=dy_range)
+        y_dens, ylim = self.calc_finish_densities(
+            pred_finish, finish_std, dy_range=dy_range)
         violins, lines = self.violin(y_dens, ax=ax, **kwargs)
         if set_lims:
             ax = ax or plt.gca()
@@ -324,7 +332,8 @@ class RaceTracker:
         dy_range=None,
         width=0.8,
     ):
-        y_dens, ylim = self.calc_finish_densities(pred_finish, finish_std, dy_range=dy_range)
+        y_dens, ylim = self.calc_finish_densities(
+            pred_finish, finish_std, dy_range=dy_range)
         self.update_violins(
             violins,
             lines,
@@ -346,7 +355,8 @@ class RaceTracker:
             x = self._by_country(x)
 
         for cnt in y.columns:
-            (lines[cnt],) = ax.plot(x[cnt], y[cnt], label=cnt, color=self.country_colors[cnt], **kwargs)
+            (lines[cnt],) = ax.plot(x[cnt], y[cnt], label=cnt,
+                                    color=self.country_colors[cnt], **kwargs)
         if set_lims:
             ax.set_xlim(0, maxdistance or 2000)
         # ax.set_xlabel('distance (m)')
@@ -372,10 +382,12 @@ class RaceTracker:
 
         distance = self._by_country(distance)
         # if covariance passed extract square root of diagonal
-        yerr = {cnt: np.diag(err) ** 0.5 if np.ndim(err) == 2 else err for cnt, err in self._by_country(yerr).items()}
+        yerr = {cnt: np.diag(err) ** 0.5 if np.ndim(err) ==
+                2 else err for cnt, err in self._by_country(yerr).items()}
 
         for cnt in y.columns:
-            (lines[cnt],) = ax.plot(distance[cnt], y[cnt], label=cnt, color=self.country_colors[cnt], **kwargs)
+            (lines[cnt],) = ax.plot(distance[cnt], y[cnt],
+                                    label=cnt, color=self.country_colors[cnt], **kwargs)
             collections[cnt] = ax.fill_between(
                 distance[cnt],
                 y[cnt] - yerr[cnt],
@@ -404,7 +416,8 @@ class RaceTracker:
 
         distance = self._by_country(distance)
         # if covariance passed extract square root of diagonal
-        yerr = {cnt: np.diag(err) ** 0.5 if np.ndim(err) == 2 else err for cnt, err in self._by_country(yerr).items()}
+        yerr = {cnt: np.diag(err) ** 0.5 if np.ndim(err) ==
+                2 else err for cnt, err in self._by_country(yerr).items()}
         for cnt in y.columns:
             lines[cnt].set_data(
                 distance[cnt],
@@ -455,7 +468,8 @@ def load_livetracker(race_id, cached=True):
     live_boat_data = parse_livetracker_data(data)
     intermediates = parse_intermediates_data(data)
     lane_info = pd.concat(
-        [pd.json_normalize({k: lane[k] for k in lane.keys() - {"live", "intermediates"}}) for lane in data["config"]["lanes"]]
+        [pd.json_normalize({k: lane[k] for k in lane.keys(
+        ) - {"live", "intermediates"}}) for lane in data["config"]["lanes"]]
     ).set_index("DisplayName")
     lane_info["ResultTime"] = utils.read_times(lane_info.ResultTime)
     race_distance = data["config"]["plot"]["totalLength"]
@@ -463,11 +477,13 @@ def load_livetracker(race_id, cached=True):
 
 
 def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_distance):
-    intermediate_times = intermediates.ResultTime.apply(lambda s: s.dt.total_seconds())
+    intermediate_times = intermediates.ResultTime.apply(
+        lambda s: s.dt.total_seconds())
     intermediate_distances = intermediates.distance.values[:, 0].astype(float)
     intermediate_times.index = intermediate_distances
 
-    live_data = live_boat_data.loc[live_boat_data.trackCount.min(axis=1).sort_values().index].reset_index(drop=True)
+    live_data = live_boat_data.loc[live_boat_data.trackCount.min(
+        axis=1).sort_values().index].reset_index(drop=True)
 
     countries = live_data.columns.levels[1]
     distances = live_data.distanceTravelled
@@ -510,7 +526,8 @@ def estimate_livetracker_times(live_boat_data, intermediates, lane_info, race_di
 
     for c in countries:
         c_data = live_time_data.xs(c, axis=1, level=1)
-        live_time_data[("avg_speed", c)] = c_data.distanceTravelled / c_data.index
+        live_time_data[("avg_speed", c)
+                       ] = c_data.distanceTravelled / c_data.index
 
     live_data = (
         live_time_data.stack(1)
@@ -538,8 +555,11 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
     race_livetracks, errors = utils.map_concurrent(
         load_livetracker, {race_id: race_id for race_id in race_ids}, singleton=True, max_workers=max_workers, **kwargs
     )
-    results, errors = utils.map_concurrent(estimate_livetracker_times, race_livetracks, max_workers=max_workers, **kwargs)
-    intermediates = pd.concat({race_id: inters for race_id, (_, inters) in results.items()}, axis=1)
+    results, errors = utils.map_concurrent(
+        estimate_livetracker_times, race_livetracks, max_workers=max_workers,
+        raise_on_err=True, **kwargs)
+    intermediates = pd.concat(
+        {race_id: inters for race_id, (_, inters) in results.items()}, axis=1)
     races_live_data = pd.concat({race_id: live_data for race_id, (live_data, _) in results.items()}, axis=0).reset_index(
         drop=True
     )
@@ -549,7 +569,8 @@ def get_races_livetracks(race_ids, max_workers=10, load_livetracker=load_livetra
 def calc_behind(live_time_data, gmt_speed=None, PGMT=1):
     if gmt_speed is None:
         distance = live_time_data.distanceTravelled.iloc[-1].max()
-        gmt_speed = np.nanmax(live_time_data.avg_speed.values[live_time_data.distanceTravelled.values == distance])
+        gmt_speed = np.nanmax(
+            live_time_data.avg_speed.values[live_time_data.distanceTravelled.values == distance])
 
     pace_speed = gmt_speed * PGMT
     t = live_time_data.index.values
@@ -565,7 +586,8 @@ def calc_behind(live_time_data, gmt_speed=None, PGMT=1):
 def get_current_data(live_data):
     current_data = live_data.iloc[[-1]].copy()
     current_data.PGMT = current_data.PGMT.map("{:.1%}".format)
-    current_data["time elapsed"] = current_data.time.max(axis=1).map(utils.format_totalseconds)
+    current_data["time elapsed"] = current_data.time.max(
+        axis=1).map(utils.format_totalseconds)
     current_data.time = current_data.time.map(utils.format_totalseconds)
     return current_data.set_index("time elapsed").astype("string").T.unstack(1)
 
@@ -580,10 +602,13 @@ def get_race_livetracker(race_id, gmt=None, cached=True, live=False):
 
         race_distance = data["config"]["plot"]["totalLength"]
 
-        gmt = gmt or find_world_best_time(race_id=race_id).ResultTime.total_seconds()
-        live_data = estimate_live_times(live_boat_data.reset_index(drop=True), gmt=gmt, race_distance=race_distance)
+        gmt = gmt or find_world_best_time(
+            race_id=race_id).ResultTime.total_seconds()
+        live_data = estimate_live_times(live_boat_data.reset_index(
+            drop=True), gmt=gmt, race_distance=race_distance)
         if "resultTime" in intermediates.columns:
-            live_data = match_intermediate_times(live_data, get_intermediate_times(intermediates), race_distance)
+            live_data = match_intermediate_times(
+                live_data, get_intermediate_times(intermediates), race_distance)
     else:
         live_boat_data = pd.DataFrame([])
         intermediates = pd.DataFrame([])
@@ -611,17 +636,20 @@ def parse_livetracker_results(data):
 
 
 def parse_livetracker_raw_data(data, field, index=None):
-    lanes = {lane["Lane"]: lane for lane in data["config"]["lanes"] if lane.get(field)}
+    lanes = {lane["Lane"]: lane for lane in data["config"]
+             ["lanes"] if lane.get(field)}
     if not lanes:
         return pd.DataFrame([])
 
-    lane_boat = pd.Series({lane_data["DisplayName"]: lane for lane, lane_data in lanes.items()}).sort_values()
+    lane_boat = pd.Series(
+        {lane_data["DisplayName"]: lane for lane, lane_data in lanes.items()}).sort_values()
 
     if index is None:
         return pd.Series({lane["DisplayName"]: lane[field] for lane in lanes.values()}, name=field)
 
     parsed = pd.concat(
-        {lane["DisplayName"]: pd.json_normalize(lane[field]).set_index(index) for lane in lanes.values()},
+        {lane["DisplayName"]: pd.json_normalize(
+            lane[field]).set_index(index) for lane in lanes.values()},
         axis=1,
         names=["boat", field],
     ).swaplevel(0, 1, 1)
@@ -663,7 +691,8 @@ def get_intermediate_times(intermediates):
     )
     distance_strs = intermediate_results.index
     distances = pd.Series(
-        distance_strs.str.extract(r"([0-9]+)")[0].astype(int).values, index=distance_strs, name="distance"
+        distance_strs.str.extract(
+            r"([0-9]+)")[0].astype(int).values, index=distance_strs, name="distance"
     ).sort_values()
     intermediate_results = intermediate_results.loc[distances.index]
     intermediate_results.index = distances
@@ -700,7 +729,8 @@ def _parse_livetracker_data(data):
             for key, boat_data in live_boat_data.items():
                 boat_data[cnt].append(tracker[key])
 
-    maxlen = max(max(map(len, live_data.values())) for live_data in live_boat_data.values())
+    maxlen = max(max(map(len, live_data.values()))
+                 for live_data in live_boat_data.values())
     if not live_data["distanceOfLeaderFromFinish"]:
         total_distance = live_data["distanceOfLeader"]
         for cnt, dists in live_boat_data["distanceTravelled"].items():
@@ -720,7 +750,8 @@ def _parse_livetracker_data(data):
                 elif cnt_len < maxlen:
                     cnt_data.extend(cnt_data[-1:] * (maxlen - cnt_len))
 
-    live_boat_data = pd.concat({key: pd.DataFrame.from_dict(live_data) for key, live_data in live_boat_data.items()}, axis=1)
+    live_boat_data = pd.concat({key: pd.DataFrame.from_dict(
+        live_data) for key, live_data in live_boat_data.items()}, axis=1)
     return live_boat_data
 
 
@@ -728,7 +759,7 @@ def estimate_times(live_boat_data, finish_distance=2000):
     live_data = live_boat_data.reset_index(drop=True).copy()
 
     for c, i in (live_data.distanceTravelled == finish_distance).idxmax(0).items():
-        live_data.loc[i + 1 :, (slice(None), c)] = np.nan
+        live_data.loc[i + 1:, (slice(None), c)] = np.nan
 
     distance = live_data.distanceTravelled
     speed = live_data.metrePerSecond.copy()
@@ -753,7 +784,8 @@ def estimate_times(live_boat_data, finish_distance=2000):
 
 def estimate_live_times(live_boat_data, gmt, race_distance=2000):
     countries = live_boat_data.columns.levels[1]
-    distance_travelled = live_boat_data.distanceTravelled.fillna(method="ffill")
+    distance_travelled = live_boat_data.distanceTravelled.fillna(
+        method="ffill")
     speed = live_boat_data.metrePerSecond.fillna(method="ffill")
 
     live_data = pd.concat(
@@ -772,14 +804,16 @@ def estimate_live_times(live_boat_data, gmt, race_distance=2000):
     boat_diffs = np.diff(distances, axis=0)
     boat_times = boat_diffs / speed
 
-    mean_time_diffs = np.ma.masked_array(boat_times, mask=boat_diffs == 0).mean(axis=1).data
+    mean_time_diffs = np.ma.masked_array(
+        boat_times, mask=boat_diffs == 0).mean(axis=1).data
     for cnt in countries:
         live_data["time", cnt] = np.where(
             live_data.distanceTravelled[cnt] == race_distance, boat_times[cnt], mean_time_diffs
         ).cumsum()
 
     for cnt in countries:
-        live_data["PGMT", cnt] = live_data.distanceTravelled[cnt] / race_distance * gmt / live_data.time[cnt]
+        live_data["PGMT", cnt] = live_data.distanceTravelled[cnt] / \
+            race_distance * gmt / live_data.time[cnt]
 
     update_time_from_leader(live_data)
 
@@ -791,15 +825,18 @@ def update_time_from_leader(live_data):
     countries = distance_travelled.columns
     times = live_data.time[countries]
 
-    leader = distance_travelled.combine(-times, lambda d, t: d.combine(t, lambda *args: args))[countries].values.argmax(1)
-    leader_distance = distance_travelled.values[np.arange(distance_travelled.shape[0]), leader]
+    leader = distance_travelled.combine(-times, lambda d, t: d.combine(
+        t, lambda *args: args))[countries].values.argmax(1)
+    leader_distance = distance_travelled.values[np.arange(
+        distance_travelled.shape[0]), leader]
     leader_time = times.values[np.arange(distance_travelled.shape[0]), leader]
     dmax = leader_distance.max()
     imax = leader_distance.searchsorted(dmax) + 1
 
     for cnt in countries:
         dist = distance_travelled[cnt]
-        delta = times[cnt].values - np.interp(dist, leader_distance[:imax], leader_time[:imax])
+        delta = times[cnt].values - \
+            np.interp(dist, leader_distance[:imax], leader_time[:imax])
         jlast = min(dist.values.searchsorted(dmax), len(delta) - 1)
         delta[jlast:] = delta[jlast]
         live_data[("timeFromLeader", cnt)] = np.clip(delta, 0, None)
@@ -809,12 +846,14 @@ def update_time_from_leader(live_data):
 
 def estimate_intermediate_times1(live_data):
     distances = [500, 1000, 1500, 2000]
-    clips = ((c, live_data.distanceTravelled[c].searchsorted(2000) + 1) for c in live_data.distanceTravelled.columns)
+    clips = ((c, live_data.distanceTravelled[c].searchsorted(
+        2000) + 1) for c in live_data.distanceTravelled.columns)
     return (
         pd.concat(
             {
                 country: pd.Series(
-                    np.interp(distances, live_data.distanceTravelled[country][:i], live_data.time[country][:i]),
+                    np.interp(
+                        distances, live_data.distanceTravelled[country][:i], live_data.time[country][:i]),
                     index=distances,
                 )
                 for country, i in clips
@@ -829,7 +868,8 @@ def estimate_live_intermediates(live_data, distances):
     return pd.DataFrame(
         {
             cnt: pd.Series(
-                np.interp(distances, live_data.distanceTravelled[cnt], live_data.time[cnt]),
+                np.interp(
+                    distances, live_data.distanceTravelled[cnt], live_data.time[cnt]),
                 distances,
             )
             for cnt in live_data.columns.levels[1]
@@ -891,7 +931,8 @@ def match_intermediate_times(live_data, intermediates, race_distance):
 
 def estimate_intermediate_times(live_data):
     distances = [500, 1000, 1500, 2000]
-    clips = ((c, live_data.distanceTravelled[c].searchsorted(2000) + 1) for c in live_data.distanceTravelled.columns)
+    clips = ((c, live_data.distanceTravelled[c].searchsorted(
+        2000) + 1) for c in live_data.distanceTravelled.columns)
     return (
         pd.concat(
             {
@@ -927,9 +968,12 @@ def plot_livedata(live_data):
     countries = live_data.time.columns
     lines = [[] for _ in range(3)]
     for c in countries:
-        lines[0].extend(axes[0].plot(live_data.distanceTravelled[c], live_data.PGMT[c], label=c))
-        lines[1].extend(axes[1].plot(live_data.distanceTravelled[c], live_data.metrePerSecond[c], label=c))
-        lines[2].extend(axes[2].plot(live_data.distanceTravelled[c], live_data.strokeRate[c], label=c))
+        lines[0].extend(axes[0].plot(
+            live_data.distanceTravelled[c], live_data.PGMT[c], label=c))
+        lines[1].extend(axes[1].plot(
+            live_data.distanceTravelled[c], live_data.metrePerSecond[c], label=c))
+        lines[2].extend(axes[2].plot(
+            live_data.distanceTravelled[c], live_data.strokeRate[c], label=c))
 
     axes[2].set_ylim(25, 55)
     axes[2].set_xlim(0, 2000)
@@ -946,21 +990,26 @@ def plot_livedata(live_data):
 
 def load_races_data(save_path, finished_races=(), download=True):
     save_path = Path(save_path)
-    downloaded = {(p.parent.name, p.stem.replace("-", "/")): (p,) for p in save_path.glob("*/*.json")}
-    logger.info('%d races livetracker data already downloaded, loading from "%s"', len(downloaded), save_path)
-    race_live_data, errors = utils.map_concurrent(lambda p: json.load(open(p)), downloaded)
+    downloaded = {(p.parent.name, p.stem.replace("-", "/")): (p,)
+                  for p in save_path.glob("*/*.json")}
+    logger.info('%d races livetracker data already downloaded, loading from "%s"', len(
+        downloaded), save_path)
+    race_live_data, errors = utils.map_concurrent(
+        lambda p: json.load(open(p)), downloaded)
     if len(finished_races) and download:
         to_download = {
             k: ("livetracker", finished_races.loc[k, "id"]) for k in finished_races.index[:].difference(race_live_data.keys())
         }
         if to_download:
-            logger.info("downloading %d races from World rowing", len(to_download))
+            logger.info("downloading %d races from World rowing",
+                        len(to_download))
 
             downloaded, errors = utils.map_concurrent(
                 api.get_worldrowing_data, to_download, max_workers=4, requests_kws=(("timeout", 5.0),)
             )
 
-            logger.info("saving %d races from World Rowing to %s", len(downloaded), save_path)
+            logger.info("saving %d races from World Rowing to %s",
+                        len(downloaded), save_path)
             for (event_name, race_name), live_data in tqdm(downloaded.items()):
                 event_path = save_path / event_name
                 event_path.mkdir(parents=True, exist_ok=True)
@@ -979,22 +1028,27 @@ def load_races_data(save_path, finished_races=(), download=True):
 def load_competition_data(competition=None, save_path="live_tracker", competition_path=None, download=True):
     save_path = Path(save_path)
     if competition_path is None:
-        competition = api.get_most_recent_competition() if competition is None else competition
+        competition = api.get_most_recent_competition(
+        ) if competition is None else competition
         competition_path = save_path / competition.DisplayName
         competition_path.mkdir(exist_ok=True, parents=True)
         competition.to_frame().to_json(competition_path / "competition.json")
     else:
         competition_path = Path(competition_path)
-        competition = pd.read_json(competition_path / "competition.json").iloc[:, 0]
+        competition = pd.read_json(
+            competition_path / "competition.json").iloc[:, 0]
 
     if download:
-        logger.info("downloading up-to-date race for %s from World Rowing", competition.DisplayName)
+        logger.info(
+            "downloading up-to-date race for %s from World Rowing", competition.DisplayName)
         races = api.get_races(competition.name, cached=False)
         events = api.get_events(competition.name)
         wbts = api.get_world_best_times()
 
-        events["BoatClass"] = api.get_boat_classes().DisplayName[events.boatClassId].values
-        events["worldBestTime"] = wbts.reindex(events.BoatClass).ResultTime.values
+        events["BoatClass"] = api.get_boat_classes(
+        ).DisplayName[events.boatClassId].values
+        events["worldBestTime"] = wbts.reindex(
+            events.BoatClass).ResultTime.values
         races = pd.merge(
             races.reset_index(), events, how="left", left_on="eventId", right_on="id", suffixes=("", "_event")
         ).rename(
@@ -1003,7 +1057,8 @@ def load_competition_data(competition=None, save_path="live_tracker", competitio
             }
         )
 
-        finished_races = races[races["raceStatus.DisplayName"] == "Official"].sort_values("Date")
+        finished_races = races[races["raceStatus.DisplayName"]
+                               == "Official"].sort_values("Date")
         finished_races.to_json(competition_path / "finished_races.json")
     else:
         races_meta_path = competition_path / "finished_races.json"
@@ -1013,10 +1068,13 @@ def load_competition_data(competition=None, save_path="live_tracker", competitio
             races_meta_path,
         )
         finished_races = pd.read_json(races_meta_path)
-        finished_races.DateString = pd.to_datetime(finished_races.DateString, unit="ms")
-        finished_races.worldBestTime = pd.to_timedelta(finished_races.worldBestTime, unit="ms")
+        finished_races.DateString = pd.to_datetime(
+            finished_races.DateString, unit="ms")
+        finished_races.worldBestTime = pd.to_timedelta(
+            finished_races.worldBestTime, unit="ms")
 
-    logger.info("loading %d races for competition %s", len(finished_races), competition.DisplayName)
+    logger.info("loading %d races for competition %s",
+                len(finished_races), competition.DisplayName)
     race_live_data = load_races_data(
         save_path / competition.DisplayName, finished_races.set_index(["EventName", "DisplayName"]), download=download
     )
