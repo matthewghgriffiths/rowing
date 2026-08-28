@@ -162,7 +162,7 @@ def main(params=None):
             with fig_plot:
                 if fig is not None:
                     fig = plots.update_figure(fig, **fig_params)
-                    fig.update_layout(title=race[select.fields.Race])
+                    # fig.update_layout(title=race[select.fields.Race])
                     st.plotly_chart(fig, width="stretch", key=time.time())
                 else:
                     st.write("no live data could be loaded")
