@@ -183,7 +183,6 @@ def filter_dataframe(
             df[[select_col] + list(column_options)]
             .set_index(select_col)
             .reset_index(),
-            hide_index=True.reset_index(),
             hide_index=True,
             column_order=column_order,
             column_config=column_config,
