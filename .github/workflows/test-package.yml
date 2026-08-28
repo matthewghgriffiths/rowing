@@ -50,3 +50,20 @@ jobs:
       # Network tests are deselected by default (conftest skips them unless
       # --run-network is passed).
       run: pytest --cov=rowing --cov-report=term-missing
+
+  network-test:
+    # Live World Rowing API integration tests (request plumbing + the livetracker pipeline).
+    # Run once, on the latest supported Python. Hits the live API, so it can be flaky if the
+    # service is down -- relax to `continue-on-error: true` if that becomes a nuisance.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install package with all extras
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e .[all,dev]
+    - name: Run live-API tests
+      run: pytest -m network --run-network
