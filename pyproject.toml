@@ -27,7 +27,8 @@ dependencies = [
 [project.optional-dependencies]
 worldrowing = [
     "streamlit>=1.54",
-    "plotly>=5.0",
+    # >=5.24 for the MapLibre map traces (Scattermap); the mapbox ones were removed in plotly 7
+    "plotly>=5.24",
     "seaborn>=0.13.2",
     "streamlit-plotly-mapbox-events>=0.1.2",
     "pyarrow>=17.0.0",

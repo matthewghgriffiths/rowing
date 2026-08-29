@@ -732,7 +732,7 @@ def make_gps_landmarks_figure(gps_data, landmarks, map_style="open-street-map", 
     if gps_data:
         for name, data in gps_data.items():
             fig.add_trace(
-                go.Scattermapbox(
+                go.Scattermap(
                     lon=data.longitude,
                     lat=data.latitude,
                     mode="lines",
@@ -744,7 +744,7 @@ def make_gps_landmarks_figure(gps_data, landmarks, map_style="open-street-map", 
             )
 
     fig.add_trace(
-        go.Scattermapbox(
+        go.Scattermap(
             lon=landmarks.longitude,
             lat=landmarks.latitude,
             # customdata = set_landmarks,
@@ -792,7 +792,7 @@ def make_gps_landmarks_figure(gps_data, landmarks, map_style="open-street-map", 
             )
             kws = set_kws
 
-        trace = go.Scattermapbox(
+        trace = go.Scattermap(
             lon=arrow.longitude,
             lat=arrow.latitude,
             mode="lines",
@@ -819,7 +819,7 @@ def make_gps_landmarks_figure(gps_data, landmarks, map_style="open-street-map", 
 
     fig.update_layout(
         {"uirevision": True},
-        mapbox={"style": map_style, "center": {"lon": lon, "lat": lat}, "zoom": zoom},
+        map={"style": map_style, "center": {"lon": lon, "lat": lat}, "zoom": zoom},
         showlegend=True,
         legend=dict(
             yanchor="top",
@@ -879,7 +879,7 @@ def make_gps_figure(gps_data, locations, index=None):
 
     fig = go.Figure()
     fig.add_trace(
-        go.Scattermapbox(
+        go.Scattermap(
             lon=locations.longitude,
             lat=locations.latitude,
             # hoverinfo = landmark_locs.index,
@@ -898,7 +898,7 @@ def make_gps_figure(gps_data, locations, index=None):
     data = locations
     for name, data in gps_data.items():
         fig.add_trace(
-            go.Scattermapbox(
+            go.Scattermap(
                 lon=data.longitude,
                 lat=data.latitude,
                 mode="lines",
@@ -907,7 +907,7 @@ def make_gps_figure(gps_data, locations, index=None):
             )
         )
     fig.update_layout(
-        mapbox={
+        map={
             "style": map_style,
             "center": {
                 "lon": data.longitude.mean(),
@@ -1496,7 +1496,7 @@ def make_gps_heatmap(telemetry_data, dists, file_col, marker_size=5, map_style="
     for k, data in power_gps_data.items():
         c = file_col[k]
         fig.add_trace(
-            go.Scattermapbox(
+            go.Scattermap(
                 lon=data.longitude.squeeze(),
                 lat=data.latitude.squeeze(),
                 mode="lines+markers",
@@ -1507,7 +1507,7 @@ def make_gps_heatmap(telemetry_data, dists, file_col, marker_size=5, map_style="
         )
 
     fig.update_layout(
-        mapbox={
+        map={
             "style": map_style,
             "center": {
                 "lon": data.longitude.squeeze().mean(),
@@ -1607,7 +1607,7 @@ def set_gps_heatmap(
             outlinewidth=0,
         ),
     )
-    fig.update_layout(mapbox={"zoom": zoom})
+    fig.update_layout(map={"zoom": zoom})
 
     return fig, file_col
 
