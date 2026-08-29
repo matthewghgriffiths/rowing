@@ -179,23 +179,30 @@ def filter_dataframe(
         # the frame index: Streamlit >=1.58 no longer round-trips a non-unique boolean index through
         # st.data_editor (it returns a positional RangeIndex), so the old `sel_df.index.values` trick
         # turned boolean masking into positional indexing and the row selection silently broke.
+        # Because the selection is now an ordinary column it has to be named in column_order too,
+        # otherwise data_editor hides it and no row can be (de)selected by the user.
+        edit_cols = [select_col] + [c for c in column_options if c != select_col]
+        edit_order = (
+            None
+            if column_order is None
+            else [select_col] + [c for c in column_order if c != select_col]
+        )
         sel_df = st.data_editor(
-            df[[select_col] + list(column_options)]
-            .set_index(select_col)
-            .reset_index(),
+            df[edit_cols],
             hide_index=True,
-            column_order=column_order,
+            column_order=edit_order,
             column_config=column_config,
             num_rows=num_rows,
             width=width,
             disabled=disabled,
         )
-        ind = df.index[sel_df[select_col].values]
+        ind = df.index[sel_df[select_col].fillna(False).astype(bool).values]
         sel_df.index = df.index
 
         df = df.copy()
         df = df.loc[ind].copy()
-        df[list(column_options)] = sel_df.loc[ind, list(column_options)]
+        edit_data_cols = [c for c in edit_cols if c != select_col]
+        df[edit_data_cols] = sel_df.loc[ind, edit_data_cols]
 
     return df
 
