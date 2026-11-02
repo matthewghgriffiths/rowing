@@ -168,7 +168,7 @@ def main(state=None):
 
     layout = dict(
         {"uirevision": True},
-        mapbox={
+        map={
             'style': map_style,
             'center': {'lon': lon, 'lat': lat},
             'zoom': zoom
@@ -353,7 +353,7 @@ def main(state=None):
                 **option_markers[q],
                 'size': 30 if is_current else 5,
             }
-            fig.add_trace(go.Scattermapbox(
+            fig.add_trace(go.Scattermap(
                 lat=[answer.latitude],
                 lon=[answer.longitude],
                 mode='markers',
@@ -368,7 +368,7 @@ def main(state=None):
                     'color': to_rgba(*option_colors[q], 0.9),
                     'size': 30,
                 }
-                fig.add_trace(go.Scattermapbox(
+                fig.add_trace(go.Scattermap(
                     lat=[sol.latitude],
                     lon=[sol.longitude],
                     mode='markers',
@@ -379,7 +379,7 @@ def main(state=None):
                     textposition='bottom right',
                 )
                 )
-            fig.add_trace(go.Scattermapbox(
+            fig.add_trace(go.Scattermap(
                 lat=[answer.latitude, sol.latitude],
                 lon=[answer.longitude, sol.longitude],
                 mode='lines',
@@ -396,7 +396,7 @@ def main(state=None):
 
     else:
         fig = go.Figure()
-        fig.add_trace(go.Scattermapbox(
+        fig.add_trace(go.Scattermap(
             lat=positions.latitude,
             lon=positions.longitude,
             mode='lines',
@@ -407,7 +407,7 @@ def main(state=None):
         for q, answer in answers.items():
             if answer is not None:
                 answer_pos = positions.loc[[int(answer)]]
-                fig.add_trace(go.Scattermapbox(
+                fig.add_trace(go.Scattermap(
                     lat=answer_pos.latitude,
                     lon=answer_pos.longitude,
                     mode='markers',
